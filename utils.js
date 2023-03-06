@@ -128,8 +128,7 @@ export function textToSpeech({text, voiceName}) {
       resolve();
     };
     utterance.onerror = function(e) {
-      alert("There was an error with speech synthesis. You may need to close this tab and re-open it (not just refresh) if you're using Chrome due to a weird bug.\n\n"+e.toString());
-      reject();
+      reject(e);
     };
     speechSynthesis.speak(utterance);
   });
