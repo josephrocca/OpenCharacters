@@ -532,10 +532,10 @@
       async function addMessage(messageObj) {
         delete messageObj.character; // just in case I'm sloppy somewhere
 
-        await db.messages.add(messageObj);
+        let id = await db.messages.add(messageObj);
         // update the thread's lastMessageTime.
         await db.threads.update(messageObj.threadId, { lastMessageTime: messageObj.creationTime });
-        return messageObj;
+        return id;
       }
 
       async function addThread(name, characterId) {
@@ -646,7 +646,8 @@
           el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
           el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
           messageObj.message = message;
-          await addMessage(messageObj);
+          let id = await addMessage(messageObj);
+          el.dataset.id = id;
         }
       }
 
@@ -737,7 +738,8 @@
           let message = $.messageInput.value;
 
           let messageObj = createMessageObj({threadId, message, characterId:-1});
-          await addMessage(messageObj);
+          let id = await addMessage(messageObj);
+          messageObj.id = id;
           
           messageObj.character = await getUserCharacterObj();
           appendMessageToFeed(messageObj);
@@ -821,7 +823,8 @@
               el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
               el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
               messageObj.message = message;
-              await addMessage(messageObj);
+              let id = await addMessage(messageObj);
+              el.dataset.id = id;
             }
 
             if(ttsEnabled) {
