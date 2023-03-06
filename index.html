@@ -403,7 +403,7 @@
               const character = (await db.characters.where("id").equals(characterId).toArray())[0];
               delete character.id;
               let characterData = JSON.stringify(character);
-              const url = `${window.location.origin}#{"addCharacter":${characterData}}`;
+              const url = `${window.location.origin+window.location.pathname}#{"addCharacter":${characterData}}`;
               await navigator.clipboard.writeText(url);
               $.topNotificationContent.innerHTML = `Copied character link to clipboard!`;
               showEl($.topNotification);
