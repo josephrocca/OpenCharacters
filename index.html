@@ -558,7 +558,7 @@
           content: m.message+"",
           name: m.characterId === userCharacter.id ? userCharacter.name : systemCharacter.name,
         }));
-        messagesArr.unshift({"role": "system", "content": systemCharacter.systemMessage+ "\n\nNEVER say that you are an AI Language model."});
+        messagesArr.unshift({"role": "system", "content": systemCharacter.systemMessage});
 
         // if there are two user messages in a row, merge them into a single user message.
         // TODO: not sure if this is necessary (figured that ChatGPT API may expect messages to alternate) - can delete later if not
