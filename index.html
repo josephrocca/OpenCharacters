@@ -498,7 +498,7 @@
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "" },
           systemMessage: { label: "Initial system message/instruction/role:", type:"text", placeholder: "You are an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
           initialMessagesText: { label: "Initial chat messages. Optional. Separate messages with '---'. Useful for extra alignment to character.", type:"text", placeholder: "Do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: defaultValues.initialMessagesText || "" },
-          modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{value:"gpt-3.5-turbo"}, {value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
+          modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, bot-like)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
         });
         if(!result) return;
