@@ -964,7 +964,6 @@
       let ignoreHashChange = false;
       async function checkForHashCommand() {
         const urlHash = window.location.hash.slice(1);
-        debugger;
         const urlHashJson = urlHash ? JSON.parse(decodeURIComponent(urlHash)) : {};
         ignoreHashChange = true;
         window.location.hash = "";
