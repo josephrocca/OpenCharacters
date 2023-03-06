@@ -122,7 +122,7 @@ export function textToSpeech({text, voiceName}) {
     const utterance = new SpeechSynthesisUtterance();
     utterance.text = text;
     utterance.voice = voice;
-    utterance.rate = 1.0;
+    utterance.rate = 1.3;
     utterance.pitch = 1.0;
     utterance.onend = function() {
       resolve();
