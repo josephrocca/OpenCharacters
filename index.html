@@ -866,12 +866,12 @@
 
             i++;
           }
-          stopAutoReplying = false;
-          alreadyAutoReplying = false;
-          $.replyWithButton.innerHTML = "reply with...";
-          $.replyWithButton.disabled = false;
-          $.sendButton.disabled = false;
         }
+        stopAutoReplying = false;
+        alreadyAutoReplying = false;
+        $.replyWithButton.innerHTML = "reply with...";
+        $.replyWithButton.disabled = false;
+        $.sendButton.disabled = false;
       });
 
       $.newThreadButton.addEventListener("click", async function() {
