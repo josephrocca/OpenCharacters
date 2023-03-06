@@ -38,7 +38,7 @@ export async function prompt2(specs, opts={}) {
           <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem;">${sanitizeHtml(spec.label)}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
-              <select data-spec-key="${sanitizeHtml(key)}" value="${sanitizeHtml(spec.defaultValue)}" style="width:100%;height:100%;background:${sanitizeHtml(opts.backgroundColor)}; padding:0.25rem;">${spec.options.map(o => `<option value="${sanitizeHtml(o.value)}" ${o.value === spec.defaultValue ? "selected" :""}>${sanitizeHtml(o.content)}</option>`).join("")}</select>
+              <select data-spec-key="${sanitizeHtml(key)}" value="${sanitizeHtml(spec.defaultValue)}" style="width:100%;height:100%;background:${sanitizeHtml(opts.backgroundColor)}; padding:0.25rem;">${spec.options.map(o => `<option value="${sanitizeHtml(o.value)}" ${o.value === spec.defaultValue ? "selected" :""}>${sanitizeHtml(o.content) || sanitizeHtml(o.value)}</option>`).join("")}</select>
             </div>
           </div>
         </section>`;
