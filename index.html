@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
-    <title>OpenCharacters - Create and Share ChatGPT Characters</title>
+    <title>Chat Tester</title>
   </head>
   <body>
     <style>
@@ -194,6 +194,14 @@
           <div><h2 style="text-align:center;">Characters</h2></div>
           <div id="characterList" style=""></div>
         </div>
+        <!--<div id="characterMaker" style="flex-grow:1; display:none;">
+          <div><h2 style="text-align:center;">Create Character</h2></div>
+          <div>
+            <input id="characterNameInput" type="text" placeholder="Name" style="width:100%; margin-top:0.5rem; min-height:2rem; font-size:100%;"></input>
+            <textarea id="characterSystemMessageInput" type="text" placeholder="You are a friendly assistant." style="width:100%; margin-top:0.5rem; min-height:6rem; font-size:100%;"></textarea>
+            <input id="characterAvatarInput" type="text" placeholder="https://example.com/image.jpg" style="width:100%; margin-top:0.5rem; min-height:2rem; font-size:100%;"></input>
+          </div>
+        </div>-->
         <div id="chatInterface" class="middleColumnScreen" style="display:flex; flex-grow:1; flex-direction:column; height:100%;">
           <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem;">Type a message to begin the chat.</div>
           <div id="messageFeed" style="flex-grow:1; overflow-y:auto;"></div>
@@ -820,7 +828,11 @@
               // so we split message up into sentences and speak each one
               let sentences = message.match(/[^\.!\?]+[\.!\?]+/g).map(s => s.trim());
               for(let sentence of sentences) {
-                await textToSpeech({text: sentence, voiceName: otherCharVoiceName});
+                let result = await textToSpeech({text: sentence, voiceName: otherCharVoiceName}).catch(e => {
+                  alert("There was an error with speech synthesis. You may need to close this tab and re-open it (not just refresh) if you're using Chrome due to a weird bug that sometimes causes this.\n\n"+e.toString());
+                  return false;
+                });
+                if(result === false) break;
               }
             }
 
@@ -840,7 +852,11 @@
                 if(ttsEnabled) {
                   let sentences = lastMessage.message.match(/[^\.!\?]+[\.!\?]+/g);
                   for(let sentence of sentences) {
-                    await textToSpeech({text: sentence, voiceName: threadCharVoiceName});
+                    let result = await textToSpeech({text: sentence, voiceName: threadCharVoiceName}).catch(e => {
+                      alert("There was an error with speech synthesis. You may need to close this tab and re-open it (not just refresh) if you're using Chrome due to a weird bug that sometimes causes this.\n\n"+e.toString());
+                      return false;
+                    });
+                    if(result === false) break;
                   }
                 }
                 break;
