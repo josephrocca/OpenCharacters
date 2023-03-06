@@ -742,6 +742,7 @@
           messageObj.character = await getUserCharacterObj();
           appendMessageToFeed(messageObj);
           $.messageInput.value = "";
+          $.messageInput.style.height = "";
           await doBotReplyIfNeeded();
         } catch(e) {
           alert(e);
