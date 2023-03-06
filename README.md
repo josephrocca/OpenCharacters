@@ -3,7 +3,7 @@ Simple little web interface for creating characters and chatting with them. It's
 
 **Try it here:** https://josephrocca.github.io/OpenCharacters
 
-You can also get characters to chat with themselves using the "reply with..." button next to the "send" button. And you can enable text-to-speech to hear their conversation. Here's a demo (TTS disabled):
+You can also get characters to chat with themselves using the "reply with..." button next to the "send" button. And you can enable text-to-speech to hear their conversation. Here's a video demo of two bots chatting (TTS disabled):
 
 
 https://user-images.githubusercontent.com/1167575/223195801-2eb9b417-a868-422f-aa76-942571e31a7e.mp4
