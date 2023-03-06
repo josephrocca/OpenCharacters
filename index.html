@@ -134,10 +134,11 @@
         background-color: var(--avatar-bg);
       }
 
-      #messageFeed .message .editButton, #messageFeed .message .recomputeButton {
+      #messageFeed .message .editButton, #messageFeed .message .recomputeButton, #messageFeed .message .deleteButton {
         opacity:0.5;
+        cursor:pointer;
       }
-      #messageFeed .message .editButton:hover, #messageFeed .message .recomputeButton:hover {
+      #messageFeed .message .editButton:hover, #messageFeed .message .recomputeButton:hover, #messageFeed .message .deleteButton:hover {
         opacity:1;
       }
       #messageFeed .messageText {
@@ -346,6 +347,7 @@
             await recomputeBotReply(this.closest(".message"));
           });
         });
+        $.messageFeed.querySelectorAll(".deleteButton").forEach(el => el.addEventListener("click", messageDeleteButtonClickHandler));
         // <code> should not occur inside <pre> tags, so remove them (not sure why `marked` does this)
         $.messageFeed.querySelectorAll(".messageText").forEach(el => el.querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML));
         // scroll to bottom of feed
@@ -495,8 +497,8 @@
         const result = await prompt2({
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "" },
           systemMessage: { label: "Initial system message/instruction/role:", type:"text", placeholder: "You are an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
-          initialMessagesText: { label: "Initial chat messages. Optional. Separate messages with '---'.", type:"text", placeholder: "Do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: defaultValues.initialMessagesText || "" },
-          modelVersion: { label: "Model version:", type:"select", options:[{value:"gpt-3.5-turbo", content:"gpt-3.5-turbo"}, {value:"text-davinci-003", content:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
+          initialMessagesText: { label: "Initial chat messages. Optional. Separate messages with '---'. Useful for extra alignment to character.", type:"text", placeholder: "Do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: defaultValues.initialMessagesText || "" },
+          modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{value:"gpt-3.5-turbo"}, {value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
         });
         if(!result) return;
@@ -549,19 +551,20 @@
         return threadObj;
       }
 
-      async function getBotReply(messages, character) {
+      async function getBotReply({messages, systemCharacter, userCharacter}) {
 
         let messagesArr = messages.map(m => ({
-          role: m.characterId === -1 ? "user" : "assistant",
+          role: m.characterId === userCharacter.id ? "user" : "assistant",
           content: m.message+"",
+          name: m.characterId === userCharacter.id ? userCharacter.name : systemCharacter.name,
         }));
-        messagesArr.unshift({"role": "system", "content": character.systemMessage});
+        messagesArr.unshift({"role": "system", "content": systemCharacter.systemMessage+ "\n\nNEVER say that you are an AI Language model."});
 
         // if there are two user messages in a row, merge them into a single user message.
-        // TODO: not sure if this is necessary - can delete later if not
+        // TODO: not sure if this is necessary (figured that ChatGPT API may expect messages to alternate) - can delete later if not
         for(let i = 1; i < messagesArr.length; i++) {
           if(messagesArr[i].role === "user" && messagesArr[i-1].role === "user") {
-            messagesArr[i-1].content += "\n\n" + messagesArr[i].content;
+            messagesArr[i-1].content += "\n" + messagesArr[i].content;
             messagesArr.splice(i, 1);
             i--;
           }
@@ -570,14 +573,14 @@
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
         if(!OPENAI_API_KEY) {
           let result = await prompt2({
-            openAiApiKey: { label: "Please enter your OpenAI API key (Get it from <a href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a>). You can change or delete this later by clicking the 'settings' button.", type:"textLine" },
+            openAiApiKey: { label: "Please create a new OpenAI API key and paste it here. Go to <a href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a> to do that. You can change or delete this later by clicking the 'settings' button.", type:"textLine" },
           });
           if(!result) return;
           await db.misc.put({ key: "openAiApiKey", value: result.openAiApiKey });
           OPENAI_API_KEY = result.openAiApiKey;
         }
 
-        let modelVersion = character.modelVersion;
+        let modelVersion = systemCharacter.modelVersion;
         let modelType = modelVersion==="gpt-3.5-turbo" ? "chat" : "general";
 
         let result;
@@ -603,10 +606,10 @@
             headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
               model: modelVersion,
-              prompt: messagesArr[0].content + "\n\nPlay the role well. Never break character.\n\n" + messagesArr.slice(1).map(m => (m.role=="user"?"THEM: ":"YOU: ")+m.content).join("\n\n") + "\n\nYOU:",
+              prompt: `You are ${systemCharacter.name}. You're talking to '${userCharacter.name}'.\n\n`+messagesArr[0].content + "\n\nPlay the role well. NEVER break character. Talk EXACTLY as your character would. The chat begins now:\n\n" + messagesArr.slice(1).map(m => (m.role=="user"?`${userCharacter.name}: `:`${systemCharacter.name}: `)+m.content).join("\n\n") + `\n\n${systemCharacter.name}: `,
               max_tokens: 2000,
               temperature: 0.7,
-              stop: ["\n\nTHEM:"],
+              stop: [`\n\n${userCharacter.name}:`],
             }),
           }).then(r => r.json()).catch(e => alert(e.toString()));
           if(!json || json.error) {
@@ -637,7 +640,7 @@
         let el = appendMessageToFeed(messageObj);
         el.querySelector(".messageText").innerHTML = createTypingIndicatorHtml();
         
-        const message = await getBotReply(messages, character);
+        const message = await getBotReply({messages, systemCharacter:character, userCharacter:await getUserCharacterObj()});
         
         // if `message` is falsy, it means the bot failed to reply, so delete the message
         if(!message) {
@@ -663,7 +666,7 @@
 
         const characterId = parseInt($.messageFeed.dataset.characterId);
         const character = await db.characters.get(characterId);
-        const message = await getBotReply(messages, character);
+        const message = await getBotReply({messages, systemCharacter:character, userCharacter:await getUserCharacterObj()});
         if(message) {
           messageEl.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
           messageEl.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
@@ -687,6 +690,7 @@
         messageEl.querySelector(".recomputeButton").addEventListener("click", async function() {
           await recomputeBotReply(this.closest(".message"));
         });
+        messageEl.querySelector(".deleteButton").addEventListener("click", messageDeleteButtonClickHandler);
         messageEl.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
         $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
         return messageEl;
@@ -701,6 +705,7 @@
                 <div class="characterName" style="font-weight:bold;">${sanitizeHtml(messageObj.character.name)}</div>
                 <div class="time" style="font-size:0.8rem; opacity:0.5; margin-left:0.5rem; display: flex; align-items: center;">${getDateTimeString(messageObj.creationTime)}</div>
                 <div class="editButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
+                <div class="deleteButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
                 <div class="recomputeButton" style="font-size:0.8rem; margin-left:0.5rem; display: ${messageObj.character.id === -1 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
               </div>
               <div class="messageText">${DOMPurify.sanitize(marked.parse(messageObj.message))}</div>
@@ -709,7 +714,9 @@
         `;
       }
 
-      async function messageEditButtonClickHandler() {
+      async function messageEditButtonClickHandler(e) {
+        e.preventDefault();
+        e.stopPropagation();
         const messageId = parseInt(this.closest(".message").dataset.id);
         const originalMessage = await db.messages.get(messageId);
         const result = await prompt2({
@@ -721,10 +728,21 @@
         this.closest(".message").querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
       }
 
+      async function messageDeleteButtonClickHandler(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const messageId = parseInt(this.closest(".message").dataset.id);
+        await db.messages.delete(messageId);
+        this.closest(".message").remove();
+        if(!$.messageFeed.querySelector(".message")) {
+          showEl($.noMessagesNotice);
+        }
+      }
+
       async function getUserCharacterObj() {
         return {
           id: -1,
-          name: (await db.misc.get("userName"))?.value || "You",
+          name: (await db.misc.get("userName"))?.value || "Anon",
           avatarUrl: (await db.misc.get("userAvatarUrl"))?.value || "",
           systemMessage: "",
         };
@@ -790,8 +808,8 @@
           let threadCharVoiceName = result.threadCharVoiceName;
           let otherCharVoiceName = result.otherCharVoiceName;
 
-          let replyWithCharacterId = parseInt(result.characterId);
-          let characterToReplyWith = await db.characters.get(replyWithCharacterId);
+          let characterToReplyWith = await db.characters.get(parseInt(result.characterId));
+          let threadCharacter = await db.characters.get(parseInt($.messageFeed.dataset.characterId));
           let repeat = parseInt(result.repeat);
           let threadId = parseInt($.messageFeed.dataset.threadId);
           let i = 0;
@@ -807,13 +825,15 @@
             el.querySelector(".messageText").innerHTML = createTypingIndicatorHtml();
             
             let messages = await db.messages.where("threadId").equals(threadId).toArray();
-            // the thread's "actual" character should "appear" to be the user from the perspective of `getBotReply`
-            messages = messages.map(m => {
-              if(m.characterId === -1) return {...m, characterId: replyWithCharacterId};
-              else return {...m, characterId: -1};
-            });
             
-            let message = await getBotReply(messages, characterToReplyWith);
+            // replace *user* message ids (characterId==-1) with the id of characterToReplyWith
+            for(let message of messages) {
+              if(message.characterId === -1) {
+                message.characterId = characterToReplyWith.id;
+              }
+            }
+            
+            let message = await getBotReply({messages, systemCharacter:characterToReplyWith, userCharacter:threadCharacter});
             
             // if `message` is falsy, it means the bot failed to reply, so delete the message and end the loop
             if(!message) {
@@ -950,8 +970,7 @@
         let file = $.importDataFileInput.files[0];
         await db.delete();
         db = await Dexie.import(file);
-        window.db = db;
-        await renderThreadList();
+        window.location.reload();
       });
 
       await renderThreadList();
