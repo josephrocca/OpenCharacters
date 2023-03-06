@@ -402,8 +402,8 @@
               const characterId = parseInt(characterEl.dataset.characterId);
               const character = (await db.characters.where("id").equals(characterId).toArray())[0];
               delete character.id;
-              let characterData = JSON.stringify(character);
-              const url = `${window.location.origin+window.location.pathname}#{"addCharacter":${characterData}}`;
+              let urlHashData = encodeURIComponent(JSON.stringify({addCharacter:character}));
+              const url = `${window.location.origin+window.location.pathname}#${urlHashData}`;
               await navigator.clipboard.writeText(url);
               $.topNotificationContent.innerHTML = `Copied character link to clipboard!`;
               showEl($.topNotification);
@@ -964,6 +964,7 @@
       let ignoreHashChange = false;
       async function checkForHashCommand() {
         const urlHash = window.location.hash.slice(1);
+        debugger;
         const urlHashJson = urlHash ? JSON.parse(decodeURIComponent(urlHash)) : {};
         ignoreHashChange = true;
         window.location.hash = "";
