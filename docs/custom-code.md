@@ -57,7 +57,7 @@ async function processMessages(messages) {
     text = text.slice(0, 1000); // only grab first 1000 characters
     messages.push({
       author: "user",
-      collapsed: true, // hide the message so it doesn't get in the way of the conversation
+      hidden: true, // hide the message so it doesn't get in the way of the conversation
       content: "I've copied the content of the webpage that I just linked: \n\n"+text,
     });
   } else {
