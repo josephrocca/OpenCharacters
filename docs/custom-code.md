@@ -2,7 +2,7 @@ If you open the advanced options in the character creation area then you'll see 
 
 Some examples of what you can do with this:
 
- * Give your character access to the internet
+ * Give your character access to the internet (e.g. so you can ask it to summarise webpages)
  * Give your character the ability to create pictures using Stable Diffusion
  * Auto-delete/retry messages from your character that contain certain keywords
 
@@ -12,11 +12,13 @@ Here's how it works: You define an `async` function called `processMessages` tha
   {
     "id": 0,
     "author": "user",
+    "hidden": false,
     "content": "Hello",
   },
   {
     "id": 1,
     "author": "ai",
+    "hidden": false,
     "content": "Hello, how can I help you today?",
   }
 ]
@@ -35,6 +37,31 @@ async function processMessages(messages) {
     m.content = m.content.replaceAll(":)", "૮ ˶ᵔ ᵕ ᵔ˶ ა");
   }
   return messages;
+}
+```
+
+Here's one which allows the AI to see the contents of webpages if you put URLs in your messages:
+
+```js
+// note that you need to replace corsproxy.com with an actual cors proxy
+async function processMessages(messages) {
+  let lastMessage = messages.at(-1);
+  if(lastMessage.author === "user") {
+    let urlsInLastMessage = [...lastMessage.content.matchAll(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g)].map(m => m[0]);
+    if(urlsInLastMessage.length === 0) return messages;
+    // just grab contents for last URL
+    let html = await fetch("https://corsproxy.com/?url="+encodeURIComponent(urlsInLastMessage.at(-1)).then(r => r.text()));
+    let doc = new DOMParser().parseFromString(html, "text/html");
+    let text = [...doc.querySelectorAll("h1,h2,h3,h4,p")].map(el => el.textContent).join("\n");
+    text = text.slice(0, 1000); // only grab first 1000 characters
+    messages.push({
+      author: "user",
+      collapsed: true, // hide the message so it doesn't get in the way of the conversation
+      content: "I've copied the content of the webpage that I just linked: \n\n"+text,
+    });
+  }
+  
+  let url = messages.at(-1)
 }
 ```
 
