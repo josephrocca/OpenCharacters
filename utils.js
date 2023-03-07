@@ -34,8 +34,8 @@ export async function prompt2(specs, opts={}) {
   for(let [key, spec] of Object.entries(specs)) {
     if(spec.type == "select") {
       sections += `
-        <section>
-          <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem;">${sanitizeHtml(spec.label)}</div>
+        <section data-initially-hidden="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
+          <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem;">${spec.label}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
               <select data-spec-key="${sanitizeHtml(key)}" value="${sanitizeHtml(spec.defaultValue)}" style="width:100%;height:100%;background:${sanitizeHtml(opts.backgroundColor)}; padding:0.25rem;">${spec.options.map(o => `<option value="${sanitizeHtml(o.value)}" ${o.value === spec.defaultValue ? "selected" :""}>${sanitizeHtml(o.content) || sanitizeHtml(o.value)}</option>`).join("")}</select>
@@ -44,7 +44,7 @@ export async function prompt2(specs, opts={}) {
         </section>`;
     } else if(spec.type == "textLine") {
       sections += `
-        <section>
+        <section data-initially-hidden="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
           <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem;">${spec.label}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
@@ -54,8 +54,8 @@ export async function prompt2(specs, opts={}) {
         </section>`;
     } else if(spec.type == "text") {
       sections += `
-        <section>
-          <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem;">${sanitizeHtml(spec.label)}</div>
+        <section data-initially-hidden="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
+          <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem;">${spec.label}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
               <textarea data-spec-key="${sanitizeHtml(key)}" style="width:100%;height:100%;background:${sanitizeHtml(opts.backgroundColor)}; min-height:4rem; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
@@ -67,11 +67,16 @@ export async function prompt2(specs, opts={}) {
   }
   ctn.innerHTML = `
     <div style="background:rgba(0,0,0,0.2); position:fixed; top:0; left:0; right:0; bottom:0; z-index:9999999; display:flex; justify-content:center; color:inherit; font:inherit;">
-      <div style="width:400px; background:${sanitizeHtml(opts.backgroundColor)}; height: min-content; padding:1rem; border:1px solid #eaeaea; border-radius:3px; box-shadow: 0px 1px 10px 3px rgb(130 130 130 / 24%); margin-top:0.5rem;">
+      <div class="sectionsContainer" style="width:400px; background:${sanitizeHtml(opts.backgroundColor)}; height: min-content; padding:1rem; border:1px solid #eaeaea; border-radius:3px; box-shadow: 0px 1px 10px 3px rgb(130 130 130 / 24%); margin-top:0.5rem; max-height: calc(100% - 1rem); overflow:auto;">
         ${sections}
+        ${Object.values(specs).find(s => s.hidden === true) ? `
+        <div style="text-align:center; margin-top:1rem; display:flex; justify-content:center;">
+          <button class="showHidden" onclick="this.closest('.sectionsContainer').querySelectorAll('[data-initially-hidden=yes]').forEach(el => el.style.display=''); this.remove();" style="padding: 0.25rem;">${opts.showHiddenInputsText || "Show hidden inputs"}</button>
+        </div>
+        ` : ""}
         <div style="text-align:center; margin-top:1rem; display:flex; justify-content:space-between;">
           <button class="cancel" style="padding: 0.25rem;">Cancel</button>
-          <button class="submit" style="padding: 0.25rem;">Submit</button>
+          <button class="submit" style="padding: 0.25rem;">${opts.submitButtonText || "Submit"}</button>
         </div>
       </div>
     </div>
