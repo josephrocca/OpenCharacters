@@ -634,7 +634,7 @@
             headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
               model: modelVersion,
-              prompt: `You are ${systemCharacter.name}. You're talking to '${userCharacter.name}'.\n\n`+messagesArr[0].content + "\n\nPlay the role well. NEVER break character. Talk EXACTLY as your character would. The chat begins now:\n\n" + messagesArr.slice(1).map(m => (m.role=="user"?`${userCharacter.name}: `:`${systemCharacter.name}: `)+m.content).join("\n\n") + `\n\n${systemCharacter.name}: `,
+              prompt: `You are ${systemCharacter.name}. You're talking to '${userCharacter.name}'.\n\n`+messagesArr[0].content + "\n\nThe chat begins now:\n\n" + messagesArr.slice(1).map(m => (m.role=="user"?`${userCharacter.name}: `:`${systemCharacter.name}: `)+m.content).join("\n\n") + `\n\n${systemCharacter.name}: `,
               max_tokens: 2000,
               temperature: systemCharacter.temperature ?? 0.7,
               stop: [`\n\n${userCharacter.name}:`],
