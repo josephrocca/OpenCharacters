@@ -3,6 +3,7 @@ If you open the advanced options in the character creation area then you'll see 
 Some examples of what you can do with this:
 
  * Give your character access to the internet (e.g. so you can ask it to summarise webpages)
+ * Allow your character to run custom JS or [Python](https://github.com/pyodide/pyodide/) code
  * Give your character the ability to create pictures using Stable Diffusion
  * Auto-delete/retry messages from your character that contain certain keywords
 
