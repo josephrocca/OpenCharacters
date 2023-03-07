@@ -477,7 +477,10 @@
         const character = await db.characters.get(characterId);
         let i = 0;
         for(let message of character.initialMessages) {
-          if(i === 0 && message === "") continue; // since we allow user to put "---" at top of the initial messages list to indicate that AI should speak first
+          if(i === 0 && message === "") {
+            i++;
+            continue; // since we allow user to put "---" at top of the initial messages list to indicate that AI should speak first
+          }
 
           // initial messages alternate between user and character, starting with user
           let characterId = i%2 === 0 ? -1 : character.id;
