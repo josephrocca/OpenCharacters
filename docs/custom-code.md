@@ -59,9 +59,9 @@ async function processMessages(messages) {
       collapsed: true, // hide the message so it doesn't get in the way of the conversation
       content: "I've copied the content of the webpage that I just linked: \n\n"+text,
     });
+  } else {
+    return messages;
   }
-  
-  let url = messages.at(-1)
 }
 ```
 
