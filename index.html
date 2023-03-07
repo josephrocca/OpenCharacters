@@ -256,7 +256,7 @@
 
       let db = new Dexie("chatbot-ui-v1");
       db.version(1).stores({
-        characters: "++id,name,systemMessage,modelVersion,initialMessages,avatarUrl,creationTime,lastMessageTime",
+        characters: "++id,name,systemMessage,modelVersion,initialMessages,avatarUrl,temperature,customCode,creationTime,lastMessageTime",
         threads: "++id,name,characterId,creationTime,lastMessageTime",
         messages: "++id,threadId,message,characterId,creationTime", // characterId is -1 for user.
         misc: "key,value",
@@ -348,6 +348,7 @@
           });
         });
         $.messageFeed.querySelectorAll(".deleteButton").forEach(el => el.addEventListener("click", messageDeleteButtonClickHandler));
+        $.messageFeed.querySelectorAll(".showHiddenButton").forEach(el => el.addEventListener("click", showHiddenButtonClickHandler));
         // <code> should not occur inside <pre> tags, so remove them (not sure why `marked` does this)
         $.messageFeed.querySelectorAll(".messageText").forEach(el => el.querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML));
         // scroll to bottom of feed
@@ -423,12 +424,14 @@
                 initialMessagesText: character.initialMessages.join("\n---\n"),
                 modelVersion: character.modelVersion,
                 avatarUrl: character.avatarUrl,
+                temperature: character.temperature,
+                customCode: character.customCode,
               });
               if(!result) return;
-              const { name, systemMessage, avatarUrl, modelVersion, initialMessages } = result;
-              await db.characters.update(characterId, { name, systemMessage, initialMessages, modelVersion, avatarUrl });
+              await db.characters.update(characterId, result);
               await renderCharacterList();
               await renderThreadList();
+              delete customCodeIframes[characterId]; // need a fresh iframe in case they edited customCode
             });
 
             // delete character if they click the delete button
@@ -457,8 +460,7 @@
             if(characterEl.dataset.characterId === "null") { // <-- i.e. they clicked on the 'new character' option.
               const result = await characterDetailsPrompt();
               if(!result) return;
-              const { name, systemMessage, initialMessages, modelVersion, avatarUrl } = result;
-              const character = await addCharacter({name, systemMessage, initialMessages, modelVersion, avatarUrl});
+              const character = await addCharacter(result);
               characterId = character.id;
             } else {
               characterId = parseInt(characterEl.dataset.characterId);
@@ -475,10 +477,12 @@
         const character = await db.characters.get(characterId);
         let i = 0;
         for(let message of character.initialMessages) {
+          if(i === 0 && message === "") continue; // since we allow user to put "---" at top of the initial messages list to indicate that AI should speak first
+
           // initial messages alternate between user and character, starting with user
           let characterId = i%2 === 0 ? -1 : character.id;
-          let messageObj = createMessageObj({threadId:thread.id, message, characterId});
-          await addMessage(messageObj)
+          let messageObj = createMessageObj({threadId:thread.id, message, characterId, hidden:false});
+          await addMessageToDb(messageObj)
           i++;
         }
 
@@ -497,23 +501,30 @@
         const result = await prompt2({
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "" },
           systemMessage: { label: "Initial system message/instruction/role:", type:"text", placeholder: "You are an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
-          initialMessagesText: { label: "Initial chat messages. Optional. Separate messages with '---'. Useful for extra alignment to character.", type:"text", placeholder: "Do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: defaultValues.initialMessagesText || "" },
+          initialMessagesText: { label: "Initial chat messages. Optional. Separate messages with '---'. Useful for extra alignment to character. If first line is '---' then AI speaks first.", type:"text", placeholder: "Do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: defaultValues.initialMessagesText ?? "" },
           modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, bot-like)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
-        });
+          temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? "0.7" },
+          customCode: { hidden:true, label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", defaultValue: defaultValues.customCode ?? "" },
+        }, {submitButtonText: "Save Character", showHiddenInputsText: "Show advanced options"});
         if(!result) return;
-        result.initialMessages = result.initialMessagesText.split("\n---\n").map(message => message.trim()).filter(message => message.length > 0);
+        // note: we don't split by "---\n" because if the first line is "---" (i.e. empty first message), then this indicates that author wants AI to start first.
+        result.initialMessages = result.initialMessagesText.split("---\n").map(message => message.trim());
         delete result.initialMessagesText;
+        result.temperature = Number(result.temperature);
+        if(isNaN(result.temperature)) result.temperature = 0.7;
         return result;
       }
 
-      async function addCharacter({name, systemMessage, initialMessages, modelVersion, avatarUrl}) {
+      async function addCharacter({name, systemMessage, initialMessages, modelVersion, avatarUrl, temperature, customCode}) {
         const characterObj = {
           name,
           systemMessage,
           initialMessages,
           avatarUrl,
           modelVersion,
+          temperature,
+          customCode,
           creationTime: Date.now(),
           lastMessageTime: Date.now(),
         };
@@ -522,16 +533,17 @@
       }
 
 
-      function createMessageObj({threadId, message, characterId}) {
+      function createMessageObj({threadId, message, characterId, hidden}) {
         return {
           threadId,
           message,
           characterId,
+          hidden,
           creationTime: Date.now(),
         };
       }
 
-      async function addMessage(messageObj) {
+      async function addMessageToDb(messageObj) {
         delete messageObj.character; // just in case I'm sloppy somewhere
 
         let id = await db.messages.add(messageObj);
@@ -553,11 +565,24 @@
 
       async function getBotReply({messages, systemCharacter, userCharacter}) {
 
-        let messagesArr = messages.map(m => ({
+        let fullMessagesArr = messages.map(m => ({
           role: m.characterId === userCharacter.id ? "user" : "assistant",
           content: m.message+"",
           name: m.characterId === userCharacter.id ? userCharacter.name : systemCharacter.name,
         }));
+
+        let messagesArr = [];
+        // push messages into messagesArrToSend until total content reaches 10000 characters (limit is 4000 tokens which is roughly 16k chars - we have some safety buffer)
+        let contentLength = 0;
+        for(let i = 0; i < fullMessagesArr.length; i++) {
+          if(contentLength + fullMessagesArr[i].content.length > 10000) break;
+          messagesArr.push(fullMessagesArr[i]);
+          contentLength += fullMessagesArr[i].content.length;
+        }
+        // TODO: use this: https://github.com/josephrocca/gpt-2-3-tokenizer or similar to get actual token counts
+        // TODO: add an auto-summarisation option for characters (enabled by default) so *effective* context can be much longer
+
+
         messagesArr.unshift({"role": "system", "content": systemCharacter.systemMessage});
 
         // if there are two user messages in a row, merge them into a single user message.
@@ -590,7 +615,7 @@
           const requestOptions = {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: modelVersion, messages: messagesArr, temperature: 0.7, max_tokens: 2000 }),
+            body: JSON.stringify({ model: modelVersion, messages: messagesArr, temperature: systemCharacter.temperature ?? 0.7, max_tokens: 2000 }),
           };
 
           let json = await fetch(endpoint, requestOptions).then(r => r.json()).catch(e => alert(e.toString()));
@@ -608,7 +633,7 @@
               model: modelVersion,
               prompt: `You are ${systemCharacter.name}. You're talking to '${userCharacter.name}'.\n\n`+messagesArr[0].content + "\n\nPlay the role well. NEVER break character. Talk EXACTLY as your character would. The chat begins now:\n\n" + messagesArr.slice(1).map(m => (m.role=="user"?`${userCharacter.name}: `:`${systemCharacter.name}: `)+m.content).join("\n\n") + `\n\n${systemCharacter.name}: `,
               max_tokens: 2000,
-              temperature: 0.7,
+              temperature: systemCharacter.temperature ?? 0.7,
               stop: [`\n\n${userCharacter.name}:`],
             }),
           }).then(r => r.json()).catch(e => alert(e.toString()));
@@ -634,7 +659,7 @@
         }
         
         const character = await db.characters.get(characterId);
-        let messageObj = createMessageObj({threadId, message:"...", characterId});
+        let messageObj = createMessageObj({threadId, message:"...", characterId, hidden:false});
         messageObj.character = character;
         
         let el = appendMessageToFeed(messageObj);
@@ -649,8 +674,9 @@
           el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
           el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
           messageObj.message = message;
-          let id = await addMessage(messageObj);
+          let id = await addMessageToDb(messageObj);
           el.dataset.id = id;
+          await runCustomProcessMessagesFunctionIfNeeded(threadId, character);
         }
       }
 
@@ -691,9 +717,19 @@
           await recomputeBotReply(this.closest(".message"));
         });
         messageEl.querySelector(".deleteButton").addEventListener("click", messageDeleteButtonClickHandler);
+        messageEl.querySelector(".showHiddenButton").addEventListener("click", showHiddenButtonClickHandler);
         messageEl.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
         $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
         return messageEl;
+      }
+
+      function showHiddenButtonClickHandler() {
+        let messageEl = this.closest(".message");
+        let messageObj = db.messages.get(parseInt(messageEl.dataset.id));
+        showEl(messageEl.querySelector(".messageText"));
+        hideEl(messageEl.querySelector(".showHiddenButton"));
+        // update db
+        db.messages.update(messageObj.id, { hidden:false });
       }
 
       function createMessageHtml(messageObj) {
@@ -708,7 +744,8 @@
                 <div class="deleteButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
                 <div class="recomputeButton" style="font-size:0.8rem; margin-left:0.5rem; display: ${messageObj.character.id === -1 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
               </div>
-              <div class="messageText">${DOMPurify.sanitize(marked.parse(messageObj.message))}</div>
+              <div><button class="showHiddenButton" style="cursor:pointer; display:${messageObj.hidden ? "inline-block" : "none"};">Show hidden message</button></div>
+              <div class="messageText" style="${messageObj.hidden ? "display:none;" : ""}">${DOMPurify.sanitize(marked.parse(messageObj.message))}</div>
             </div>
           </div>
         `;
@@ -755,16 +792,22 @@
           let threadId = parseInt($.messageFeed.dataset.threadId);
           let message = $.messageInput.value;
 
-          let messageObj = createMessageObj({threadId, message, characterId:-1});
-          let id = await addMessage(messageObj);
+          let messageObj = createMessageObj({threadId, message, characterId:-1, hidden:false});
+          let id = await addMessageToDb(messageObj);
           messageObj.id = id;
           
           messageObj.character = await getUserCharacterObj();
           appendMessageToFeed(messageObj);
           $.messageInput.value = "";
           $.messageInput.style.height = "";
+
+          let characterId = (await db.threads.get(threadId)).characterId;
+          let threadCharacter = await db.characters.get(characterId);
+          await runCustomProcessMessagesFunctionIfNeeded(threadId, threadCharacter);
+
           await doBotReplyIfNeeded();
         } catch(e) {
+          console.error(e);
           alert(e);
         }
         $.sendButton.disabled = false;
@@ -775,6 +818,63 @@
         if(now-utcMs > 1000*60*60*24) return new Date(utcMs).toISOString().split('T')[0].replace(/-/g, "/")+" "+new Date(utcMs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}).replace(/^0([0-9]):/, "$1:");
         else return new Date(utcMs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}).replace(/^0([0-9]):/, "$1:");
       }
+
+
+      const customCodeIframes = {}; // characterId -> iframe
+      async function createCustomCodeIframeForCharacter(characterId) {
+        let iframe = document.createElement("iframe");
+        let loadPromise = new Promise(r => {
+          iframe.onload = r;
+        });
+        iframe.setAttribute("sandbox", "allow-scripts");
+        iframe.style.display = "none";
+        document.body.appendChild(iframe);
+        customCodeIframes[characterId] = iframe;
+        let customCode = (await db.characters.get(characterId)).customCode || "";
+        customCodeIframes[characterId].srcdoc = `<script>
+          ${customCode.trim() || "function transform(text) { return text; }"}
+          window.onmessage = async function(e) {
+            console.log(e.data);
+            if(e.data._id && e.data.functionName) {
+              try {
+                let output = await window[e.data.functionName](...e.data.functionArgs);
+                window.parent.postMessage({_id:e.data._id, success:true, result:output}, "${window.location.origin}");
+              } catch(err) {
+                console.error(err);
+                window.parent.postMessage({_id:e.data._id, success:false, result:err.message+"\\n"+err.stack}, "${window.location.origin}");
+              }
+            }
+          }
+        <\/script>`; // <-- need to escape the script tag so it doesn't close the script tag that this code is within
+        return loadPromise;
+      }
+
+      let customCodeResolvers = {}; // id -> resolver
+      window.addEventListener("message", function(e) {
+        let resolver = customCodeResolvers[e.data._id];
+        if(resolver) {
+          if(e.data.success) {
+            resolver(e.data.result);
+          } else {
+            console.log(e);
+            alert("There was a problem with this character's custom code:\n\n"+e.data.result);
+            resolver(null);
+          }
+          delete customCodeResolvers[e.data._id];
+        }
+      });
+      async function securelyExecuteCustomCodeFunction(characterId, functionName, functionArgs) {
+        if(!customCodeIframes[characterId]) {
+          await createCustomCodeIframeForCharacter(characterId);
+        }
+        let iframe = customCodeIframes[characterId];
+        let _id = Math.random().toString()+Math.random().toString();
+        iframe.contentWindow.postMessage({_id, functionName, functionArgs}, "*");
+        return new Promise(r => {
+          customCodeResolvers[_id] = r;
+        });
+      }
+
   
       $.sendButton.addEventListener("click", sendButtonClickHandler);
 
@@ -818,7 +918,7 @@
               break;
             }
 
-            let messageObj = createMessageObj({threadId, message:"...", characterId:-1});
+            let messageObj = createMessageObj({threadId, message:"...", characterId:-1, hidden:false});
             messageObj.character = await getUserCharacterObj();
             
             let el = appendMessageToFeed(messageObj);
@@ -826,15 +926,16 @@
             
             let messages = await db.messages.where("threadId").equals(threadId).toArray();
             
-            // replace *user* message ids (characterId==-1) with the id of characterToReplyWith
+            // characterToReplyWith is replying *on behalf of the user*, so we replace *user* message ids (characterId==-1) with the id of characterToReplyWith
             for(let message of messages) {
               if(message.characterId === -1) {
                 message.characterId = characterToReplyWith.id;
               }
             }
             
+            // the "systemCharacter" is the one that replies 
             let message = await getBotReply({messages, systemCharacter:characterToReplyWith, userCharacter:threadCharacter});
-            
+
             // if `message` is falsy, it means the bot failed to reply, so delete the message and end the loop
             if(!message) {
               el.remove();
@@ -843,8 +944,9 @@
               el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
               el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
               messageObj.message = message;
-              let id = await addMessage(messageObj);
+              let id = await addMessageToDb(messageObj);
               el.dataset.id = id;
+              await runCustomProcessMessagesFunctionIfNeeded(threadId, threadCharacter);
             }
 
             if(ttsEnabled) {
@@ -853,6 +955,7 @@
               let sentences = message.match(/[^\.!\?]+[\.!\?]+/g).map(s => s.trim());
               for(let sentence of sentences) {
                 let result = await textToSpeech({text: sentence, voiceName: otherCharVoiceName}).catch(e => {
+                  console.error(e);
                   alert("There was an error with speech synthesis. You may need to close this tab and re-open it (not just refresh) if you're using Chrome due to a weird bug that sometimes causes this.\n\n"+e.toString());
                   return false;
                 });
@@ -877,6 +980,7 @@
                   let sentences = lastMessage.message.match(/[^\.!\?]+[\.!\?]+/g);
                   for(let sentence of sentences) {
                     let result = await textToSpeech({text: sentence, voiceName: threadCharVoiceName}).catch(e => {
+                      console.error(e);
                       alert("There was an error with speech synthesis. You may need to close this tab and re-open it (not just refresh) if you're using Chrome due to a weird bug that sometimes causes this.\n\n"+e.toString());
                       return false;
                     });
@@ -896,6 +1000,34 @@
         $.replyWithButton.disabled = false;
         $.sendButton.disabled = false;
       });
+
+      // note: this function runs after every message is sent. see here for details: https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md
+      async function runCustomProcessMessagesFunctionIfNeeded(threadId, threadCharacter) {
+        if(threadCharacter.customCode) {
+          let messages = await db.messages.where("threadId").equals(threadId).toArray();
+          let inputMessages = messages.map((m, i) => {
+            return {id:i, author:m.characterId==threadCharacter.id?"ai":"user", content:m.message, hidden:m.hidden};
+          });
+          let functionArgs = [inputMessages];
+          let outputMessages = await securelyExecuteCustomCodeFunction(threadCharacter.id, "processMessages", functionArgs);
+          if(outputMessages) {
+            let outputMessageObjs = outputMessages.map(m => createMessageObj({threadId, message:m.content, characterId:m.author=="ai"?threadCharacter.id:-1, hidden:m.hidden}));
+            let originalMessageObjs = await db.messages.where("threadId").equals(threadId).toArray();
+            try {
+              // replace messages in the database with the output messages
+              await db.messages.where("threadId").equals(threadId).delete();
+              await db.messages.bulkAdd(outputMessageObjs);
+            } catch(e) {
+              // if there was an error, restore the original messages
+              await db.messages.where("threadId").equals(threadId).delete();
+              await db.messages.bulkAdd(originalMessageObjs);
+              console.error(e);
+              alert("There was an error during custom code handling. The original messages have been restored.\n\n"+e.toString());
+            }
+            await renderMessageFeed(threadId);
+          }
+        }
+      }
 
       $.newThreadButton.addEventListener("click", async function() {
         document.querySelectorAll("#middleColumn > .middleColumnScreen").forEach(el => hideEl(el));
@@ -959,6 +1091,9 @@
         await db.misc.put({key: "userName", value: userName});
         await db.misc.put({key: "userAvatarUrl", value: userAvatarUrl});
         await db.misc.put({key: "openAiApiKey", value: openAiApiKey});
+        // update the user's name and avatar in the message feed:
+        let threadId = parseInt($.messageFeed.dataset.threadId);
+        await renderMessageFeed(threadId);
       });
 
       // import data if they click import button
@@ -994,16 +1129,12 @@
 
         if(urlHashJson.addCharacter) {
           $.newThreadButton.click();
-          let result = await characterDetailsPrompt({
-            name: urlHashJson.addCharacter.name,
-            avatarUrl: urlHashJson.addCharacter.avatarUrl,
-            systemMessage: urlHashJson.addCharacter.systemMessage,
-            modelVersion: urlHashJson.addCharacter.modelVersion,
-            initialMessagesText: urlHashJson.addCharacter.initialMessages.join("\n---\n"),
-          });
+          let characterPromptDefaults = urlHashJson.addCharacter;
+          characterPromptDefaults.initialMessagesText = urlHashJson.addCharacter.initialMessages.join("\n---\n").trim(); // the .trim() is because the first message can be empty (indicating AI speaks first) and we don't want to put a newline before it
+          delete characterPromptDefaults.initialMessages;
+          let result = await characterDetailsPrompt(characterPromptDefaults);
           if(result) {
-            let { name, avatarUrl, initialMessages, modelVersion, systemMessage } = result;
-            const character = await addCharacter({name, systemMessage, initialMessages, modelVersion, avatarUrl});
+            const character = await addCharacter(result);
             await createNewThreadWithCharacterId(character.id);
           }
         }
@@ -1015,6 +1146,7 @@
       });
       checkForHashCommand();
 
+   
     </script>
 
   </body>
