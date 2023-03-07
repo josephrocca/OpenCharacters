@@ -11,7 +11,7 @@ Simple little web interface for creating characters and chatting with them. It's
 
 ## Video Demo
 
-You can also get characters to chat with themselves using the "reply with..." button next to the "send" button. And you can enable text-to-speech to hear their conversation. Here's a video demo of two bots chatting (TTS disabled):
+Here's a video demo of two bots chatting with one another:
 
 
 https://user-images.githubusercontent.com/1167575/223195801-2eb9b417-a868-422f-aa76-942571e31a7e.mp4
