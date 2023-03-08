@@ -78,6 +78,11 @@
         border-radius: var(--border-radius);
       }
 
+      input[type="text"], select {
+        background: var(--textarea-bg);
+        border-radius: var(--border-radius);
+      }
+
       #appOptions .appOptionButton {
         width:100%;
         cursor:pointer;
@@ -504,7 +509,7 @@
 
       async function characterDetailsPrompt(defaultValues={}) {
         const result = await prompt2({
-          name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "" },
+          name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:"[A-Za-z0-9_\\- ]{1,64}" },
           systemMessage: { label: "Initial system message/instruction/role:", type:"text", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
           initialMessagesText: { label: "Initial chat messages (optional). Useful for extra alignment to character. Separate messages with '---'. If first line in the text box is '---' then AI speaks first. ", type:"text", placeholder: "Hey Sammy, do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: defaultValues.initialMessagesText ?? "" },
           modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, bot-like)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
