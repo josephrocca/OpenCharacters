@@ -180,7 +180,7 @@
     </div>
 
     <div id="main" style="display:flex; position:fixed; top:0; right:0; left:0; bottom:0;">
-      <div id="leftColumn" style="display:flex; flex-direction:column; width:250px; min-width:250px; padding:0.5rem;">
+      <div id="leftColumn" style="display:flex; flex-direction:column; width:270px; min-width:250px; padding:0.5rem;">
         <div>
           <button id="newThreadButton" style="width:100%; cursor:pointer; min-height:2rem;">💬 new chat</button>
         </div>
@@ -271,7 +271,7 @@
           <div class="thread" data-thread-id="${sanitizeHtml(thread.id)}">
             <div class="avatar" style="${thread.character.avatarUrl ? `background-image:url(${sanitizeHtml(thread.character.avatarUrl)})` : ""};"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem;">
-              <div class="nameWrapper" style="font-weight:bold;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
+              <div class="nameWrapper" style="font-weight:bold; font-size:0.9rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
               <div class="characterName" style="font-size:0.8rem;">${sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;">#${sanitizeHtml(thread.character.id)}</span></div>
               <div class="modelVersion" style="font-size:0.8rem; opacity:0.5;">${sanitizeHtml(thread.character.modelVersion)}</div>
             </div>
@@ -478,7 +478,7 @@
       }
 
       async function createNewThreadWithCharacterId(characterId) {
-        const thread = await addThread("New Thread", characterId);
+        const thread = await addThread("Unnamed Thread", characterId);
 
         // add initial messages
         const character = await db.characters.get(characterId);
@@ -578,7 +578,7 @@
         let fullMessagesArr = messages.map(m => ({
           role: m.characterId === userCharacter.id ? "user" : "assistant",
           content: m.message+"",
-          name: m.characterId === userCharacter.id ? userCharacter.name : systemCharacter.name,
+          name: m.characterId === userCharacter.id ? userCharacter.name.replaceAll(" ", "_") : systemCharacter.name.replaceAll(" ", "_"),
         }));
 
         let messagesArr = [];
