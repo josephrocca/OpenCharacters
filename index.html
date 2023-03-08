@@ -423,7 +423,17 @@
               await db.characters.update(characterId, result);
               await renderCharacterList();
               await renderThreadList();
-              delete customCodeIframes[characterId]; // need a fresh iframe in case they edited customCode
+
+              if(result.customCode !== character.customCode) {
+                // get all threads with this character and delete custom code iframes for them if they exist
+                const threads = await db.threads.where("characterId").equals(characterId).toArray();
+                for(let thread of threads) {
+                  if(customCodeIframes[thread.id]) {
+                    customCodeIframes[thread.id].remove();
+                    delete customCodeIframes[thread.id];
+                  }
+                }
+              }
             });
 
             // delete character if they click the delete button
@@ -815,8 +825,8 @@
       }
 
 
-      const customCodeIframes = {}; // characterId -> iframe
-      async function createCustomCodeIframeForCharacter(characterId) {
+      const customCodeIframes = {}; // threadId -> iframe
+      async function createCustomCodeIframeForThread(threadId) {
         let iframe = document.createElement("iframe");
         let loadPromise = new Promise(r => {
           iframe.onload = r;
@@ -824,9 +834,12 @@
         iframe.setAttribute("sandbox", "allow-scripts");
         iframe.style.display = "none";
         document.body.appendChild(iframe);
-        customCodeIframes[characterId] = iframe;
-        let customCode = (await db.characters.get(characterId)).customCode || "";
-        customCodeIframes[characterId].srcdoc = `<script>
+        customCodeIframes[threadId] = iframe;
+
+        let thread = await db.threads.get(threadId);
+        let customCode = (await db.characters.get(thread.characterId)).customCode || "";
+
+        customCodeIframes[threadId].srcdoc = `<script>
           ${customCode.trim() || "function transform(text) { return text; }"}
           window.onmessage = async function(e) {
             console.log(e.data);
@@ -858,11 +871,11 @@
           delete customCodeResolvers[e.data._id];
         }
       });
-      async function securelyExecuteCustomCodeFunction(characterId, functionName, functionArgs) {
-        if(!customCodeIframes[characterId]) {
-          await createCustomCodeIframeForCharacter(characterId);
+      async function securelyExecuteCustomCodeFunction(threadId, functionName, functionArgs) {
+        if(!customCodeIframes[threadId]) {
+          await createCustomCodeIframeForThread(threadId);
         }
-        let iframe = customCodeIframes[characterId];
+        let iframe = customCodeIframes[threadId];
         let _id = Math.random().toString()+Math.random().toString();
         iframe.contentWindow.postMessage({_id, functionName, functionArgs}, "*");
         return new Promise(r => {
@@ -1004,7 +1017,7 @@
             return {id:i, author:m.characterId==threadCharacter.id?"ai":"user", content:m.message, hidden:m.hidden};
           });
           let functionArgs = [inputMessages];
-          let outputMessages = await securelyExecuteCustomCodeFunction(threadCharacter.id, "processMessages", functionArgs);
+          let outputMessages = await securelyExecuteCustomCodeFunction(threadId, "processMessages", functionArgs);
           if(outputMessages) {
             let outputMessageObjs = outputMessages.map(m => createMessageObj({threadId, message:m.content, characterId:m.author=="ai"?threadCharacter.id:-1, hidden:m.hidden}));
             let originalMessageObjs = await db.messages.where("threadId").equals(threadId).toArray();
