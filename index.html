@@ -578,6 +578,9 @@
 
       async function getBotReply({messages, systemCharacter, userCharacter}) {
 
+        let modelVersion = systemCharacter.modelVersion;
+        let tokenLimit = 3500; // buffer due to token count being an estimate
+
         let fullMessagesArr = messages.map(m => ({
           role: m.characterId === userCharacter.id ? "user" : "assistant",
           content: m.message+"",
@@ -585,15 +588,17 @@
         }));
 
         let messagesArr = [];
-        // push messages into messagesArrToSend until total content reaches 10000 characters (limit is 4000 tokens which is roughly 16k chars - we have some safety buffer)
-        let contentLength = 0;
-        for(let i = 0; i < fullMessagesArr.length; i++) {
-          if(contentLength + fullMessagesArr[i].content.length > 10000) break;
-          messagesArr.push(fullMessagesArr[i]);
-          contentLength += fullMessagesArr[i].content.length;
+        // push messages into messagesArrToSend until total content reaches token limit
+        let numTokensInContext = 0;
+        for(let i = fullMessagesArr.length-1; i >= 0; i--) {
+          if(numTokensInContext + fullMessagesArr[i].content.length > tokenLimit-1000) break; // we want at least 1000 tokens for the bot's response
+          messagesArr.unshift(fullMessagesArr[i]);
+          numTokensInContext += Math.round(fullMessagesArr[i].content.length/4); // assume 4 chars per token for now
         }
         // TODO: use this: https://github.com/josephrocca/gpt-2-3-tokenizer or similar to get actual token counts
         // TODO: add an auto-summarisation option for characters (enabled by default) so *effective* context can be much longer
+
+        let maxTokensInResponse = tokenLimit - numTokensInContext;
 
 
         messagesArr.unshift({"role": "system", "content": systemCharacter.systemMessage});
@@ -618,7 +623,6 @@
           OPENAI_API_KEY = result.openAiApiKey;
         }
 
-        let modelVersion = systemCharacter.modelVersion;
         let modelType = modelVersion==="gpt-3.5-turbo" ? "chat" : "general";
 
         let result;
@@ -628,7 +632,7 @@
           const requestOptions = {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: modelVersion, messages: messagesArr, temperature: systemCharacter.temperature ?? 0.7, max_tokens: 2000 }),
+            body: JSON.stringify({ model: modelVersion, messages: messagesArr, temperature: systemCharacter.temperature ?? 0.7, max_tokens: maxTokensInResponse }),
           };
 
           let json = await fetch(endpoint, requestOptions).then(r => r.json()).catch(e => alert(e.toString()));
@@ -645,7 +649,7 @@
             body: JSON.stringify({
               model: modelVersion,
               prompt: `You are ${systemCharacter.name}. You're talking to '${userCharacter.name}'.\n\n`+messagesArr[0].content + "\n\nThe chat begins now:\n\n" + messagesArr.slice(1).map(m => (m.role=="user"?`${userCharacter.name}: `:`${systemCharacter.name}: `)+m.content).join("\n\n") + `\n\n${systemCharacter.name}: `,
-              max_tokens: 2000,
+              max_tokens: maxTokensInResponse,
               temperature: systemCharacter.temperature ?? 0.7,
               stop: [`\n\n${userCharacter.name}:`],
             }),
