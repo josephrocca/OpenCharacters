@@ -247,7 +247,7 @@
       }
 
       let db = new Dexie("chatbot-ui-v1");
-      db.version(1).stores({
+      db.version(2).stores({
         characters: "++id,name,systemMessage,modelVersion,initialMessages,avatarUrl,temperature,customCode,creationTime,lastMessageTime",
         threads: "++id,name,characterId,creationTime,lastMessageTime",
         messages: "++id,threadId,message,characterId,creationTime", // characterId is -1 for user.
@@ -365,7 +365,7 @@
           id: null,
           name: "Create New Character",
           systemMessage: "Click here to create a new character",
-          avatarUrl: "",
+          avatarUrl: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgZmlsbD0iY3VycmVudENvbG9yIiBjbGFzcz0iYmkgYmktcGx1cy1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+CiAgPHBhdGggZD0iTTggMTVBNyA3IDAgMSAxIDggMWE3IDcgMCAwIDEgMCAxNHptMCAxQTggOCAwIDEgMCA4IDBhOCA4IDAgMCAwIDAgMTZ6Ii8+CiAgPHBhdGggZD0iTTggNGEuNS41IDAgMCAxIC41LjV2M2gzYS41LjUgMCAwIDEgMCAxaC0zdjNhLjUuNSAwIDAgMS0xIDB2LTNoLTNhLjUuNSAwIDAgMSAwLTFoM3YtM0EuNS41IDAgMCAxIDggNHoiLz4KPC9zdmc+",
         });
 
         $.characterList.innerHTML = characters.map(character => `
