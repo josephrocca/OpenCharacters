@@ -72,6 +72,9 @@
       button:hover {
         background: var(--button-bg-hover);
       }
+      button:disabled {
+        cursor: not-allowed;
+      }
       textarea {
         background: var(--textarea-bg);
         border: none;
@@ -833,11 +836,20 @@
       const customCodeIframes = {}; // threadId -> iframe
       async function createCustomCodeIframeForThread(threadId) {
         let iframe = document.createElement("iframe");
-        let loadPromise = new Promise(r => {
-          iframe.onload = r;
+
+        let pageLoadId = Math.random().toString();
+        let iframeLoadPromise = new Promise((resolve, reject) => {
+          function handler(e) {
+            if(e.data._id === pageLoadId) {
+              resolve();
+              window.removeEventListener("message", handler);
+            }
+          }
+          window.addEventListener("message", handler);
         });
+
         iframe.setAttribute("sandbox", "allow-scripts");
-        iframe.style.display = "none";
+        iframe.style.cssText = "position:fixed; opacity:0; pointer-events:none;";
         document.body.appendChild(iframe);
         customCodeIframes[threadId] = iframe;
 
@@ -845,7 +857,7 @@
         let customCode = (await db.characters.get(thread.characterId)).customCode || "";
 
         customCodeIframes[threadId].srcdoc = `<script>
-          ${customCode.trim() || "function transform(text) { return text; }"}
+          ${customCode}
           window.onmessage = async function(e) {
             console.log(e.data);
             if(e.data._id && e.data.functionName) {
@@ -858,8 +870,10 @@
               }
             }
           }
+          window.parent.postMessage({_id:"${pageLoadId}"}, "${window.location.origin}");
         <\/script>`; // <-- need to escape the script tag so it doesn't close the script tag that this code is within
-        return loadPromise;
+        
+        return iframeLoadPromise;
       }
 
       let customCodeResolvers = {}; // id -> resolver
@@ -882,6 +896,7 @@
         }
         let iframe = customCodeIframes[threadId];
         let _id = Math.random().toString()+Math.random().toString();
+        debugger;
         iframe.contentWindow.postMessage({_id, functionName, functionArgs}, "*");
         return new Promise(r => {
           customCodeResolvers[_id] = r;
