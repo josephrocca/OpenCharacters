@@ -35,7 +35,7 @@ export async function prompt2(specs, opts={}) {
     if(spec.type == "select") {
       sections += `
         <section data-initially-hidden="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
-          <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem;">${spec.label}</div>
+          <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
               <select data-spec-key="${sanitizeHtml(key)}" value="${sanitizeHtml(spec.defaultValue)}" style="width:100%;height:100%;background:${sanitizeHtml(opts.backgroundColor)}; padding:0.25rem;">${spec.options.map(o => `<option value="${sanitizeHtml(o.value)}" ${o.value === spec.defaultValue ? "selected" :""}>${sanitizeHtml(o.content) || sanitizeHtml(o.value)}</option>`).join("")}</select>
@@ -45,7 +45,7 @@ export async function prompt2(specs, opts={}) {
     } else if(spec.type == "textLine") {
       sections += `
         <section data-initially-hidden="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
-          <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem;">${spec.label}</div>
+          <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
               <input data-spec-key="${sanitizeHtml(key)}" value="${sanitizeHtml(spec.defaultValue)}" style="width:100%;height:100%;background:${sanitizeHtml(opts.backgroundColor)}; border: 1px solid lightgrey; border-radius: 3px; padding: 0.25rem;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">
@@ -55,7 +55,7 @@ export async function prompt2(specs, opts={}) {
     } else if(spec.type == "text") {
       sections += `
         <section data-initially-hidden="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
-          <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem;">${spec.label}</div>
+          <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
               <textarea data-spec-key="${sanitizeHtml(key)}" style="width:100%;height:100%;background:${sanitizeHtml(opts.backgroundColor)}; min-height:4rem; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
