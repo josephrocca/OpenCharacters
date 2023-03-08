@@ -100,16 +100,10 @@
         cursor:pointer;
         border: 1px solid var(--border-color);
       }
-      #chatThreads .thread .nameEditButton {
+      #chatThreads .thread .button {
         opacity:0.5;
       }
-      #chatThreads .thread .nameEditButton:hover {
-        opacity:1;
-      }
-      #chatThreads .thread .deleteButton {
-        opacity:0.5;
-      }
-      #chatThreads .thread .deleteButton:hover {
+      #chatThreads .thread .button:hover {
         opacity:1;
       }
       #chatThreads .thread.selected {
@@ -191,7 +185,7 @@
         <div id="appOptions">
           <button id="settingsButton" class="appOptionButton">⚙️ settings</button>
           <button id="clearDataButton" class="appOptionButton">🗑️ clear all data</button>
-          <button id="exportDataButton" class="appOptionButton">📁 export data</button>
+          <button id="exportDataButton" class="appOptionButton">💾 export data</button>
           <button class="appOptionButton" style="position:relative;">📁 import data<input id="importDataFileInput" style="position:absolute; top:0; left:0; right:0; bottom:0; opacity:0; cursor:pointer;" type="file"/></button>
           <button onclick="window.open('https://github.com/josephrocca/OpenCharacters')" class="appOptionButton">🧑‍💻 see/improve code</button>
         </div>
@@ -256,6 +250,7 @@
 
       let db = new Dexie("chatbot-ui-v1");
       db.version(2).stores({
+        // REMEMBER: If you update the database schema, you may also need to update the export/import code
         characters: "++id,name,systemMessage,modelVersion,initialMessages,avatarUrl,temperature,customCode,creationTime,lastMessageTime",
         threads: "++id,name,characterId,creationTime,lastMessageTime",
         messages: "++id,threadId,message,characterId,creationTime", // characterId is -1 for user.
@@ -272,15 +267,16 @@
         }
         $.chatThreads.innerHTML = threads.map(thread => `
           <div class="thread" data-thread-id="${sanitizeHtml(thread.id)}">
-            <div class="avatar" style="${thread.character.avatarUrl ? `background-image:url(${sanitizeHtml(thread.character.avatarUrl)})` : ""};"></div>
+            <div class="avatar" style="${thread.character.avatarUrl ? `background-image:url(${sanitizeHtml(thread.character.avatarUrl)})` : ""}; border:1px solid var(--border-color);"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem;">
               <div class="nameWrapper" style="font-weight:bold; font-size:0.9rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
               <div class="characterName" style="font-size:0.8rem;">${sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;">#${sanitizeHtml(thread.character.id)}</span></div>
-              <div class="modelVersion" style="font-size:0.8rem; opacity:0.5;">${sanitizeHtml(thread.character.modelVersion)}</div>
+              <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span>${sanitizeHtml(thread.character.modelVersion)}</span><span style="font-size:0.7rem; display:flex; align-items:center;">#${sanitizeHtml(thread.id)}</span></div>
             </div>
-            <div style="display:flex; flex-direction:column; justify-content:space-between;">
-              <span class="nameEditButton">✏️</span>
-              <span class="deleteButton">🗑️</span>
+            <div style="display:flex; flex-direction:column; justify-content:space-between; font-size:0.65rem;">
+              <span class="button nameEditButton">✏️</span>
+              <span class="button exportButton">💾</span>
+              <span class="button deleteButton">🗑️</span>
             </div>
           </div>
         `).join("");
@@ -312,6 +308,39 @@
               await db.threads.update(threadId, { name: newName });
               await renderThreadList();
             }
+          });
+        });
+        $.chatThreads.querySelectorAll(".exportButton").forEach(btn => {
+          btn.addEventListener("click", async function(e) {
+            e.stopPropagation();
+
+            const threadId = parseInt(btn.closest(".thread").dataset.threadId);
+            const thread = await db.threads.get(threadId);
+
+            const blob = await db.export({prettyJson: true});
+            const json = JSON.parse(await blob.text());
+
+            // delete misc data:
+            json.data.data.find(d => d.tableName === "misc").rows = [];
+
+            // only keep the data for the current thread:
+            let characters = json.data.data.find(d => d.tableName === "characters");
+            characters.rows = characters.rows.filter(c => c.id === thread.characterId);
+            let threads = json.data.data.find(d => d.tableName === "threads");
+            threads.rows = threads.rows.filter(t => t.id === threadId);
+            if(threads.rows.length > 1) alert("Something went wrong. There should only be one thread in the export, but several were exported.");
+            let messages = json.data.data.find(d => d.tableName === "messages");
+            messages.rows = messages.rows.filter(m => m.threadId === threadId);
+
+            const newBlob = new Blob([JSON.stringify(json)], {type: "application/json"});
+
+            const dataUri = URL.createObjectURL(newBlob);
+            const exportFileDefaultName = "data.json";
+            let linkElement = document.createElement("a");
+            linkElement.setAttribute("href", dataUri);
+            linkElement.setAttribute("download", exportFileDefaultName);
+            linkElement.click();
+            linkElement.remove();
           });
         });
         $.chatThreads.querySelectorAll(".deleteButton").forEach(btn => {
@@ -900,7 +929,6 @@
         }
         let iframe = customCodeIframes[threadId];
         let _id = Math.random().toString()+Math.random().toString();
-        debugger;
         iframe.contentWindow.postMessage({_id, functionName, functionArgs}, "*");
         return new Promise(r => {
           customCodeResolvers[_id] = r;
@@ -1097,8 +1125,52 @@
 
       // export data if they click export button
       $.exportDataButton.addEventListener("click", async function() {
+
+        // choose export options
+        let result = await prompt2({
+          exportUserData: {label: "Export user data? (API key, avatar, etc)", type: "select", options:[{value: "yes", content: "Yes"}, {value: "no", content: "No"}]},
+          exportThreadIds: {label: "Thread IDs to export (comma-separated numbers). Leave blank to export all threads. Thread IDs are shown in bottom-right of each thread card in the side bar.", type: "textLine", defaultValue: "", placeholder:"23,45,67"},
+          exportCharacterIds: {label: "Character IDs to export (comma-separated numbers). Leave blank to export all characters. If you export a thread, the character for that thread will be exported by default.", type: "textLine", defaultValue: "", placeholder:"3,12,7,14"},
+        });
+        if(!result) return;
+
         const blob = await db.export({prettyJson: true});
-        const dataUri = URL.createObjectURL(blob);
+        const json = JSON.parse(await blob.text());
+
+        if(result.exportUserData === "no") {
+          json.data.data.find(d => d.tableName === "misc").rows = [];
+        }
+
+
+        let keepThreadCheck;
+        if(result.exportThreadIds.trim()) {
+          const keepThreadIds = result.exportThreadIds.split(",").map(s => parseInt(s)).filter(id => !isNaN(id));
+          keepThreadCheck = (id) => keepThreadIds.includes(id);
+        } else {
+          keepThreadCheck = (id) => true;
+        }
+
+        let threads = json.data.data.find(d => d.tableName === "threads");
+        threads.rows = threads.rows.filter(t => keepThreadCheck(t.id));
+
+        let keepCharacterCheck;
+        if(result.exportCharacterIds.trim()) {
+          const keepCharacterIds = result.exportCharacterIds.split(",").map(s => parseInt(s)).filter(id => !isNaN(id));
+          keepCharacterIds.push(...threads.rows.map(t => t.characterId)); // <-- characterIds that we are keeping by virtue of keeping the thread
+          keepCharacterCheck = (id) => keepCharacterIds.includes(id);
+        } else {
+          keepCharacterCheck = (id) =>  true;
+        }
+
+        let characters = json.data.data.find(d => d.tableName === "characters");
+        characters.rows = characters.rows.filter(c => keepCharacterCheck(c.id));
+
+        let messages = json.data.data.find(d => d.tableName === "messages");
+        messages.rows = messages.rows.filter(m => keepThreadCheck(m.threadId));
+
+        const newBlob = new Blob([JSON.stringify(json)], {type: "application/json"});
+
+        const dataUri = URL.createObjectURL(newBlob);
         const exportFileDefaultName = "data.json";
         let linkElement = document.createElement("a");
         linkElement.setAttribute("href", dataUri);
@@ -1130,13 +1202,91 @@
 
       // import data if they click import button
       $.importDataFileInput.addEventListener("change", async function() {
-        // warn about overwrite:
-        if(!confirm("Are you sure you want to import data? This will overwrite all existing data.")) {
+
+        let options = await prompt2({
+          keepExistingData: {label: "Keep existing data?", type: "select", options:[{value:"yes", content:"Yes, keep."}, {value:"no", content:"No, DELETE existing data."}], defaultValue: "yes"},
+        }, {submitButtonText:"Import Data"});
+
+        if(!options) {
+          $.importDataFileInput.value = "";
           return;
         }
+
+        // warn about overwrite:
+        if(options.keepExistingData === "no" && !confirm("Are you sure you want to DELETE all of your existing data?")) {
+          $.importDataFileInput.value = "";
+          return;
+        }
+
         let file = $.importDataFileInput.files[0];
-        await db.delete();
-        db = await Dexie.import(file);
+
+        if(options.keepExistingData === "no") {
+          await db.delete();
+          db = await Dexie.import(file);
+        } else {
+          let json = JSON.parse(await new Blob([file]).text());
+
+          // TODO: I should probably convert IDs to UUIDs so I don't need to do this sort of thing, but this is fine for now. Note: If you do this, you need to update the export modal because it currently uses comma-separated IDs
+          
+          // we need to re-number all ids in the imported data to be higher than the current max ids.
+
+          // get current maximum id for each table
+          let maxThreadId = (await db.threads.orderBy("id").last()).id;
+          let maxMessageId = (await db.messages.orderBy("id").last()).id;
+          let maxCharacterId = (await db.characters.orderBy("id").last()).id;
+
+          let importedCharacters = json.data.data.find(d => d.tableName === "characters").rows;
+          let importedThreads = json.data.data.find(d => d.tableName === "threads").rows;
+          let importedMessages = json.data.data.find(d => d.tableName === "messages").rows;
+          
+          // old id -> new id maps
+          let characterIdMap = {};
+          let threadIdMap = {};
+          let messageIdMap = {};
+
+          // re-number character ids
+          for(let character of importedCharacters) {
+            maxCharacterId++;
+            characterIdMap[character.id] = maxCharacterId;
+            character.id = maxCharacterId;
+          }
+
+          // re-number thread ids
+          for(let thread of importedThreads) {
+            maxThreadId++;
+            threadIdMap[thread.id] = maxThreadId;
+            thread.id = maxThreadId;
+            // re-number character id of each thread
+            thread.characterId = characterIdMap[thread.characterId];
+          }
+
+          // re-number message ids
+          for(let message of importedMessages) {
+            maxMessageId++;
+            messageIdMap[message.id] = maxMessageId;
+            message.id = maxMessageId;
+            // re-number thread id of each message
+            message.threadId = threadIdMap[message.threadId];
+            // re-number author/character id of each message
+            if(message.characterId !== -1) {
+              message.characterId = characterIdMap[message.characterId];
+            }
+          }
+
+          json.data.data.find(d => d.tableName === "characters").rows = importedCharacters;
+          json.data.data.find(d => d.tableName === "threads").rows = importedThreads;
+          json.data.data.find(d => d.tableName === "messages").rows = importedMessages;
+
+          // check which misc keys user already has, and remove them from the misc table that we're importing:
+          let existingMiscKeys = (await db.misc.toArray()).map(m => m.key);
+          let miscData = json.data.data.find(d => d.tableName === "misc");
+          miscData.rows = miscData.rows.filter(m => !existingMiscKeys.includes(m.key));
+
+          // convert json back to blob and import
+          let blob = new Blob([JSON.stringify(json)], {type: "application/json"});
+          await db.import(blob);
+          
+        }
         window.location.reload();
       });
 
