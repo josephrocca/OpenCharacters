@@ -633,7 +633,7 @@
         let maxTokensInResponse = tokenLimit - numTokensInContext;
 
 
-        messagesArr.unshift({"role": "system", "content": systemCharacter.systemMessage});
+        messagesArr.unshift({"role": "system", "content": systemCharacter.systemMessage, "name": systemCharacter.name.replaceAll(" ", "_")});
 
         // if there are two user messages in a row, merge them into a single user message.
         // TODO: not sure if this is necessary (figured that ChatGPT API may expect messages to alternate) - can delete later if not
@@ -1066,7 +1066,7 @@
 
       // note: this function runs after every message is sent. see here for details: https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md
       async function runCustomProcessMessagesFunctionIfNeeded(threadId, threadCharacter) {
-        if(threadCharacter.customCode) {
+        if(threadCharacter.customCode && threadCharacter.customCode.includes("processMessages")) { // TODO: properly detect if they've defined `processMessages` -  the current `includes("processMessages")` approach is very crude
           let messages = await db.messages.where("threadId").equals(threadId).toArray();
           let inputMessages = messages.map((m, i) => {
             return {id:i, author:m.characterId==threadCharacter.id?"ai":"user", content:m.message, hidden:m.hidden};
@@ -1333,6 +1333,8 @@
           // convert json back to blob and import
           let blob = new Blob([JSON.stringify(json)], {type: "application/json"});
           await db.import(blob);
+
+          // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
           
         }
         window.location.reload();
