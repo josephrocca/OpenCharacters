@@ -191,7 +191,7 @@
         </div>
       </div>
 
-      <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative;">
+      <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden;">
         <button id="leftColumnToggleButton" data-state="open" style="position:absolute; top:0.25rem; left:0.25rem; z-index:500; border:1px solid black; padding:0.25rem; display:none;">menu</button>
         <div id="characterSelection" class="middleColumnScreen" style="flex-grow:1; display:none;">
           <div><h2 style="text-align:center;">Characters</h2></div>
@@ -271,8 +271,8 @@
             <div class="avatar" style="${thread.character.avatarUrl ? `background-image:url(${sanitizeHtml(thread.character.avatarUrl)})` : ""}; border:1px solid var(--border-color);"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem;">
               <div class="nameWrapper" style="font-weight:bold; font-size:0.9rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
-              <div class="characterName" style="font-size:0.8rem;">${sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;">#${sanitizeHtml(thread.character.id)}</span></div>
-              <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span>${sanitizeHtml(thread.character.modelVersion)}</span><span style="font-size:0.7rem; display:flex; align-items:center;">#${sanitizeHtml(thread.id)}</span></div>
+              <div class="characterName" style="font-size:0.8rem;">${sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span></div>
+              <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span>${sanitizeHtml(thread.character.modelVersion)}</span><span style="font-size:0.7rem; display:flex; align-items:center;" title="Thread ID">#${sanitizeHtml(thread.id)}</span></div>
             </div>
             <div style="display:flex; flex-direction:column; justify-content:space-between; font-size:0.65rem;">
               <span class="button nameEditButton">✏️</span>
@@ -785,7 +785,7 @@
         return `
           <div class="message" data-id="${sanitizeHtml(messageObj.id)}" style="display:flex; padding:0.5rem;">
             <div class="avatar" style="${messageObj.character.avatarUrl ? `background-image:url(${sanitizeHtml(messageObj.character.avatarUrl)})` : ""};"></div>
-            <div style="padding-left:0.5rem;">
+            <div style="padding-left:0.5rem; min-width: 0;">
               <div class="info" style="flex-grow:1; display:flex; font-size:80%;">
                 <div class="characterName" style="font-weight:bold;">${sanitizeHtml(messageObj.character.name)}</div>
                 <div class="time" style="font-size:0.8rem; opacity:0.5; margin-left:0.5rem; display: flex; align-items: center;">${getDateTimeString(messageObj.creationTime)}</div>
@@ -794,7 +794,7 @@
                 <div class="recomputeButton" style="font-size:0.8rem; margin-left:0.5rem; display: ${messageObj.character.id === -1 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
               </div>
               <div><button class="showHiddenButton" style="cursor:pointer; display:${messageObj.hidden ? "inline-block" : "none"};">Show hidden message</button></div>
-              <div class="messageText" style="${messageObj.hidden ? "display:none;" : ""}">${DOMPurify.sanitize(marked.parse(messageObj.message))}</div>
+              <div class="messageText" style="${messageObj.hidden ? "display:none;" : ""} overflow-wrap:break-word;">${DOMPurify.sanitize(marked.parse(messageObj.message))}</div>
             </div>
           </div>
         `;
