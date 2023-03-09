@@ -125,7 +125,7 @@
         white-space: nowrap;
         flex-grow: 1;
       }
-      #chatThreads .thread .avatar, #characterList  .character .avatar, #messageFeed .message .avatar {
+      #chatThreads .thread .avatar, #characterSelection  .character .avatar, #messageFeed .message .avatar {
         width:50px;
         height:50px;
         border-radius:50%;
@@ -150,15 +150,18 @@
         margin-top:0;
       }
 
-      #characterList .character {
+      #characterSelection .character {
         border: 1px solid var(--border-color);
         border-radius: var(--border-radius);
         width: 100%;
       }
-      #characterList .character .info .buttons {
+      #characterSelection .character .info .buttons {
         margin-top: 0.25rem;
       }
-      #characterList {
+      #characterSelection .character .info .buttons button {
+        font-size: 0.7rem;
+      }
+      #characterList, #starterCharacterList {
         display: grid;
         grid-template-columns: repeat(auto-fill, 280px);
         grid-gap: 0.5rem;
@@ -194,8 +197,10 @@
       <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden;">
         <button id="leftColumnToggleButton" data-state="open" style="position:absolute; top:0.25rem; left:0.25rem; z-index:500; border:1px solid black; padding:0.25rem; display:none;">menu</button>
         <div id="characterSelection" class="middleColumnScreen" style="flex-grow:1; display:none;">
-          <div><h2 style="text-align:center;">Characters</h2></div>
+          <div><h2 style="text-align:center;">Your Characters</h2></div>
           <div id="characterList" style=""></div>
+          <div><h2 style="text-align:center; margin-top:4rem;">Starter Characters</h2></div>
+          <div id="starterCharacterList" style=""></div>
         </div>
         <div id="chatInterface" class="middleColumnScreen" style="display:flex; flex-grow:1; flex-direction:column; height:100%;">
           <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem;">Type a message to begin the chat.</div>
@@ -228,7 +233,7 @@
     <script>!function(e,t){"object"==typeof exports&&"undefined"!=typeof module?module.exports=t():"function"==typeof define&&define.amd?define(t):(e="undefined"!=typeof globalThis?globalThis:e||self).DOMPurify=t()}(this,(function(){"use strict";function e(t){return e="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},e(t)}function t(e,n){return t=Object.setPrototypeOf||function(e,t){return e.__proto__=t,e},t(e,n)}function n(){if("undefined"==typeof Reflect||!Reflect.construct)return!1;if(Reflect.construct.sham)return!1;if("function"==typeof Proxy)return!0;try{return Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],(function(){}))),!0}catch(e){return!1}}function r(e,o,a){return r=n()?Reflect.construct:function(e,n,r){var o=[null];o.push.apply(o,n);var a=new(Function.bind.apply(e,o));return r&&t(a,r.prototype),a},r.apply(null,arguments)}function o(e,t){return function(e){if(Array.isArray(e))return e}(e)||function(e,t){var n=null==e?null:"undefined"!=typeof Symbol&&e[Symbol.iterator]||e["@@iterator"];if(null==n)return;var r,o,a=[],i=!0,l=!1;try{for(n=n.call(e);!(i=(r=n.next()).done)&&(a.push(r.value),!t||a.length!==t);i=!0);}catch(e){l=!0,o=e}finally{try{i||null==n.return||n.return()}finally{if(l)throw o}}return a}(e,t)||i(e,t)||function(){throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function a(e){return function(e){if(Array.isArray(e))return l(e)}(e)||function(e){if("undefined"!=typeof Symbol&&null!=e[Symbol.iterator]||null!=e["@@iterator"])return Array.from(e)}(e)||i(e)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function i(e,t){if(e){if("string"==typeof e)return l(e,t);var n=Object.prototype.toString.call(e).slice(8,-1);return"Object"===n&&e.constructor&&(n=e.constructor.name),"Map"===n||"Set"===n?Array.from(e):"Arguments"===n||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)?l(e,t):void 0}}function l(e,t){(null==t||t>e.length)&&(t=e.length);for(var n=0,r=new Array(t);n<t;n++)r[n]=e[n];return r}var c=Object.entries,u=Object.setPrototypeOf,s=Object.isFrozen,f=Object.getPrototypeOf,m=Object.getOwnPropertyDescriptor,p=Object.freeze,d=Object.seal,h=Object.create,y="undefined"!=typeof Reflect&&Reflect,g=y.apply,b=y.construct;g||(g=function(e,t,n){return e.apply(t,n)}),p||(p=function(e){return e}),d||(d=function(e){return e}),b||(b=function(e,t){return r(e,a(t))});var v,T=R(Array.prototype.forEach),N=R(Array.prototype.pop),A=R(Array.prototype.push),E=R(String.prototype.toLowerCase),w=R(String.prototype.toString),S=R(String.prototype.match),_=R(String.prototype.replace),x=R(String.prototype.indexOf),k=R(String.prototype.trim),O=R(RegExp.prototype.test),D=(v=TypeError,function(){for(var e=arguments.length,t=new Array(e),n=0;n<e;n++)t[n]=arguments[n];return b(v,t)});function R(e){return function(t){for(var n=arguments.length,r=new Array(n>1?n-1:0),o=1;o<n;o++)r[o-1]=arguments[o];return g(e,t,r)}}function C(e,t,n){n=n||E,u&&u(e,null);for(var r=t.length;r--;){var o=t[r];if("string"==typeof o){var a=n(o);a!==o&&(s(t)||(t[r]=a),o=a)}e[o]=!0}return e}function L(e){var t,n=h(null),r=function(e,t){var n="undefined"!=typeof Symbol&&e[Symbol.iterator]||e["@@iterator"];if(!n){if(Array.isArray(e)||(n=i(e))||t&&e&&"number"==typeof e.length){n&&(e=n);var r=0,o=function(){};return{s:o,n:function(){return r>=e.length?{done:!0}:{done:!1,value:e[r++]}},e:function(e){throw e},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var a,l=!0,c=!1;return{s:function(){n=n.call(e)},n:function(){var e=n.next();return l=e.done,e},e:function(e){c=!0,a=e},f:function(){try{l||null==n.return||n.return()}finally{if(c)throw a}}}}(c(e));try{for(r.s();!(t=r.n()).done;){var a=o(t.value,2),l=a[0],u=a[1];n[l]=u}}catch(e){r.e(e)}finally{r.f()}return n}function M(e,t){for(;null!==e;){var n=m(e,t);if(n){if(n.get)return R(n.get);if("function"==typeof n.value)return R(n.value)}e=f(e)}return function(e){return console.warn("fallback value for",e),null}}var I=p(["a","abbr","acronym","address","area","article","aside","audio","b","bdi","bdo","big","blink","blockquote","body","br","button","canvas","caption","center","cite","code","col","colgroup","content","data","datalist","dd","decorator","del","details","dfn","dialog","dir","div","dl","dt","element","em","fieldset","figcaption","figure","font","footer","form","h1","h2","h3","h4","h5","h6","head","header","hgroup","hr","html","i","img","input","ins","kbd","label","legend","li","main","map","mark","marquee","menu","menuitem","meter","nav","nobr","ol","optgroup","option","output","p","picture","pre","progress","q","rp","rt","ruby","s","samp","section","select","shadow","small","source","spacer","span","strike","strong","style","sub","summary","sup","table","tbody","td","template","textarea","tfoot","th","thead","time","tr","track","tt","u","ul","var","video","wbr"]),U=p(["svg","a","altglyph","altglyphdef","altglyphitem","animatecolor","animatemotion","animatetransform","circle","clippath","defs","desc","ellipse","filter","font","g","glyph","glyphref","hkern","image","line","lineargradient","marker","mask","metadata","mpath","path","pattern","polygon","polyline","radialgradient","rect","stop","style","switch","symbol","text","textpath","title","tref","tspan","view","vkern"]),F=p(["feBlend","feColorMatrix","feComponentTransfer","feComposite","feConvolveMatrix","feDiffuseLighting","feDisplacementMap","feDistantLight","feFlood","feFuncA","feFuncB","feFuncG","feFuncR","feGaussianBlur","feImage","feMerge","feMergeNode","feMorphology","feOffset","fePointLight","feSpecularLighting","feSpotLight","feTile","feTurbulence"]),z=p(["animate","color-profile","cursor","discard","fedropshadow","font-face","font-face-format","font-face-name","font-face-src","font-face-uri","foreignobject","hatch","hatchpath","mesh","meshgradient","meshpatch","meshrow","missing-glyph","script","set","solidcolor","unknown","use"]),H=p(["math","menclose","merror","mfenced","mfrac","mglyph","mi","mlabeledtr","mmultiscripts","mn","mo","mover","mpadded","mphantom","mroot","mrow","ms","mspace","msqrt","mstyle","msub","msup","msubsup","mtable","mtd","mtext","mtr","munder","munderover"]),j=p(["maction","maligngroup","malignmark","mlongdiv","mscarries","mscarry","msgroup","mstack","msline","msrow","semantics","annotation","annotation-xml","mprescripts","none"]),P=p(["#text"]),B=p(["accept","action","align","alt","autocapitalize","autocomplete","autopictureinpicture","autoplay","background","bgcolor","border","capture","cellpadding","cellspacing","checked","cite","class","clear","color","cols","colspan","controls","controlslist","coords","crossorigin","datetime","decoding","default","dir","disabled","disablepictureinpicture","disableremoteplayback","download","draggable","enctype","enterkeyhint","face","for","headers","height","hidden","high","href","hreflang","id","inputmode","integrity","ismap","kind","label","lang","list","loading","loop","low","max","maxlength","media","method","min","minlength","multiple","muted","name","nonce","noshade","novalidate","nowrap","open","optimum","pattern","placeholder","playsinline","poster","preload","pubdate","radiogroup","readonly","rel","required","rev","reversed","role","rows","rowspan","spellcheck","scope","selected","shape","size","sizes","span","srclang","start","src","srcset","step","style","summary","tabindex","title","translate","type","usemap","valign","value","width","xmlns","slot"]),G=p(["accent-height","accumulate","additive","alignment-baseline","ascent","attributename","attributetype","azimuth","basefrequency","baseline-shift","begin","bias","by","class","clip","clippathunits","clip-path","clip-rule","color","color-interpolation","color-interpolation-filters","color-profile","color-rendering","cx","cy","d","dx","dy","diffuseconstant","direction","display","divisor","dur","edgemode","elevation","end","fill","fill-opacity","fill-rule","filter","filterunits","flood-color","flood-opacity","font-family","font-size","font-size-adjust","font-stretch","font-style","font-variant","font-weight","fx","fy","g1","g2","glyph-name","glyphref","gradientunits","gradienttransform","height","href","id","image-rendering","in","in2","k","k1","k2","k3","k4","kerning","keypoints","keysplines","keytimes","lang","lengthadjust","letter-spacing","kernelmatrix","kernelunitlength","lighting-color","local","marker-end","marker-mid","marker-start","markerheight","markerunits","markerwidth","maskcontentunits","maskunits","max","mask","media","method","mode","min","name","numoctaves","offset","operator","opacity","order","orient","orientation","origin","overflow","paint-order","path","pathlength","patterncontentunits","patterntransform","patternunits","points","preservealpha","preserveaspectratio","primitiveunits","r","rx","ry","radius","refx","refy","repeatcount","repeatdur","restart","result","rotate","scale","seed","shape-rendering","specularconstant","specularexponent","spreadmethod","startoffset","stddeviation","stitchtiles","stop-color","stop-opacity","stroke-dasharray","stroke-dashoffset","stroke-linecap","stroke-linejoin","stroke-miterlimit","stroke-opacity","stroke","stroke-width","style","surfacescale","systemlanguage","tabindex","targetx","targety","transform","transform-origin","text-anchor","text-decoration","text-rendering","textlength","type","u1","u2","unicode","values","viewbox","visibility","version","vert-adv-y","vert-origin-x","vert-origin-y","width","word-spacing","wrap","writing-mode","xchannelselector","ychannelselector","x","x1","x2","xmlns","y","y1","y2","z","zoomandpan"]),W=p(["accent","accentunder","align","bevelled","close","columnsalign","columnlines","columnspan","denomalign","depth","dir","display","displaystyle","encoding","fence","frame","height","href","id","largeop","length","linethickness","lspace","lquote","mathbackground","mathcolor","mathsize","mathvariant","maxsize","minsize","movablelimits","notation","numalign","open","rowalign","rowlines","rowspacing","rowspan","rspace","rquote","scriptlevel","scriptminsize","scriptsizemultiplier","selection","separator","separators","stretchy","subscriptshift","supscriptshift","symmetric","voffset","width","xmlns"]),q=p(["xlink:href","xml:id","xlink:title","xml:space","xmlns:xlink"]),Y=d(/\{\{[\w\W]*|[\w\W]*\}\}/gm),$=d(/<%[\w\W]*|[\w\W]*%>/gm),K=d(/\${[\w\W]*}/gm),V=d(/^data-[\-\w.\u00B7-\uFFFF]/),X=d(/^aria-[\-\w]+$/),Z=d(/^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i),J=d(/^(?:\w+script|data):/i),Q=d(/[\u0000-\u0020\u00A0\u1680\u180E\u2000-\u2029\u205F\u3000]/g),ee=d(/^html$/i),te=function(){return"undefined"==typeof window?null:window},ne=function(t,n){if("object"!==e(t)||"function"!=typeof t.createPolicy)return null;var r=null,o="data-tt-policy-suffix";n.currentScript&&n.currentScript.hasAttribute(o)&&(r=n.currentScript.getAttribute(o));var a="dompurify"+(r?"#"+r:"");try{return t.createPolicy(a,{createHTML:function(e){return e},createScriptURL:function(e){return e}})}catch(e){return console.warn("TrustedTypes policy "+a+" could not be created."),null}};var re=function t(){var n=arguments.length>0&&void 0!==arguments[0]?arguments[0]:te(),r=function(e){return t(e)};if(r.version="3.0.1",r.removed=[],!n||!n.document||9!==n.document.nodeType)return r.isSupported=!1,r;var o=n.document,i=n.document,l=n.DocumentFragment,u=n.HTMLTemplateElement,s=n.Node,f=n.Element,m=n.NodeFilter,d=n.NamedNodeMap,h=void 0===d?n.NamedNodeMap||n.MozNamedAttrMap:d,y=n.HTMLFormElement,g=n.DOMParser,b=n.trustedTypes,v=f.prototype,R=M(v,"cloneNode"),re=M(v,"nextSibling"),oe=M(v,"childNodes"),ae=M(v,"parentNode");if("function"==typeof u){var ie=i.createElement("template");ie.content&&ie.content.ownerDocument&&(i=ie.content.ownerDocument)}var le=ne(b,o),ce=le?le.createHTML(""):"",ue=i,se=ue.implementation,fe=ue.createNodeIterator,me=ue.createDocumentFragment,pe=ue.getElementsByTagName,de=o.importNode,he={};r.isSupported="function"==typeof c&&"function"==typeof ae&&se&&void 0!==se.createHTMLDocument;var ye,ge,be=Y,ve=$,Te=K,Ne=V,Ae=X,Ee=J,we=Q,Se=Z,_e=null,xe=C({},[].concat(a(I),a(U),a(F),a(H),a(P))),ke=null,Oe=C({},[].concat(a(B),a(G),a(W),a(q))),De=Object.seal(Object.create(null,{tagNameCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},attributeNameCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},allowCustomizedBuiltInElements:{writable:!0,configurable:!1,enumerable:!0,value:!1}})),Re=null,Ce=null,Le=!0,Me=!0,Ie=!1,Ue=!0,Fe=!1,ze=!1,He=!1,je=!1,Pe=!1,Be=!1,Ge=!1,We=!0,qe=!1,Ye="user-content-",$e=!0,Ke=!1,Ve={},Xe=null,Ze=C({},["annotation-xml","audio","colgroup","desc","foreignobject","head","iframe","math","mi","mn","mo","ms","mtext","noembed","noframes","noscript","plaintext","script","style","svg","template","thead","title","video","xmp"]),Je=null,Qe=C({},["audio","video","img","source","image","track"]),et=null,tt=C({},["alt","class","for","id","label","name","pattern","placeholder","role","summary","title","value","style","xmlns"]),nt="http://www.w3.org/1998/Math/MathML",rt="http://www.w3.org/2000/svg",ot="http://www.w3.org/1999/xhtml",at=ot,it=!1,lt=null,ct=C({},[nt,rt,ot],w),ut=["application/xhtml+xml","text/html"],st="text/html",ft=null,mt=i.createElement("form"),pt=function(e){return e instanceof RegExp||e instanceof Function},dt=function(t){ft&&ft===t||(t&&"object"===e(t)||(t={}),t=L(t),ye=ye=-1===ut.indexOf(t.PARSER_MEDIA_TYPE)?st:t.PARSER_MEDIA_TYPE,ge="application/xhtml+xml"===ye?w:E,_e="ALLOWED_TAGS"in t?C({},t.ALLOWED_TAGS,ge):xe,ke="ALLOWED_ATTR"in t?C({},t.ALLOWED_ATTR,ge):Oe,lt="ALLOWED_NAMESPACES"in t?C({},t.ALLOWED_NAMESPACES,w):ct,et="ADD_URI_SAFE_ATTR"in t?C(L(tt),t.ADD_URI_SAFE_ATTR,ge):tt,Je="ADD_DATA_URI_TAGS"in t?C(L(Qe),t.ADD_DATA_URI_TAGS,ge):Qe,Xe="FORBID_CONTENTS"in t?C({},t.FORBID_CONTENTS,ge):Ze,Re="FORBID_TAGS"in t?C({},t.FORBID_TAGS,ge):{},Ce="FORBID_ATTR"in t?C({},t.FORBID_ATTR,ge):{},Ve="USE_PROFILES"in t&&t.USE_PROFILES,Le=!1!==t.ALLOW_ARIA_ATTR,Me=!1!==t.ALLOW_DATA_ATTR,Ie=t.ALLOW_UNKNOWN_PROTOCOLS||!1,Ue=!1!==t.ALLOW_SELF_CLOSE_IN_ATTR,Fe=t.SAFE_FOR_TEMPLATES||!1,ze=t.WHOLE_DOCUMENT||!1,Pe=t.RETURN_DOM||!1,Be=t.RETURN_DOM_FRAGMENT||!1,Ge=t.RETURN_TRUSTED_TYPE||!1,je=t.FORCE_BODY||!1,We=!1!==t.SANITIZE_DOM,qe=t.SANITIZE_NAMED_PROPS||!1,$e=!1!==t.KEEP_CONTENT,Ke=t.IN_PLACE||!1,Se=t.ALLOWED_URI_REGEXP||Se,at=t.NAMESPACE||ot,De=t.CUSTOM_ELEMENT_HANDLING||{},t.CUSTOM_ELEMENT_HANDLING&&pt(t.CUSTOM_ELEMENT_HANDLING.tagNameCheck)&&(De.tagNameCheck=t.CUSTOM_ELEMENT_HANDLING.tagNameCheck),t.CUSTOM_ELEMENT_HANDLING&&pt(t.CUSTOM_ELEMENT_HANDLING.attributeNameCheck)&&(De.attributeNameCheck=t.CUSTOM_ELEMENT_HANDLING.attributeNameCheck),t.CUSTOM_ELEMENT_HANDLING&&"boolean"==typeof t.CUSTOM_ELEMENT_HANDLING.allowCustomizedBuiltInElements&&(De.allowCustomizedBuiltInElements=t.CUSTOM_ELEMENT_HANDLING.allowCustomizedBuiltInElements),Fe&&(Me=!1),Be&&(Pe=!0),Ve&&(_e=C({},a(P)),ke=[],!0===Ve.html&&(C(_e,I),C(ke,B)),!0===Ve.svg&&(C(_e,U),C(ke,G),C(ke,q)),!0===Ve.svgFilters&&(C(_e,F),C(ke,G),C(ke,q)),!0===Ve.mathMl&&(C(_e,H),C(ke,W),C(ke,q))),t.ADD_TAGS&&(_e===xe&&(_e=L(_e)),C(_e,t.ADD_TAGS,ge)),t.ADD_ATTR&&(ke===Oe&&(ke=L(ke)),C(ke,t.ADD_ATTR,ge)),t.ADD_URI_SAFE_ATTR&&C(et,t.ADD_URI_SAFE_ATTR,ge),t.FORBID_CONTENTS&&(Xe===Ze&&(Xe=L(Xe)),C(Xe,t.FORBID_CONTENTS,ge)),$e&&(_e["#text"]=!0),ze&&C(_e,["html","head","body"]),_e.table&&(C(_e,["tbody"]),delete Re.tbody),p&&p(t),ft=t)},ht=C({},["mi","mo","mn","ms","mtext"]),yt=C({},["foreignobject","desc","title","annotation-xml"]),gt=C({},["title","style","font","a","script"]),bt=C({},U);C(bt,F),C(bt,z);var vt=C({},H);C(vt,j);var Tt=function(e){var t=ae(e);t&&t.tagName||(t={namespaceURI:at,tagName:"template"});var n=E(e.tagName),r=E(t.tagName);return!!lt[e.namespaceURI]&&(e.namespaceURI===rt?t.namespaceURI===ot?"svg"===n:t.namespaceURI===nt?"svg"===n&&("annotation-xml"===r||ht[r]):Boolean(bt[n]):e.namespaceURI===nt?t.namespaceURI===ot?"math"===n:t.namespaceURI===rt?"math"===n&&yt[r]:Boolean(vt[n]):e.namespaceURI===ot?!(t.namespaceURI===rt&&!yt[r])&&(!(t.namespaceURI===nt&&!ht[r])&&(!vt[n]&&(gt[n]||!bt[n]))):!("application/xhtml+xml"!==ye||!lt[e.namespaceURI]))},Nt=function(e){A(r.removed,{element:e});try{e.parentNode.removeChild(e)}catch(t){e.remove()}},At=function(e,t){try{A(r.removed,{attribute:t.getAttributeNode(e),from:t})}catch(e){A(r.removed,{attribute:null,from:t})}if(t.removeAttribute(e),"is"===e&&!ke[e])if(Pe||Be)try{Nt(t)}catch(e){}else try{t.setAttribute(e,"")}catch(e){}},Et=function(e){var t,n;if(je)e="<remove></remove>"+e;else{var r=S(e,/^[\r\n\t ]+/);n=r&&r[0]}"application/xhtml+xml"===ye&&at===ot&&(e='<html xmlns="http://www.w3.org/1999/xhtml"><head></head><body>'+e+"</body></html>");var o=le?le.createHTML(e):e;if(at===ot)try{t=(new g).parseFromString(o,ye)}catch(e){}if(!t||!t.documentElement){t=se.createDocument(at,"template",null);try{t.documentElement.innerHTML=it?ce:o}catch(e){}}var a=t.body||t.documentElement;return e&&n&&a.insertBefore(i.createTextNode(n),a.childNodes[0]||null),at===ot?pe.call(t,ze?"html":"body")[0]:ze?t.documentElement:a},wt=function(e){return fe.call(e.ownerDocument||e,e,m.SHOW_ELEMENT|m.SHOW_COMMENT|m.SHOW_TEXT,null,!1)},St=function(e){return e instanceof y&&("string"!=typeof e.nodeName||"string"!=typeof e.textContent||"function"!=typeof e.removeChild||!(e.attributes instanceof h)||"function"!=typeof e.removeAttribute||"function"!=typeof e.setAttribute||"string"!=typeof e.namespaceURI||"function"!=typeof e.insertBefore||"function"!=typeof e.hasChildNodes)},_t=function(t){return"object"===e(s)?t instanceof s:t&&"object"===e(t)&&"number"==typeof t.nodeType&&"string"==typeof t.nodeName},xt=function(e,t,n){he[e]&&T(he[e],(function(e){e.call(r,t,n,ft)}))},kt=function(e){var t;if(xt("beforeSanitizeElements",e,null),St(e))return Nt(e),!0;var n=ge(e.nodeName);if(xt("uponSanitizeElement",e,{tagName:n,allowedTags:_e}),e.hasChildNodes()&&!_t(e.firstElementChild)&&(!_t(e.content)||!_t(e.content.firstElementChild))&&O(/<[/\w]/g,e.innerHTML)&&O(/<[/\w]/g,e.textContent))return Nt(e),!0;if(!_e[n]||Re[n]){if(!Re[n]&&Dt(n)){if(De.tagNameCheck instanceof RegExp&&O(De.tagNameCheck,n))return!1;if(De.tagNameCheck instanceof Function&&De.tagNameCheck(n))return!1}if($e&&!Xe[n]){var o=ae(e)||e.parentNode,a=oe(e)||e.childNodes;if(a&&o)for(var i=a.length-1;i>=0;--i)o.insertBefore(R(a[i],!0),re(e))}return Nt(e),!0}return e instanceof f&&!Tt(e)?(Nt(e),!0):"noscript"!==n&&"noembed"!==n||!O(/<\/no(script|embed)/i,e.innerHTML)?(Fe&&3===e.nodeType&&(t=e.textContent,t=_(t,be," "),t=_(t,ve," "),t=_(t,Te," "),e.textContent!==t&&(A(r.removed,{element:e.cloneNode()}),e.textContent=t)),xt("afterSanitizeElements",e,null),!1):(Nt(e),!0)},Ot=function(e,t,n){if(We&&("id"===t||"name"===t)&&(n in i||n in mt))return!1;if(Me&&!Ce[t]&&O(Ne,t));else if(Le&&O(Ae,t));else if(!ke[t]||Ce[t]){if(!(Dt(e)&&(De.tagNameCheck instanceof RegExp&&O(De.tagNameCheck,e)||De.tagNameCheck instanceof Function&&De.tagNameCheck(e))&&(De.attributeNameCheck instanceof RegExp&&O(De.attributeNameCheck,t)||De.attributeNameCheck instanceof Function&&De.attributeNameCheck(t))||"is"===t&&De.allowCustomizedBuiltInElements&&(De.tagNameCheck instanceof RegExp&&O(De.tagNameCheck,n)||De.tagNameCheck instanceof Function&&De.tagNameCheck(n))))return!1}else if(et[t]);else if(O(Se,_(n,we,"")));else if("src"!==t&&"xlink:href"!==t&&"href"!==t||"script"===e||0!==x(n,"data:")||!Je[e]){if(Ie&&!O(Ee,_(n,we,"")));else if(n)return!1}else;return!0},Dt=function(e){return e.indexOf("-")>0},Rt=function(t){var n,o,a,i;xt("beforeSanitizeAttributes",t,null);var l=t.attributes;if(l){var c={attrName:"",attrValue:"",keepAttr:!0,allowedAttributes:ke};for(i=l.length;i--;){var u=n=l[i],s=u.name,f=u.namespaceURI;if(o="value"===s?n.value:k(n.value),a=ge(s),c.attrName=a,c.attrValue=o,c.keepAttr=!0,c.forceKeepAttr=void 0,xt("uponSanitizeAttribute",t,c),o=c.attrValue,!c.forceKeepAttr&&(At(s,t),c.keepAttr))if(Ue||!O(/\/>/i,o)){Fe&&(o=_(o,be," "),o=_(o,ve," "),o=_(o,Te," "));var m=ge(t.nodeName);if(Ot(m,a,o)){if(!qe||"id"!==a&&"name"!==a||(At(s,t),o=Ye+o),le&&"object"===e(b)&&"function"==typeof b.getAttributeType)if(f);else switch(b.getAttributeType(m,a)){case"TrustedHTML":o=le.createHTML(o);break;case"TrustedScriptURL":o=le.createScriptURL(o)}try{f?t.setAttributeNS(f,s,o):t.setAttribute(s,o),N(r.removed)}catch(e){}}}else At(s,t)}xt("afterSanitizeAttributes",t,null)}},Ct=function e(t){var n,r=wt(t);for(xt("beforeSanitizeShadowDOM",t,null);n=r.nextNode();)xt("uponSanitizeShadowNode",n,null),kt(n)||(n.content instanceof l&&e(n.content),Rt(n));xt("afterSanitizeShadowDOM",t,null)};return r.sanitize=function(e){var t,n,a,i,c=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{};if((it=!e)&&(e="\x3c!--\x3e"),"string"!=typeof e&&!_t(e)){if("function"!=typeof e.toString)throw D("toString is not a function");if("string"!=typeof(e=e.toString()))throw D("dirty is not a string, aborting")}if(!r.isSupported)return e;if(He||dt(c),r.removed=[],"string"==typeof e&&(Ke=!1),Ke){if(e.nodeName){var u=ge(e.nodeName);if(!_e[u]||Re[u])throw D("root node is forbidden and cannot be sanitized in-place")}}else if(e instanceof s)1===(n=(t=Et("\x3c!----\x3e")).ownerDocument.importNode(e,!0)).nodeType&&"BODY"===n.nodeName||"HTML"===n.nodeName?t=n:t.appendChild(n);else{if(!Pe&&!Fe&&!ze&&-1===e.indexOf("<"))return le&&Ge?le.createHTML(e):e;if(!(t=Et(e)))return Pe?null:Ge?ce:""}t&&je&&Nt(t.firstChild);for(var f=wt(Ke?e:t);a=f.nextNode();)kt(a)||(a.content instanceof l&&Ct(a.content),Rt(a));if(Ke)return e;if(Pe){if(Be)for(i=me.call(t.ownerDocument);t.firstChild;)i.appendChild(t.firstChild);else i=t;return(ke.shadowroot||ke.shadowrootmod)&&(i=de.call(o,i,!0)),i}var m=ze?t.outerHTML:t.innerHTML;return ze&&_e["!doctype"]&&t.ownerDocument&&t.ownerDocument.doctype&&t.ownerDocument.doctype.name&&O(ee,t.ownerDocument.doctype.name)&&(m="<!DOCTYPE "+t.ownerDocument.doctype.name+">\n"+m),Fe&&(m=_(m,be," "),m=_(m,ve," "),m=_(m,Te," ")),le&&Ge?le.createHTML(m):m},r.setConfig=function(e){dt(e),He=!0},r.clearConfig=function(){ft=null,He=!1},r.isValidAttribute=function(e,t,n){ft||dt({});var r=ge(e),o=ge(t);return Ot(r,o,n)},r.addHook=function(e,t){"function"==typeof t&&(he[e]=he[e]||[],A(he[e],t))},r.removeHook=function(e){if(he[e])return N(he[e])},r.removeHooks=function(e){he[e]&&(he[e]=[])},r.removeAllHooks=function(){he={}},r}();return re}));</script>
     
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, sanitizeHtml, textToSpeech, sha256Text } from "./utils.js?v=4";
+      import { $, $$, delay, showEl, hideEl, prompt2, sanitizeHtml, textToSpeech, sha256Text } from "./utils.js?v=5";
 
       // add menu open/close button for narrow screens
       if(window.innerWidth < 700) {
@@ -249,13 +254,14 @@
       }
 
       let db = new Dexie("chatbot-ui-v1");
-      db.version(2).stores({
+      db.version(4).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
-        characters: "++id,name,systemMessage,modelVersion,initialMessages,avatarUrl,temperature,customCode,creationTime,lastMessageTime",
+        characters: "++id,name,systemMessage,modelVersion,initialMessages,avatarUrl,fitMessagesInContextMethod,temperature,customCode,creationTime,lastMessageTime",
         threads: "++id,name,characterId,creationTime,lastMessageTime",
-        messages: "++id,threadId,message,characterId,creationTime", // characterId is -1 for user.
+        messages: "++id,threadId,message,characterId,creationTime", // characterId is -1 for user, and for system it is -2.
         misc: "key,value",
+        summaries: "hash,text,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries
       });
       window.db = db;
 
@@ -327,11 +333,18 @@
             // only keep the data for the current thread:
             let characters = json.data.data.find(d => d.tableName === "characters");
             characters.rows = characters.rows.filter(c => c.id === thread.characterId);
+            
             let threads = json.data.data.find(d => d.tableName === "threads");
             threads.rows = threads.rows.filter(t => t.id === threadId);
             if(threads.rows.length > 1) alert("Something went wrong. There should only be one thread in the export, but several were exported.");
+            
             let messages = json.data.data.find(d => d.tableName === "messages");
             messages.rows = messages.rows.filter(m => m.threadId === threadId);
+
+            let summaries = json.data.data.find(d => d.tableName === "summaries");
+            if(summaries) {
+              summaries.rows = summaries.rows.filter(s => s.threadId === threadId);
+            }
 
             const newBlob = new Blob([JSON.stringify(json)], {type: "application/json"});
 
@@ -350,8 +363,9 @@
             if(confirm("Are you sure you want to delete this thread?")) {
               const threadId = parseInt(btn.closest(".thread").dataset.threadId);
               await db.threads.delete(threadId);
-              // delete messages for this thread:
+              // delete messages and summaries for this thread:
               await db.messages.where("threadId").equals(threadId).delete();
+              await db.summaries.where("threadId").equals(threadId).delete();
               await renderThreadList();
             }
           });
@@ -367,6 +381,8 @@
         for(let message of messages) {
           if(message.characterId === -1) {
             message.character = await getUserCharacterObj();
+          } else if(message.characterId === -2) {
+            message.character = await getSystemCharacterObj();
           } else {
             message.character = character;
           }
@@ -393,6 +409,25 @@
         }
         await doBotReplyIfNeeded();
       }
+
+      function createCharacterCardHtml(character) {
+        return `
+          <div class="character" data-character-id="${sanitizeHtml(character.id)}" style="display:flex; padding:0.5rem; cursor:pointer;">
+            <div class="avatar" style="${character.avatarUrl ? `background-image:url(${sanitizeHtml(character.avatarUrl)})` : ""};"></div>
+            <div class="info" style="flex-grow:1; padding-left:0.5rem;">
+              <div class="name" style="font-weight:bold;">${sanitizeHtml(character.name)} <span style="opacity:0.5; font-weight:normal;">${character.id ? "#"+sanitizeHtml(character.id) : ""}</span></div>
+              <div class="systemMessage" style="font-size: 0.8rem; text-overflow: ellipsis; word-wrap: break-word; overflow: hidden; height: 2em; line-height: 1em;">${character.systemMessage.length > 85 ? sanitizeHtml(character.systemMessage.slice(0, 85)+"...") : sanitizeHtml(character.systemMessage)}</div>
+              <div class="buttons">
+                ${character.id === null ? "" :
+                `<button class="share">🔗 share</button>
+                <button class="edit">✏️ edit</button>
+                <button class="delete">🗑️ delete</button>`
+                }
+              </div>
+            </div>
+          </div>
+        `;
+      }
       
       // The character list appears when user clicks the "new chat" button.
       // If they click a character, it starts a new thread with that character.
@@ -408,22 +443,49 @@
           avatarUrl: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgZmlsbD0iY3VycmVudENvbG9yIiBjbGFzcz0iYmkgYmktcGx1cy1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+CiAgPHBhdGggZD0iTTggMTVBNyA3IDAgMSAxIDggMWE3IDcgMCAwIDEgMCAxNHptMCAxQTggOCAwIDEgMCA4IDBhOCA4IDAgMCAwIDAgMTZ6Ii8+CiAgPHBhdGggZD0iTTggNGEuNS41IDAgMCAxIC41LjV2M2gzYS41LjUgMCAwIDEgMCAxaC0zdjNhLjUuNSAwIDAgMS0xIDB2LTNoLTNhLjUuNSAwIDAgMSAwLTFoM3YtM0EuNS41IDAgMCAxIDggNHoiLz4KPC9zdmc+",
         });
 
-        $.characterList.innerHTML = characters.map(character => `
-          <div class="character" data-character-id="${sanitizeHtml(character.id)}" style="display:flex; padding:0.5rem; cursor:pointer;">
-            <div class="avatar" style="${character.avatarUrl ? `background-image:url(${sanitizeHtml(character.avatarUrl)})` : ""};"></div>
-            <div class="info" style="flex-grow:1; padding-left:0.5rem;">
-              <div class="name" style="font-weight:bold;">${sanitizeHtml(character.name)} <span style="opacity:0.5; font-weight:normal;">${character.id ? "#"+sanitizeHtml(character.id) : ""}</span></div>
-              <div class="systemMessage" style="font-size: 0.8rem; text-overflow: ellipsis; word-wrap: break-word; overflow: hidden; height: 2em; line-height: 1em;">${character.systemMessage.length > 85 ? sanitizeHtml(character.systemMessage.slice(0, 85)+"...") : sanitizeHtml(character.systemMessage)}</div>
-              <div class="buttons">
-                ${character.id === null ? "" :
-                `<button class="share">🔗 share</button>
-                <button class="edit">✏️ edit</button>
-                <button class="delete">🗑️ delete</button>`
-                }
-              </div>
-            </div>
-          </div>
-        `).join("");
+        $.characterList.innerHTML = characters.map(character => createCharacterCardHtml(character)).join("");
+
+        let starterCharacters = [
+          {
+            id: null,
+            name: "Game Master",
+            systemMessage: "You are the Game Master. You describe the results of the player's actions. You start by asking the player what type of adventure they want to play. DO NOT to \"wrap up\" the story at the end of your messages.",
+            initialMessages: [
+              "",
+              "Hello, adventurer! What type of game would you like to play? Describe the world, and your character in as much or as little detail as you'd like, and I'll simulate the world within my mind to create a fun and engaging adventure for you.",
+            ],
+            modelVersion: "gpt-3.5-turbo",
+            avatarUrl: "https://i.imgur.com/Gxt0kRX.jpg",
+            fitMessagesInContextMethod: "summarizeOld",
+            temperature: 0.7,
+            customCode: "",
+          },
+          {
+            id: null,
+            name: "Roleplayer",
+            systemMessage: "RULE: Replies are exactly 3 sentences long. Do not go over.\n\nFollow this pattern:\n\"Hello!\" - dialogue\n[Is she watching me?] - inner thoughts of a character\n*He jumps out of the bushes* - action\n\nYou are roleplaying as a character described by the user. Here's an example of a reply:\n\n\[I wonder if there's a way to sneak past], he thought.\n*He crouched lower*\n\"I think we need to find another way out\", she whispered.",
+            initialMessages: [
+              "",
+              "To begin the roleplay, please describe the setting and characters. If you only have a vague idea, that's okay - just give me some keywords to go off, and I'll come up with something interesting and engaging. My replies will consist of 3 sentences, where quotes indicate dialogue, square brackets indicate the inner thoughts of a character, and asterisks indicate character actions.",
+            ],
+            modelVersion: "gpt-3.5-turbo",
+            avatarUrl: "https://i.imgur.com/bHN0oiq.jpg",
+            fitMessagesInContextMethod: "summarizeOld",
+            temperature: 0.7,
+            customCode: "",
+          },
+        ];
+
+        $.starterCharacterList.innerHTML = starterCharacters.map(character => createCharacterCardHtml(character)).join("");
+        $.starterCharacterList.querySelectorAll(".character").forEach((characterEl, i) => {
+          characterEl.addEventListener("click", async function(e) {
+            let character = starterCharacters[i];
+            const result = await characterDetailsPrompt(character);
+            if(!result) return;
+            const characterObj = await addCharacter(result);
+            await createNewThreadWithCharacterId(characterObj.id);
+          });
+        });
 
         // Add an onclick handler to each character which starts a new thread with that character.
         // If they click the "create character" option (characterId === "null"), it prompts them for a name, system message, and avatar URL.
@@ -450,15 +512,7 @@
               e.stopPropagation();
               const characterId = parseInt(characterEl.dataset.characterId);
               const character = (await db.characters.where("id").equals(characterId).toArray())[0];
-              const result = await characterDetailsPrompt({
-                name: character.name,
-                systemMessage: character.systemMessage,
-                initialMessagesText: character.initialMessages.join("\n---\n"),
-                modelVersion: character.modelVersion,
-                avatarUrl: character.avatarUrl,
-                temperature: character.temperature,
-                customCode: character.customCode,
-              });
+              const result = await characterDetailsPrompt(character);
               if(!result) return;
               await db.characters.update(characterId, result);
               await renderCharacterList();
@@ -543,20 +597,28 @@
       }
 
       async function characterDetailsPrompt(defaultValues={}) {
+        
+        let initialMessagesText;
+        if(defaultValues.initialMessages) initialMessagesText = defaultValues.initialMessages.join("\n---\n").trim(); // need "trim" because first message can be "" which indicates that AI should speak first, and we don't want to put a newline before that because it changes the meaning
+        else initialMessagesText = "";
+        
         const result = await prompt2({
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:"[A-Za-z0-9_\\- ]{1,64}" },
-          systemMessage: { label: "Initial system message/instruction/role:", type:"text", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
-          initialMessagesText: { label: "Initial chat messages (optional). Useful for extra alignment to character. Separate messages with '---'. If first line in the text box is '---' then AI speaks first. ", type:"text", placeholder: "Hey Sammy, do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: defaultValues.initialMessagesText ?? "" },
-          modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, bot-like)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
+          systemMessage: { label: "Initial system message/instruction/role:", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
+          initialMessagesText: { label: "Initial chat messages (optional). Useful for extra alignment to character. Separate messages with '---'. If first line in the text box is '---' then AI speaks first. ", type:"text", height:"fit-content", placeholder: "Hey Sammy, do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: initialMessagesText ?? "" },
+          modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
-          temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? "0.7" },
-          customCode: { hidden:true, label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", defaultValue: defaultValues.customCode ?? "" },
+          fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.summarizationMethod ?? "summarizeOld" },
+          temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.7 },
+          customCode: { hidden:true, label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
         }, {submitButtonText: "Save Character", showHiddenInputsText: "Show advanced options"});
         if(!result) return;
-        // note: we don't split by "---\n" because if the first line is "---" (i.e. empty first message), then this indicates that author wants AI to start first.
-        result.initialMessages = result.initialMessagesText.split("---\n").map(message => message.trim());
+        
+        // process prompt results back into well-formed character object:
+        result.initialMessages = result.initialMessagesText.split("---\n").map(message => message.trim()); // note: we don't split by "---\n" because if the first line is "---" (i.e. empty first message), then this indicates that author wants AI to start first.
         delete result.initialMessagesText;
         result.temperature = Number(result.temperature);
+
         if(isNaN(result.temperature)) result.temperature = 0.7;
         return result;
       }
@@ -608,42 +670,112 @@
         return threadObj;
       }
 
-      async function getBotReply({messages, systemCharacter, userCharacter}) {
+      async function getBotReply({messages, aiCharacter, userCharacter}) {
 
-        let modelVersion = systemCharacter.modelVersion;
+        let systemName = "System"; // name for the role:system messages (needed for non-chat models like davinci-003 e.g. "System: Sammy has joined the chat")
+
+        let threadId = messages[0].threadId;
+
+        let modelVersion = aiCharacter.modelVersion;
         let tokenLimit = 3500; // buffer due to token count being an estimate
 
-        let fullMessagesArr = messages.map(m => ({
-          role: m.characterId === userCharacter.id ? "user" : "assistant",
-          content: m.message+"",
-          name: m.characterId === userCharacter.id ? userCharacter.name.replaceAll(" ", "_") : systemCharacter.name.replaceAll(" ", "_"),
-        }));
+        let fullMessagesArr = messages.map(m => {
+          let role;
+          if(m.characterId === userCharacter.id) role = "user";
+          else if(m.characterId === aiCharacter.id) role = "assistant";
+          else if(m.characterId === -2) role = "system";
+
+          let name;
+          if(m.characterId === userCharacter.id) name = userCharacter.name.replaceAll(" ", "_");
+          else if(m.characterId === aiCharacter.id) name = aiCharacter.name.replaceAll(" ", "_");
+          else if(m.characterId === -2) name = systemName;
+
+          return { role, content: m.message+"", name };
+        });
+
+        // TODO: use this: https://github.com/josephrocca/gpt-2-3-tokenizer or similar to get actual token counts
+
+        console.log("getBotReply() - fullMessagesArr:", fullMessagesArr);
 
         let messagesArr = [];
-        // push messages into messagesArrToSend until total content reaches token limit
-        let numTokensInContext = 0;
-        for(let i = fullMessagesArr.length-1; i >= 0; i--) {
-          if(numTokensInContext + fullMessagesArr[i].content.length > tokenLimit-1000) break; // we want at least 1000 tokens for the bot's response
-          messagesArr.unshift(fullMessagesArr[i]);
-          numTokensInContext += Math.round(fullMessagesArr[i].content.length/4); // assume 4 chars per token for now
+        let numTokensInContext = fullMessagesArr.reduce((acc, m) => acc + Math.round(m.content.length/4), 0);
+        let minTokenAllowanceForBotResponse = 1000;
+
+        if(numTokensInContext > tokenLimit-minTokenAllowanceForBotResponse) {
+          let fitMessagesInContextMethod = aiCharacter.fitMessagesInContextMethod ?? "summarizeOld";
+          if(fitMessagesInContextMethod === "dropOld") {
+            // push messages into messagesArrToSend until total content reaches token limit
+            numTokensInContext = 0;
+            for(let i = fullMessagesArr.length-1; i >= 0; i--) {
+              if(numTokensInContext + fullMessagesArr[i].content.length > tokenLimit-minTokenAllowanceForBotResponse) break;
+              messagesArr.unshift(fullMessagesArr[i]);
+              numTokensInContext += Math.round(fullMessagesArr[i].content.length/4); // assume 4 chars per token for now
+            }
+          } else if(fitMessagesInContextMethod === "summarizeOld") {
+            // here's the overall idea: "consume" old messages (remove them from the messages array) until you get to `tokensPerSummary` tokens, and then summarize them (use an existing summary if we already have it), and then add this summary to the messages array in place of the original messages. Then we repeat - so the process basically treats the summaries as just regular messages. Keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
+            let tokensPerSummary = 600;
+            // get total tokens in all messages
+            let initialTokenCount = fullMessagesArr.reduce((acc, m) => acc + Math.round(m.content.length/4), 0);
+            let currentTokenCount = initialTokenCount;
+            let messagesAndSummariesArr = fullMessagesArr.slice(0);
+            let i = 0;
+            // while the total token count is too high, grab batches of old messages, and summarize them
+            while(currentTokenCount > tokenLimit-minTokenAllowanceForBotResponse) {
+              // grab old messages until we have at least 1000 tokens worth of text
+              let messageBatchTokenCount = 0;
+              let messageBatchArr = [];
+              while(messageBatchTokenCount < tokensPerSummary) {
+                let m = messagesAndSummariesArr.shift();
+                messageBatchArr.push(m);
+                messageBatchTokenCount += Math.round(m.content.length/4);
+              }
+              // note that messageBatchArr will include earlier summaries, so we are running "summaries of (summaries+messages)" - this is actually good/okay because it means that summaries are done within the context of the full history, not just a lone batch of messages with no context
+              let messageBatchSummarizationInstruction;
+              if(i > 0) { // if i>0, then first message in batch is always the previous summary, and the rest are regular messages
+                let prevSummary = messageBatchArr.shift().content;
+                let messages = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
+                messageBatchSummarizationInstruction = `Here's what has recently happened:\n\n---\n${messages}\n---\n\nHere's a summary of what happened previously:\n\n---\n${prevSummary}\n---\n\nPlease reply with a new version of this summary that ALSO includes what has recently happened. Include ALL the KEY details. DO NOT MISS ANY IMPORTANT DETAILS. You MUST include all the details that were in the previous summary in your response.`;
+              } else {
+                let messages = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
+                messageBatchSummarizationInstruction = `Please summarize the content of these messages:\n\n------\n`+messages+`\n------\n\nRespond with the summary only - nothing else. Include all relevant details. Be concise, but DO NOT leave out any important details.`;
+              }
+              
+              let hash = await sha256Text(messageBatchSummarizationInstruction);
+              // check if we have a summary for this text yet
+              let summary = (await db.summaries.get(hash))?.summary;
+              if(!summary) {
+                let messages = [
+                  {role: "system", content: "You are a text summarization assistant. You respond only with summary that the user requests - nothing more, nothing less."},
+                  {role: "user", content: messageBatchSummarizationInstruction},
+                ];
+                summary = await doChatCompletion({messages, model:"gpt-3.5-turbo", temperature:0.7});
+                console.log("summary:", summary);
+                await db.summaries.put({hash, summary, threadId});
+              }
+              messagesAndSummariesArr.unshift({
+                role: "system",
+                content: summary,
+              });
+              // get size difference between summary and original messages
+              let summaryTokenCount = Math.round(summary.length/4);
+              let tokenReduction = messageBatchTokenCount - summaryTokenCount;
+              currentTokenCount -= tokenReduction;
+              i++;
+            }
+            messagesArr = messagesAndSummariesArr;
+            numTokensInContext = messagesAndSummariesArr.reduce((acc, m) => acc + Math.round(m.content.length/4), 0);
+          } else {
+            throw new Error("Invalid fitIntoContextMethod");
+          }
+        } else {
+          messagesArr = fullMessagesArr.slice(0);
         }
-        // TODO: use this: https://github.com/josephrocca/gpt-2-3-tokenizer or similar to get actual token counts
-        // TODO: add an auto-summarisation option for characters (enabled by default) so *effective* context can be much longer
 
         let maxTokensInResponse = tokenLimit - numTokensInContext;
 
+        messagesArr.unshift({"role": "system", "content": aiCharacter.systemMessage, "name": aiCharacter.name.replaceAll(" ", "_")});
 
-        messagesArr.unshift({"role": "system", "content": systemCharacter.systemMessage, "name": systemCharacter.name.replaceAll(" ", "_")});
-
-        // if there are two user messages in a row, merge them into a single user message.
-        // TODO: not sure if this is necessary (figured that ChatGPT API may expect messages to alternate) - can delete later if not
-        for(let i = 1; i < messagesArr.length; i++) {
-          if(messagesArr[i].role === "user" && messagesArr[i-1].role === "user") {
-            messagesArr[i-1].content += "\n" + messagesArr[i].content;
-            messagesArr.splice(i, 1);
-            i--;
-          }
-        }
+        console.log("getBotReply() - messagesArr:", messagesArr);
         
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
         if(!OPENAI_API_KEY) {
@@ -660,14 +792,17 @@
         let result;
 
         if(modelType === "chat") {
-          const endpoint = 'https://api.openai.com/v1/chat/completions';
-          const requestOptions = {
+
+          let json = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: modelVersion, messages: messagesArr, temperature: systemCharacter.temperature ?? 0.7, max_tokens: maxTokensInResponse }),
-          };
-
-          let json = await fetch(endpoint, requestOptions).then(r => r.json()).catch(e => alert(e.toString()));
+            body: JSON.stringify({
+              model: modelVersion,
+              messages: messagesArr,
+              temperature: aiCharacter.temperature ?? 0.7,
+              max_tokens: maxTokensInResponse,
+            }),
+          }).then(r => r.json()).catch(e => alert("getBotReply > modelType:chat > fetch "+e.stack));
           if(!json || json.error) {
             alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
@@ -675,17 +810,20 @@
           result = json.choices[0].message.content;
 
         } else {
+          let promptIntro = `You are ${aiCharacter.name}. You're talking to '${userCharacter.name}'. Some messages are "System" messages which do not originate from either party. \n\n`+messagesArr[0].content + "\n\nThe chat begins now:\n\n";
+          let prompt = promptIntro + messagesArr.slice(1).map(m => (m.role=="user"?`${userCharacter.name}: `:`${aiCharacter.name}: `)+m.content).join("\n\n") + `\n\n${aiCharacter.name}: `;
+
           let json = await fetch("https://api.openai.com/v1/completions", {
             method: "POST",
             headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
               model: modelVersion,
-              prompt: `You are ${systemCharacter.name}. You're talking to '${userCharacter.name}'.\n\n`+messagesArr[0].content + "\n\nThe chat begins now:\n\n" + messagesArr.slice(1).map(m => (m.role=="user"?`${userCharacter.name}: `:`${systemCharacter.name}: `)+m.content).join("\n\n") + `\n\n${systemCharacter.name}: `,
+              prompt,
               max_tokens: maxTokensInResponse,
-              temperature: systemCharacter.temperature ?? 0.7,
+              temperature: aiCharacter.temperature ?? 0.7,
               stop: [`\n\n${userCharacter.name}:`],
             }),
-          }).then(r => r.json()).catch(e => alert(e.toString()));
+          }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch "+e.stack));
           if(!json || json.error) {
             alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
@@ -696,15 +834,96 @@
         return result;
       }
 
-      async function doBotReplyIfNeeded() {
+
+      async function doChatCompletion({messages, model, temperature, stop}) {
+
+        let tokenLimit = 3500; // buffer due to token count being an estimate
+
+        let numTokensInContext = messages.reduce((a, m) => a + Math.round(m.content.length/4), 0); // assume 4 chars per token for now
+        let maxTokensInResponse = tokenLimit - numTokensInContext;
+
+        if(maxTokensInResponse <= 0) return alert("This prompt is too long:\n\n"+prompt.slice(0, 200)+"...");
+        if(stop !== undefined && !Array.isArray(stop)) return alert("The `stop` parameter should be an array of up to 4 strings.");
+
+        let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
+
+        let data = {
+          model,
+          messages,
+          temperature: temperature ?? 0.7,
+          max_tokens: maxTokensInResponse,
+        };
+        if(stop) data.stop = stop;
+
+        let json = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        }).then(r => r.json()).catch(e => alert("doChatCompletion: "+e.stack));
+        if(!json || json.error) {
+          alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+        }
+
+        let result = json.choices[0].message.content;
+
+        return result;
+      }
+
+
+      async function doGenericCompletion({prompt, model, temperature, stop}) {
+
+        let tokenLimit = 3500; // buffer of ~500 tokens due to token count being an estimate
+
+        let maxTokensInResponse = Math.round(tokenLimit - prompt.length/4); // TODO: count actual tokens instead of crude `length/4` estimate
+
+        if(maxTokensInResponse <= 0) return alert("This prompt is too long:\n\n"+prompt.slice(0, 200)+"...");
+        if(stop !== undefined && !Array.isArray(stop)) return alert("The `stop` parameter should be an array of up to 4 strings.");
+
+        let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
+
+        let json = await fetch("https://api.openai.com/v1/completions", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            prompt,
+            max_tokens: maxTokensInResponse,
+            temperature: temperature ?? 0.7,
+            stop: stop || [],
+          }),
+        }).then(r => r.json()).catch(e => alert("doGenericCompletion: "+e.stack));
+        if(!json || json.error) {
+          alert("For some reason a prompt completion request didn't work. You can try verifying your API key by clicking the 'settings' button. Here's the error: \n" + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+        }
+
+        let result = json?.choices[0].text.trim();
+        return result;
+      }
+
+
+
+      let lastBotReplyTime = 0;
+      async function doBotReplyIfNeeded({forceReply=false}={}) {
+        while(Date.now()-lastBotReplyTime < 300) {
+          await delay(100); // don't reply too fast in case of infinite bot reply loop (e.g. due to custom processMessages stuff)
+        }
+
+        lastBotReplyTime = Date.now();
+
+        // if thread is not currently visible, don't reply
+        let messageThreadIsVisible = messageFeed.offsetHeight > 0;
+        if(!messageThreadIsVisible) return;
+
         // get all messages in the thread so far, so we can send them to bot
         const threadId = parseInt($.messageFeed.dataset.threadId);
         const messages = await db.messages.where("threadId").equals(threadId).toArray();
         const characterId = parseInt($.messageFeed.dataset.characterId);
         
-        if(messages.length === 0 || messages[messages.length-1].characterId  === characterId) {
-          // if no messages, or the last message was from the bot, no reply is currently needed
-          return;
+        if(!forceReply) {
+          if(messages.length === 0 || messages[messages.length-1].characterId  === characterId) {
+            // if no messages, or the last message was from the bot, no reply is currently needed
+            return;
+          }
         }
         
         const character = await db.characters.get(characterId);
@@ -713,8 +932,18 @@
         
         let el = appendMessageToFeed(messageObj);
         el.querySelector(".messageText").innerHTML = createTypingIndicatorHtml();
+        el.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
+
+        let userDeletedMessage = false;
+        el.querySelector(".info .deleteButton").addEventListener("click", async e => {
+          e.preventDefault(); e.stopPropagation();
+          userDeletedMessage = true;
+          el.remove();
+        });
         
-        const message = await getBotReply({messages, systemCharacter:character, userCharacter:await getUserCharacterObj()});
+        const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj()});
+
+        if(userDeletedMessage) return;
         
         // if `message` is falsy, it means the bot failed to reply, so delete the message
         if(!message) {
@@ -725,6 +954,7 @@
           messageObj.message = message;
           let id = await addMessageToDb(messageObj);
           el.dataset.id = id;
+          el.dataset.canDelete = "true";
           await runCustomProcessMessagesFunctionIfNeeded(threadId, character);
         }
       }
@@ -741,7 +971,7 @@
 
         const characterId = parseInt($.messageFeed.dataset.characterId);
         const character = await db.characters.get(characterId);
-        const message = await getBotReply({messages, systemCharacter:character, userCharacter:await getUserCharacterObj()});
+        const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj()});
         if(message) {
           messageEl.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
           messageEl.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
@@ -760,6 +990,7 @@
         $.messageFeed.appendChild(tmp.firstElementChild);
 
         let messageEl = $.messageFeed.lastElementChild;
+
         hideEl($.noMessagesNotice);
         messageEl.querySelector(".editButton").addEventListener("click", messageEditButtonClickHandler);
         messageEl.querySelector(".recomputeButton").addEventListener("click", async function() {
@@ -782,8 +1013,9 @@
       }
 
       function createMessageHtml(messageObj) {
+        let messageContentHtml = DOMPurify.sanitize(marked.parse(messageObj.message));
         return `
-          <div class="message" data-id="${sanitizeHtml(messageObj.id)}" style="display:flex; padding:0.5rem;">
+          <div class="message" data-id="${sanitizeHtml(messageObj.id)}" data-can-delete="true" style="display:flex; padding:0.5rem;">
             <div class="avatar" style="${messageObj.character.avatarUrl ? `background-image:url(${sanitizeHtml(messageObj.character.avatarUrl)})` : ""};"></div>
             <div style="padding-left:0.5rem; min-width: 0;">
               <div class="info" style="flex-grow:1; display:flex; font-size:80%;">
@@ -791,10 +1023,10 @@
                 <div class="time" style="font-size:0.8rem; opacity:0.5; margin-left:0.5rem; display: flex; align-items: center;">${getDateTimeString(messageObj.creationTime)}</div>
                 <div class="editButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
                 <div class="deleteButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
-                <div class="recomputeButton" style="font-size:0.8rem; margin-left:0.5rem; display: ${messageObj.character.id === -1 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
+                <div class="recomputeButton" style="font-size:0.8rem; margin-left:0.5rem; display: ${messageObj.character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
               </div>
               <div><button class="showHiddenButton" style="cursor:pointer; display:${messageObj.hidden ? "inline-block" : "none"};">Show hidden message</button></div>
-              <div class="messageText" style="${messageObj.hidden ? "display:none;" : ""} overflow-wrap:break-word;">${DOMPurify.sanitize(marked.parse(messageObj.message))}</div>
+              <div class="messageText" style="${messageObj.hidden ? "display:none;" : ""} overflow-wrap:break-word;">${messageContentHtml}</div>
             </div>
           </div>
         `;
@@ -806,7 +1038,7 @@
         const messageId = parseInt(this.closest(".message").dataset.id);
         const originalMessage = await db.messages.get(messageId);
         const result = await prompt2({
-          message: {label: "Message", type: "text", defaultValue: originalMessage.message},
+          message: {label: "Message", type: "text", height:"fit-content", defaultValue: originalMessage.message},
         });
         if(!result) return;
         const { message } = result;
@@ -815,6 +1047,7 @@
       }
 
       async function messageDeleteButtonClickHandler(e) {
+        if(this.closest(".message").dataset.canDelete === "false") return; // it doesn't exist (just a "typing indicator" place holder) - deletion during that time is handled within the doBotReplyIfNeeded function
         e.preventDefault();
         e.stopPropagation();
         const messageId = parseInt(this.closest(".message").dataset.id);
@@ -833,31 +1066,71 @@
           systemMessage: "",
         };
       }
+      async function getSystemCharacterObj() {
+        return {
+          id: -2,
+          name: "System",
+          avatarUrl: "",
+          systemMessage: "",
+        };
+      }
 
 
       async function sendButtonClickHandler() {
         $.sendButton.disabled = true;
+        let threadId = parseInt($.messageFeed.dataset.threadId);
+        let message = $.messageInput.value;
         try {
-          let threadId = parseInt($.messageFeed.dataset.threadId);
-          let message = $.messageInput.value;
 
-          let messageObj = createMessageObj({threadId, message, characterId:-1, hidden:false});
-          let id = await addMessageToDb(messageObj);
-          messageObj.id = id;
-          
-          messageObj.character = await getUserCharacterObj();
-          appendMessageToFeed(messageObj);
-          $.messageInput.value = "";
-          $.messageInput.style.height = "";
+          if(message.startsWith("/ai")) {
+            // $.messageInput.value = "";
 
-          let characterId = (await db.threads.get(threadId)).characterId;
-          let threadCharacter = await db.characters.get(characterId);
-          await runCustomProcessMessagesFunctionIfNeeded(threadId, threadCharacter);
+            if(message.trim() === "/ai") {
+              await doBotReplyIfNeeded({forceReply:true});
+            } else {
+              message = message.replace(/^\/ai /, "");
+              const characterId = parseInt($.messageFeed.dataset.characterId);
+              const character = await db.characters.get(characterId);
+              let messageObj = createMessageObj({threadId, message, characterId, hidden:false});
+              messageObj.character = character;
+              messageObj.id = await addMessageToDb(messageObj);
+              let el = appendMessageToFeed(messageObj);
+            }
 
-          await doBotReplyIfNeeded();
+          } else {
+
+            let senderCharacterId = -1;
+            if(message.startsWith("/sys ")) {
+              message = message.replace(/^\/sys /, "");
+              senderCharacterId = -2;
+            }
+            if(message.startsWith("/system ")) {
+              message = message.replace(/^\/system /, "");
+              senderCharacterId = -2;
+            }
+
+            let messageObj = createMessageObj({threadId, message, characterId:senderCharacterId, hidden:false});
+            
+            let id = await addMessageToDb(messageObj);
+            messageObj.id = id;
+            
+            if(messageObj.characterId === -1) messageObj.character = await getUserCharacterObj();
+            if(messageObj.characterId === -2) messageObj.character = await getSystemCharacterObj();
+
+            appendMessageToFeed(messageObj);
+            $.messageInput.value = "";
+            $.messageInput.style.height = "";
+
+            let threadCharacterId = (await db.threads.get(threadId)).characterId;
+            let threadCharacter = await db.characters.get(threadCharacterId);
+            await runCustomProcessMessagesFunctionIfNeeded(threadId, threadCharacter);
+
+            await doBotReplyIfNeeded();
+
+          }
         } catch(e) {
           console.error(e);
-          alert(e);
+          alert("sendButtonClickHandler error: "+e.stack);
         }
         $.sendButton.disabled = false;
       } 
@@ -996,8 +1269,8 @@
               }
             }
             
-            // the "systemCharacter" is the one that replies 
-            let message = await getBotReply({messages, systemCharacter:characterToReplyWith, userCharacter:threadCharacter});
+            // the "aiCharacter" is the one that replies 
+            let message = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter});
 
             // if `message` is falsy, it means the bot failed to reply, so delete the message and end the loop
             if(!message) {
@@ -1069,12 +1342,23 @@
         if(threadCharacter.customCode && threadCharacter.customCode.includes("processMessages")) { // TODO: properly detect if they've defined `processMessages` -  the current `includes("processMessages")` approach is very crude
           let messages = await db.messages.where("threadId").equals(threadId).toArray();
           let inputMessages = messages.map((m, i) => {
-            return {id:i, author:m.characterId==threadCharacter.id?"ai":"user", content:m.message, hidden:m.hidden};
+            let author;
+            if(m.characterId == threadCharacter.id) author = "ai";
+            if(m.characterId == -1) author = "user";
+            if(m.characterId == -2) author = "system";
+            return {id:i, author, content:m.message, hidden:m.hidden};
           });
           let functionArgs = [inputMessages];
           let outputMessages = await securelyExecuteCustomCodeFunction(threadId, "processMessages", functionArgs);
           if(outputMessages) {
-            let outputMessageObjs = outputMessages.map(m => createMessageObj({threadId, message:m.content, characterId:m.author=="ai"?threadCharacter.id:-1, hidden:m.hidden}));
+            let outputMessageObjs = outputMessages.map(m => {
+              let characterId;
+              if(m.author=="ai") characterId = threadCharacter.id;
+              if(m.author=="user") characterId = -1;
+              if(m.author=="system") characterId = -2;
+              return createMessageObj({threadId, message:m.content, characterId, hidden:m.hidden});
+            });
+            // TODO: add some obvious optimisations here - e.g. go through messages until first change, then only update that one and all following (remember that messages can be completely re-ordered/removed/etc.)
             let originalMessageObjs = await db.messages.where("threadId").equals(threadId).toArray();
             try {
               // replace messages in the database with the output messages
@@ -1085,7 +1369,7 @@
               await db.messages.where("threadId").equals(threadId).delete();
               await db.messages.bulkAdd(originalMessageObjs);
               console.error(e);
-              alert("There was an error during custom code handling. The original messages have been restored.\n\n"+e.toString());
+              alert("There was an error during custom code handling. The original messages have been restored.\n\n"+e.stack);
             }
             await renderMessageFeed(threadId);
           }
@@ -1174,6 +1458,11 @@
         let messages = json.data.data.find(d => d.tableName === "messages");
         messages.rows = messages.rows.filter(m => keepThreadCheck(m.threadId));
 
+        let summaries = json.data.data.find(d => d.tableName === "summaries");
+        if(summaries) {
+          summaries.rows = summaries.rows.filter(s => keepThreadCheck(s.threadId));
+        }
+
         const newBlob = new Blob([JSON.stringify(json)], {type: "application/json"});
 
         const dataUri = URL.createObjectURL(newBlob);
@@ -1253,13 +1542,15 @@
           // we need to re-number all ids in the imported data to be higher than the current max ids.
 
           // get current maximum id for each table
-          let maxThreadId = (await db.threads.orderBy("id").last()).id;
-          let maxMessageId = (await db.messages.orderBy("id").last()).id;
-          let maxCharacterId = (await db.characters.orderBy("id").last()).id;
+          let maxThreadId = (await db.threads.orderBy("id").last())?.id ?? -1;
+          let maxMessageId = (await db.messages.orderBy("id").last())?.id ?? -1;
+          let maxCharacterId = (await db.characters.orderBy("id").last())?.id ?? -1;
+          // note: summaries don't have an id (we index by hash), so we don't need to re-number their ids (but note that we do need to renumber their thread ids to match the new thread ids)
 
           let importedCharacters = json.data.data.find(d => d.tableName === "characters").rows;
           let importedThreads = json.data.data.find(d => d.tableName === "threads").rows;
           let importedMessages = json.data.data.find(d => d.tableName === "messages").rows;
+          let importedSummaries = json.data.data.find(d => d.tableName === "summaries")?.rows;
           
           const existingCharacters = await db.characters.toArray();
 
@@ -1279,6 +1570,7 @@
           let characterIdMap = {};
           let threadIdMap = {};
           let messageIdMap = {};
+          let summaryIdMap = {};
 
           let charactersThatWeAlreadyHave = [];
 
@@ -1316,23 +1608,37 @@
             // re-number thread id of each message
             message.threadId = threadIdMap[message.threadId];
             // re-number author/character id of each message
-            if(message.characterId !== -1) {
+            if(message.characterId >= 0) { // remember, user messages have characterId = -1, and system messages have characterId = -2
               message.characterId = characterIdMap[message.characterId];
             }
+          }
+
+          if(importedSummaries) {
+            // convert old summary thread ids to new ones
+            for(let summary of importedSummaries) {
+              summary.threadId = threadIdMap[summary.threadId];
+            }
+            // get existing summary hashes from db
+            let existingSummaryHashes = new Set((await db.summaries.toArray()).map(s => s.hash));
+            // remove summaries we already have
+            importedSummaries = importedSummaries.filter(s => !existingSummaryHashes.has(s.hash));
           }
 
           json.data.data.find(d => d.tableName === "characters").rows = importedCharacters;
           json.data.data.find(d => d.tableName === "threads").rows = importedThreads;
           json.data.data.find(d => d.tableName === "messages").rows = importedMessages;
+          if(importedSummaries) {
+            json.data.data.find(d => d.tableName === "summaries").rows = importedSummaries;
+          }
 
           // check which misc keys user already has, and remove them from the misc table that we're importing:
           let existingMiscKeys = (await db.misc.toArray()).map(m => m.key);
           let miscData = json.data.data.find(d => d.tableName === "misc");
           miscData.rows = miscData.rows.filter(m => !existingMiscKeys.includes(m.key));
-
+          
           // convert json back to blob and import
           let blob = new Blob([JSON.stringify(json)], {type: "application/json"});
-          await db.import(blob);
+          await db.import(blob, {acceptVersionDiff:true, acceptMissingTables:true});
 
           // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
           
@@ -1361,10 +1667,8 @@
 
         if(urlHashJson.addCharacter) {
           $.newThreadButton.click();
-          let characterPromptDefaults = urlHashJson.addCharacter;
-          characterPromptDefaults.initialMessagesText = urlHashJson.addCharacter.initialMessages.join("\n---\n").trim(); // the .trim() is because the first message can be empty (indicating AI speaks first) and we don't want to put a newline before it
-          delete characterPromptDefaults.initialMessages;
-          let result = await characterDetailsPrompt(characterPromptDefaults);
+          let character = urlHashJson.addCharacter;
+          let result = await characterDetailsPrompt(character);
           if(result) {
             const character = await addCharacter(result);
             await createNewThreadWithCharacterId(character.id);
