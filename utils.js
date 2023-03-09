@@ -58,7 +58,7 @@ export async function prompt2(specs, opts={}) {
           <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
-              <textarea data-spec-key="${sanitizeHtml(key)}" style="width:100%;height:100%; min-height:4rem; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
+              <textarea data-spec-key="${sanitizeHtml(key)}" data-height="fit-content" style="width:100%; ${spec.height === "fit-content" ? "" : `height:${spec.height}`}; min-height:4rem; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
             </div>
           </div>
         </section>`;
@@ -66,8 +66,8 @@ export async function prompt2(specs, opts={}) {
     i++;
   }
   ctn.innerHTML = `
-    <div class="promptModalInnerContainer" style="background:rgba(0,0,0,0.2); position:fixed; top:0; left:0; right:0; bottom:0; z-index:9999999; display:flex; justify-content:center; color:inherit; font:inherit;">
-      <div class="sectionsContainer" style="width:400px; background:${sanitizeHtml(opts.backgroundColor)}; height: min-content; padding:1rem; border:1px solid #eaeaea; border-radius:3px; box-shadow: 0px 1px 10px 3px rgb(130 130 130 / 24%); margin-top:0.5rem; max-height: calc(100% - 1rem); overflow:auto;">
+    <div class="promptModalInnerContainer" style="background:rgba(0,0,0,0.2); position:fixed; top:0; left:0; right:0; bottom:0; z-index:9999999; display:flex; justify-content:center; color:inherit; font:inherit; padding:0.5rem;">
+      <div class="sectionsContainer" style="width:600px; background:${sanitizeHtml(opts.backgroundColor)}; height: min-content; padding:1rem; border:1px solid #eaeaea; border-radius:3px; box-shadow: 0px 1px 10px 3px rgb(130 130 130 / 24%); max-height: calc(100% - 1rem); overflow:auto;">
         ${sections}
         ${Object.values(specs).find(s => s.hidden === true) ? `
         <div style="text-align:center; margin-top:1rem; display:flex; justify-content:center;">
@@ -87,30 +87,35 @@ export async function prompt2(specs, opts={}) {
     </div>
   `;
   document.body.appendChild(ctn);
+  
+  setTimeout(() => { // settimeout to ensure rendered
+    ctn.querySelectorAll("textarea[data-height=fit-content]").forEach(el => el.style.height = Math.max(70, (el.scrollHeight+5)) + "px");
+  }, 10);
+
   let values = await new Promise((resolve) => {
-  ctn.querySelector("button.submit").onclick = () => {
-    let values = {};
-    for(let el of [...ctn.querySelectorAll("[data-spec-key]")]) {
-      if(el.tagName === "INPUT") {
-        if(el.type == "file") {
-          values[el.dataset.specKey] = el.files;
-        } else {
+    ctn.querySelector("button.submit").onclick = () => {
+      let values = {};
+      for(let el of [...ctn.querySelectorAll("[data-spec-key]")]) {
+        if(el.tagName === "INPUT") {
+          if(el.type == "file") {
+            values[el.dataset.specKey] = el.files;
+          } else {
+            values[el.dataset.specKey] = el.value;
+          }
+        } else if(el.tagName === "TEXTAREA") {
+          values[el.dataset.specKey] = el.value;
+        } else if(el.tagName === "SELECT") {
           values[el.dataset.specKey] = el.value;
         }
-      } else if(el.tagName === "TEXTAREA") {
-        values[el.dataset.specKey] = el.value;
-      } else if(el.tagName === "SELECT") {
-        values[el.dataset.specKey] = el.value;
       }
+      resolve(values);
     }
-    resolve(values);
-  }
-  ctn.querySelector("button.cancel").onclick = () => {
-    resolve(null);
-  }
-   });
-   ctn.remove();
-   return values;
+    ctn.querySelector("button.cancel").onclick = () => {
+      resolve(null);
+    }
+  });
+  ctn.remove();
+  return values;
 }
 
 
