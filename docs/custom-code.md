@@ -15,20 +15,18 @@ You can define an `async` function called `processMessages` that accepts a singl
 ```json5
 [
   {
-    "id": 0,
     "author": "user",
     "hidden": false,
     "content": "Hello",
   },
   {
-    "id": 1,
     "author": "ai",
     "hidden": false,
     "content": "Hello, how can I help you today?",
   }
 ]
 ```
-The most recent message is at the bottom.
+The most recent message is at the bottom. The `author` field can be `user`, `ai`, or `system`. Use "system" for guiding the AI's behavior, and including context/info where it wouldn't make sense to have that context/info come from the user or the AI.
 
 Your `processMessages` function can alter messages, and add messages to this array, and then it should return that updated `messages` array.
 
@@ -60,9 +58,9 @@ async function processMessages(messages) {
     let text = [...doc.querySelectorAll("h1,h2,h3,h4,p")].map(el => el.textContent).join("\n");
     text = text.slice(0, 1000); // only grab first 1000 characters
     messages.push({
-      author: "user",
+      author: "system",
       hidden: true, // hide the message so it doesn't get in the way of the conversation
-      content: "I've copied the content of the webpage that I just linked: \n\n"+text,
+      content: "Here's the content of the webpage that was linked in the previous message: \n\n"+text,
     });
   } else {
     return messages;
