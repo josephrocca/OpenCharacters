@@ -778,6 +778,8 @@
         let modelVersion = aiCharacter.modelVersion;
         let tokenLimit = 3500; // buffer due to token count being an estimate
 
+        tokenLimit -= (aiCharacter.systemMessage.length/4); // allow for system message tokens
+
         let fullMessagesArr = messages.map(m => {
           let role;
           if(m.characterId === userCharacter.id) role = "user";
@@ -873,6 +875,8 @@
         } else {
           messagesArr = fullMessagesArr.slice(0);
         }
+
+        statusEl.innerHTML = "";
 
         let maxTokensInResponse = tokenLimit - numTokensInContext;
 
