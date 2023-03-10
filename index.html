@@ -373,7 +373,8 @@
 
         // if message feed is visible, set selected thread to the currently-visible chat thread
         if($.messageFeed.offsetWidth > 0 && $.messageFeed.dataset.threadId) {
-          $.chatThreads.querySelector(`.thread[data-thread-id="${$.messageFeed.dataset.threadId}"]`).classList.add("selected");
+          let threadCardForActiveThread = $.chatThreads.querySelector(`.thread[data-thread-id="${$.messageFeed.dataset.threadId}"]`);
+          if(threadCardForActiveThread) threadCardForActiveThread.classList.add("selected");
         }
 
         $.chatThreads.querySelectorAll(".thread").forEach(thread => {
