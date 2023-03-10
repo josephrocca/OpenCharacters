@@ -1084,6 +1084,8 @@
           messageEl.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
           // update db with bot's reply
           await db.messages.update(messageObj.id, { message });
+          // update thread's lastMessageTime
+          await db.threads.update(threadId, { lastMessageTime: Date.now() });
         }
       }
 
