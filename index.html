@@ -471,6 +471,7 @@
           }
         }
         $.messageFeed.dataset.characterId = character.id;
+        $.messageFeed.innerHTML = "";
         let messageEls = messages.map(m => createMessageElement(m));
         for(let el of messageEls) {
           $.messageFeed.appendChild(el);
