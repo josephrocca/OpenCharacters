@@ -26,7 +26,9 @@ export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function prompt2(specs, opts={}) {
 
-  if(!opts.backgroundColor) opts.backgroundColor = getComputedStyle(document.body).getPropertyValue('--background');
+  if(!opts.backgroundColor) opts.backgroundColor = prompt2.defaults.backgroundColor ?? getComputedStyle(document.body).getPropertyValue('background-color');
+  if(!opts.borderColor) opts.borderColor = prompt2.defaults.borderColor ?? "#eaeaea";
+  if(!opts.borderRadius) opts.borderRadius = prompt2.defaults.borderRadius ?? "3px";
 
   let ctn = document.createElement("div");
   let sections = "";
@@ -67,7 +69,7 @@ export async function prompt2(specs, opts={}) {
   }
   ctn.innerHTML = `
     <div class="promptModalInnerContainer" style="background:rgba(0,0,0,0.2); position:fixed; top:0; left:0; right:0; bottom:0; z-index:9999999; display:flex; justify-content:center; color:inherit; font:inherit; padding:0.5rem;">
-      <div class="sectionsContainer" style="width:600px; background:${sanitizeHtml(opts.backgroundColor)}; height: min-content; padding:1rem; border:1px solid #eaeaea; border-radius:3px; box-shadow: 0px 1px 10px 3px rgb(130 130 130 / 24%); max-height: calc(100% - 1rem); overflow:auto;">
+      <div class="sectionsContainer" style="width:600px; background:${sanitizeHtml(opts.backgroundColor)}; height: min-content; padding:1rem; border:1px solid ${opts.borderColor}; border-radius:${opts.borderRadius}; box-shadow: 0px 1px 10px 3px rgb(130 130 130 / 24%); max-height: calc(100% - 1rem); overflow:auto;">
         ${sections}
         ${Object.values(specs).find(s => s.hidden === true) ? `
         <div style="text-align:center; margin-top:1rem; display:flex; justify-content:center;">
@@ -116,6 +118,90 @@ export async function prompt2(specs, opts={}) {
   });
   ctn.remove();
   return values;
+}
+
+
+export function createFloatingWindow(opts={}) {
+
+  if(!opts.backgroundColor) opts.backgroundColor = createFloatingWindow.defaults.backgroundColor ?? getComputedStyle(document.body).getPropertyValue('background-color');
+  if(!opts.borderColor) opts.borderColor = createFloatingWindow.defaults.borderColor ?? "#eaeaea";
+  if(!opts.borderRadius) opts.borderRadius = createFloatingWindow.defaults.borderRadius ?? "3px";
+  if(!opts.initialWidth) opts.initialWidth = createFloatingWindow.defaults.initialWidth ?? 500;
+  if(!opts.initialHeight) opts.initialHeight = createFloatingWindow.defaults.initialHeight ?? 300;
+
+  // calculate centered `left` value based on initial width/height
+  let left = Math.max(0, (window.innerWidth - opts.initialWidth) / 2);
+  let top = 50;
+
+  let tmp = document.createElement("div");
+  tmp.innerHTML = `<div class="window" style="background-color:${opts.backgroundColor}; border:1px solid ${opts.borderColor}; border-radius:${opts.borderRadius}; width:${opts.initialWidth}px;height:${opts.initialHeight}px;z-index:999999999;position:fixed; top:${top}px; left:${left}px; box-shadow:0px 1px 10px 3px rgb(130 130 130 / 24%); display:flex; flex-direction:column;">
+    <div class="header" style="user-select:none; cursor:move; border-bottom: 1px solid var(--border-color);display: flex;justify-content: space-between; padding:0.25rem;">
+      <div>${opts.header || ""}</div>
+      <div class="closeButton" style="min-width: 1.3rem; background: #9e9e9e; display: flex; justify-content: center; align-items: center; cursor: pointer; border-radius:${opts.borderRadius};">✖</div>
+    </div>
+    <div class="body" style="overflow:auto; padding:0.5rem;">${opts.body || ""}</div>
+    <div class="cornerResizeHandle" style="position:absolute; bottom:0; right:0; cursor:se-resize; user-select:none;width: 0; height: 0; border-style: solid; border-width: 0 0 10px 10px; border-color: transparent transparent #9e9e9e transparent;"></div>
+  </div>
+  `;
+  let windowEl = tmp.firstElementChild;
+
+  let headerEl = windowEl.querySelector(".header");
+  let bodyEl = windowEl.querySelector(".body");
+  let closeButtonEl = windowEl.querySelector(".closeButton");
+  let cornerResizeHandle = windowEl.querySelector(".cornerResizeHandle");
+
+  let mouseDown = false;
+  let x = 0;
+  let y = 0;
+  headerEl.addEventListener("mousedown", (e) => {
+    mouseDown = true;
+    x = e.clientX;
+    y = e.clientY;
+  });
+  document.documentElement.addEventListener("mouseup", () => {mouseDown=false; x=0; y=0;});
+  document.documentElement.addEventListener('mouseleave', () => {mouseDown=false; x=0; y=0;});
+  document.documentElement.addEventListener('contextmenu', () => {mouseDown=false; x=0; y=0;});
+  document.documentElement.addEventListener('mousemove', (e) => {
+    if(mouseDown) {
+      let dx = e.clientX-x;
+      let dy = e.clientY-y;
+      windowEl.style.top = parseInt(windowEl.style.top) + dy + "px";
+      windowEl.style.left = parseInt(windowEl.style.left) + dx + "px";
+      x = e.clientX;
+      y = e.clientY;
+    }
+  });
+  // make windowEl resizable from the right-hand bottom corner (cornerResizeHandle element)
+  // similar to above, but we alter width and height instead of top and left
+  let mouseDown2 = false;
+  let x2 = 0;
+  let y2 = 0;
+  cornerResizeHandle.addEventListener("mousedown", (e) => {
+    mouseDown2 = true;
+    x2 = e.clientX;
+    y2 = e.clientY;
+  });
+  document.documentElement.addEventListener("mouseup", () => {mouseDown2=false; x2=0; y2=0;});
+  document.documentElement.addEventListener('mouseleave', () => {mouseDown2=false; x2=0; y2=0;});
+  document.documentElement.addEventListener('contextmenu', () => {mouseDown2=false; x2=0; y2=0;});
+  document.documentElement.addEventListener('mousemove', (e) => {
+    if(mouseDown2) {
+      let dx = e.clientX-x2;
+      let dy = e.clientY-y2;
+      windowEl.style.height = parseInt(windowEl.style.height) + dy + "px";
+      windowEl.style.width = parseInt(windowEl.style.width) + dx + "px";
+      x2 = e.clientX;
+      y2 = e.clientY;
+    }
+  });
+
+  document.body.appendChild(windowEl);
+  return {
+    ctn: windowEl,
+    headerEl,
+    bodyEl,
+    closeButtonEl,
+  };
 }
 
 
