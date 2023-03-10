@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
-    <title>OpenCharacters - Create and share AI/ChatGPT characters</title>
+    <title>OpenCharacters - Create and share ChatGPT/AI characters</title>
   </head>
   <body>
     <style>
@@ -227,6 +227,7 @@
           <div id="characterList" style=""></div>
           <div><h2 style="text-align:center; margin-top:4rem;">Starter Characters</h2></div>
           <div id="starterCharacterList" style=""></div>
+          <br><br>
         </div>
         <div id="chatInterface" class="middleColumnScreen" style="display:flex; flex-grow:1; flex-direction:column; height:100%;">
           <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem;">Type a message to begin the chat.</div>
@@ -701,7 +702,7 @@
         
         const result = await prompt2({
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:"[A-Za-z0-9_\\- ]{1,64}" },
-          systemMessage: { label: "Initial system message/instruction/role:", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
+          systemMessage: { label: "Initial system message, instruction, role, or personality:", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
           initialMessagesText: { label: "Initial chat messages (optional). Useful for extra alignment to character. Separate messages with '---'. If first line in the text box is '---' then AI speaks first. ", type:"text", height:"fit-content", placeholder: "Hey Sammy, do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: initialMessagesText ?? "" },
           modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
