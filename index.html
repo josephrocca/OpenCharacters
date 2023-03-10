@@ -450,6 +450,10 @@
               await db.messages.where("threadId").equals(threadId).delete();
               await db.summaries.where("threadId").equals(threadId).delete();
               await renderThreadList();
+              // switch to character selection area
+              await renderCharacterList();
+              document.querySelectorAll("#middleColumn > .middleColumnScreen").forEach(el => hideEl(el));
+              showEl($.characterSelection);
             }
           });
         });
