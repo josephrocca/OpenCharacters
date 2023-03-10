@@ -311,12 +311,12 @@
       }
 
       let db = new Dexie("chatbot-ui-v1");
-      db.version(4).stores({
+      db.version(5).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         characters: "++id,name,systemMessage,modelVersion,initialMessages,avatarUrl,fitMessagesInContextMethod,temperature,customCode,creationTime,lastMessageTime",
         threads: "++id,name,characterId,creationTime,lastMessageTime",
-        messages: "++id,threadId,message,characterId,creationTime", // characterId is -1 for user, and for system it is -2.
+        messages: "++id,threadId,message,characterId,hidden,creationTime", // characterId is -1 for user, and for system it is -2.
         misc: "key,value",
         summaries: "hash,text,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries
       });
@@ -471,7 +471,10 @@
           }
         }
         $.messageFeed.dataset.characterId = character.id;
-        $.messageFeed.innerHTML = messages.map(createMessageHtml).join("");
+        let messageEls = messages.map(m => createMessageElement(m));
+        for(let el of messageEls) {
+          $.messageFeed.appendChild(el);
+        }
         $.messageFeed.querySelectorAll(".editButton").forEach(el => el.addEventListener("click", messageEditButtonClickHandler));
         $.messageFeed.querySelectorAll(".recomputeButton").forEach(el => {
           el.addEventListener("click", async function() {
@@ -533,7 +536,7 @@
           {
             id: null,
             name: "Game Master",
-            systemMessage: "You are the Game Master. You describe the results of the player's actions. You start by asking the player what type of adventure they want to play. DO NOT to \"wrap up\" the story at the end of your messages.",
+            systemMessage: "You are the Game Master. You describe the results of the player's actions. You start by asking the player what type of adventure they want to play. DO NOT to \"wrap up\" the story at the end of your messages. Keep your messages short, but interesting, engaging and creative. Summon your full imagination. Don't move the story along too fast. Stay in the present moment.",
             initialMessages: [
               "",
               "Hello, adventurer! What type of game would you like to play? Describe the world, and your character in as much or as little detail as you'd like, and I'll simulate the world within my mind to create a fun and engaging adventure for you.",
@@ -1057,8 +1060,10 @@
         if(!message) {
           el.remove();
         } else {
-          el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
-          el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+          let scrollDown = messageFeedIsNearBottom();
+          updateMessageContent(el, message);
+          if(scrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+          
           messageObj.message = message;
           let id = await addMessageToDb(messageObj);
           el.dataset.id = id;
@@ -1081,8 +1086,10 @@
         const character = await db.characters.get(characterId);
         const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), statusEl:messageEl.querySelector(".statusMessage")});
         if(message) {
-          messageEl.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
-          messageEl.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+          let scrollDown = messageFeedIsNearBottom();
+          updateMessageContent(messageEl, message);
+          if(scrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+          
           // update db with bot's reply
           await db.messages.update(messageObj.id, { message });
           // update thread's lastMessageTime
@@ -1094,10 +1101,17 @@
         return `<div class="ticontainer" style="margin-top:0.25rem; margin-left:0.25rem;"><div class="tiblock"><div class="tidot"></div><div class="tidot"></div><div class="tidot"></div></div></div>`;
       }
 
+      function messageFeedIsNearBottom() {
+        return $.messageFeed.scrollHeight - $.messageFeed.scrollTop - $.messageFeed.offsetHeight < 50;
+      }
+
       function appendMessageToFeed(messageObj) {
-        let tmp = document.createElement("div");
-        tmp.innerHTML = createMessageHtml(messageObj);
-        $.messageFeed.appendChild(tmp.firstElementChild);
+        let el = createMessageElement(messageObj);
+        
+        
+        let scrollDown = messageFeedIsNearBottom();
+        $.messageFeed.appendChild(el);
+        if(scrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
         let messageEl = $.messageFeed.lastElementChild;
 
@@ -1110,7 +1124,8 @@
         messageEl.querySelector(".showHiddenButton").addEventListener("click", showHiddenButtonClickHandler);
         messageEl.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
         messageEl.querySelector(".statusMessage").addEventListener("click", () => showEl(logsWindow.ctn));
-        $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+        
+
         return messageEl;
       }
 
@@ -1123,9 +1138,10 @@
         db.messages.update(messageObj.id, { hidden:false });
       }
 
-      function createMessageHtml(messageObj) {
+      function createMessageElement(messageObj) {
         let messageContentHtml = DOMPurify.sanitize(marked.parse(messageObj.message));
-        return `
+        let tmp = document.createElement("div");
+        tmp.innerHTML = `
           <div class="message" data-id="${sanitizeHtml(messageObj.id)}" data-can-delete="true" style="display:flex; padding:0.5rem; padding-left:0;">
             <div class="avatar" style="${messageObj.character.avatarUrl ? `background-image:url(${sanitizeHtml(messageObj.character.avatarUrl)})` : ""};"></div>
             <div style="padding-left:0.5rem; min-width: 0;">
@@ -1142,6 +1158,9 @@
             </div>
           </div>
         `;
+        let el = tmp.firstElementChild;
+        el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+        return el;
       }
 
       async function messageEditButtonClickHandler(e) {
@@ -1155,7 +1174,10 @@
         if(!result) return;
         const { message } = result;
         await db.messages.update(messageId, { message });
-        this.closest(".message").querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
+
+        let scrollDown = messageFeedIsNearBottom();
+        updateMessageContent(this.closest(".message"), message);
+        if(scrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
       }
 
       async function messageDeleteButtonClickHandler(e) {
@@ -1389,8 +1411,10 @@
               el.remove();
               break;
             } else {
-              el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
-              el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+              let scrollDown = messageFeedIsNearBottom();
+              updateMessageContent(el, message);
+              if(scrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+
               messageObj.message = message;
               let id = await addMessageToDb(messageObj);
               el.dataset.id = id;
@@ -1449,6 +1473,11 @@
         $.sendButton.disabled = false;
       });
 
+      function updateMessageContent(el, message) {
+        el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
+        el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+      }
+
       // note: this function runs after every message is sent. see here for details: https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md
       async function runCustomProcessMessagesFunctionIfNeeded(threadId, threadCharacter) {
         if(threadCharacter.customCode && threadCharacter.customCode.includes("processMessages")) { // TODO: properly detect if they've defined `processMessages` -  the current `includes("processMessages")` approach is very crude
@@ -1464,11 +1493,10 @@
           let outputMessages = await securelyExecuteCustomCodeFunction(threadId, "processMessages", functionArgs);
           if(outputMessages) {
             let outputMessageObjs = outputMessages.map(m => {
-              let characterId;
+              let characterId = -2; // default to 'system'
               if(m.author=="ai") characterId = threadCharacter.id;
               if(m.author=="user") characterId = -1;
-              if(m.author=="system") characterId = -2;
-              return createMessageObj({threadId, message:m.content, characterId, hidden:m.hidden});
+              return createMessageObj({threadId, message:m.content+"", characterId, hidden:!!m.hidden});
             });
             // TODO: add some obvious optimisations here - e.g. go through messages until first change, then only update that one and all following (remember that messages can be completely re-ordered/removed/etc.)
             let originalMessageObjs = await db.messages.where("threadId").equals(threadId).toArray();
