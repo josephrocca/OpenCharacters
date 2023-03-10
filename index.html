@@ -64,10 +64,10 @@
 
       button {
         background: var(--button-bg);
-        border: none;
         border-radius: var(--border-radius);
         cursor:pointer;
         padding: 0.125rem;
+        border: 1px solid #b4b4b4;
       }
       button:hover {
         background: var(--button-bg-hover);
@@ -77,12 +77,13 @@
       }
       textarea {
         background: var(--textarea-bg);
-        border: none;
+        border: 1px solid var(--border-color);
         border-radius: var(--border-radius);
       }
 
       input[type="text"], select {
         background: var(--textarea-bg);
+        border: 1px solid var(--border-color);
         border-radius: var(--border-radius);
       }
 
@@ -93,12 +94,14 @@
         min-height: 2rem;
       }
       #chatThreads .thread {
-        margin-top: 0.5rem;
         border-radius: var(--border-radius);
         display:flex;
         padding:0.5rem;
         cursor:pointer;
         border: 1px solid var(--border-color);
+      }
+      #chatThreads .thread:not(:first-child) {
+        margin-top: 0.5rem;
       }
       #chatThreads .thread .button {
         opacity:0.5;
@@ -194,10 +197,10 @@
           <button id="newThreadButton" style="width:100%; cursor:pointer; min-height:2rem;">💬 new chat</button>
         </div>
         <div id="threadSearchCtn" style="display:flex; width:100%; margin-top:0.5rem;">
-          <input id="threadSearchInput" style="height: 100%; flex-grow: 1; min-width: 0; padding-left: 0.5rem;" placeholder="search threads...">
+          <input id="threadSearchInput" style="height: 100%; flex-grow: 1; min-width: 0; padding-left: 0.5rem;" type="text" placeholder="search threads...">
           <button id="threadSearchButton" style="cursor:pointer;min-height: 2rem;min-width: 3rem;margin-left: 0.25rem;">🔎</button>
         </div>
-        <div id="chatThreads" style="flex-grow:1; overflow-y:auto;"></div>
+        <div id="chatThreads" style="flex-grow:1; overflow-y:auto; margin-top:0.5rem;"></div>
         <div id="appOptions">
           <button id="settingsButton" class="appOptionButton">⚙️ settings</button>
           <button id="clearDataButton" class="appOptionButton">🗑️ clear all data</button>
@@ -870,7 +873,7 @@
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
         if(!OPENAI_API_KEY) {
           let result = await prompt2({
-            openAiApiKey: { label: "Please create a new OpenAI API key and paste it here. Go to <a href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a> to do that. You can change or delete this later by clicking the 'settings' button.", type:"textLine" },
+            openAiApiKey: { label: "Please create a new OpenAI API key and paste it here. Go to <a style='color:blue' href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a> to do that. You can change or delete this later by clicking the 'settings' button.", type:"textLine" },
           });
           if(!result) return;
           await db.misc.put({ key: "openAiApiKey", value: result.openAiApiKey });
