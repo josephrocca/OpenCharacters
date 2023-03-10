@@ -18,6 +18,7 @@
         --border-radius: 3px;
         --avatar-bg: lightgrey;
         --notification-bg-color: #005ac2;
+        --button-border-color: #b4b4b4;
       }
 
 
@@ -32,6 +33,7 @@
           --selected-thread-bg: #444;
           --border-color: #333;
           --avatar-bg: #333;
+          --button-border-color: #515151;
         }
       }
 
@@ -67,7 +69,7 @@
         border-radius: var(--border-radius);
         cursor:pointer;
         padding: 0.125rem;
-        border: 1px solid #b4b4b4;
+        border: 1px solid var(--button-border-color);
       }
       button:hover {
         background: var(--button-bg-hover);
@@ -77,13 +79,13 @@
       }
       textarea {
         background: var(--textarea-bg);
-        border: 1px solid var(--border-color);
+        border: 1px solid var(--button-border-color);
         border-radius: var(--border-radius);
       }
 
       input[type="text"], select {
         background: var(--textarea-bg);
-        border: 1px solid var(--border-color);
+        border: 1px solid var(--button-border-color);
         border-radius: var(--border-radius);
       }
 
@@ -92,6 +94,14 @@
         cursor:pointer;
         margin-top:0.5rem;
         min-height: 2rem;
+      }
+      #chatThreads {
+        flex-grow:1;
+        overflow-y:auto;
+        margin-top:0.5rem;
+        -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 30px), #ffffff00 100%);
+        mask-image: linear-gradient(to bottom, black calc(100% - 30px), #ffffff00 100%);
+        padding-bottom:2rem;
       }
       #chatThreads .thread {
         border-radius: var(--border-radius);
@@ -200,7 +210,7 @@
           <input id="threadSearchInput" style="height: 100%; flex-grow: 1; min-width: 0; padding-left: 0.5rem;" type="text" placeholder="search threads...">
           <button id="threadSearchButton" style="cursor:pointer;min-height: 2rem;min-width: 3rem;margin-left: 0.25rem;">🔎</button>
         </div>
-        <div id="chatThreads" style="flex-grow:1; overflow-y:auto; margin-top:0.5rem;"></div>
+        <div id="chatThreads"></div>
         <div id="appOptions">
           <button id="settingsButton" class="appOptionButton">⚙️ settings</button>
           <button id="clearDataButton" class="appOptionButton">🗑️ clear all data</button>
@@ -211,7 +221,7 @@
       </div>
 
       <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden;">
-        <button id="leftColumnToggleButton" data-state="open" style="position:absolute; top:0.25rem; left:0.25rem; z-index:500; border:1px solid black; padding:0.25rem; display:none;">menu</button>
+        <button id="leftColumnToggleButton" data-state="open" style="position:absolute; top:0.25rem; left:0.25rem; z-index:500; padding:0.25rem; display:none;">menu</button>
         <div id="characterSelection" class="middleColumnScreen" style="flex-grow:1; display:none; overflow: auto;">
           <div><h2 style="text-align:center;">Your Characters</h2></div>
           <div id="characterList" style=""></div>
@@ -221,7 +231,7 @@
         <div id="chatInterface" class="middleColumnScreen" style="display:flex; flex-grow:1; flex-direction:column; height:100%;">
           <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem;">Type a message to begin the chat.</div>
           <div id="messageFeed" style="flex-grow:1; overflow-y:auto;"></div>
-          <div id="inputWrapper" style="display:flex; padding:0.5rem;">
+          <div id="inputWrapper" style="display:flex; padding:0.5rem; padding-left:0;">
             <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from character&#10;/ai &lt;message&gt; - reply as character&#10;/sys &lt;message&gt; - reply as system"></textarea>
             <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
               <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
@@ -1109,7 +1119,7 @@
       function createMessageHtml(messageObj) {
         let messageContentHtml = DOMPurify.sanitize(marked.parse(messageObj.message));
         return `
-          <div class="message" data-id="${sanitizeHtml(messageObj.id)}" data-can-delete="true" style="display:flex; padding:0.5rem;">
+          <div class="message" data-id="${sanitizeHtml(messageObj.id)}" data-can-delete="true" style="display:flex; padding:0.5rem; padding-left:0;">
             <div class="avatar" style="${messageObj.character.avatarUrl ? `background-image:url(${sanitizeHtml(messageObj.character.avatarUrl)})` : ""};"></div>
             <div style="padding-left:0.5rem; min-width: 0;">
               <div class="info" style="flex-grow:1; display:flex; font-size:80%;">
