@@ -809,7 +809,7 @@
         await db.threads.update(messageObj.threadId, { lastMessageTime: messageObj.creationTime });
         
         // if this isn't at the top of the thread list, re-render the thread list
-        if($.chatThreads.firstElementChild.dataset.threadId !== messageObj.threadId.toString()) {
+        if($.chatThreads.firstElementChild && $.chatThreads.firstElementChild.dataset.threadId !== messageObj.threadId.toString()) {
           await renderThreadList();
         }
 
