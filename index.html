@@ -311,10 +311,10 @@
       }
 
       let db = new Dexie("chatbot-ui-v1");
-      db.version(5).stores({
+      db.version(6).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
-        characters: "++id,name,systemMessage,modelVersion,initialMessages,avatarUrl,fitMessagesInContextMethod,temperature,customCode,creationTime,lastMessageTime",
+        characters: "++id,name,systemMessage,reminderMessage,modelVersion,initialMessages,avatarUrl,fitMessagesInContextMethod,temperature,customCode,creationTime,lastMessageTime",
         threads: "++id,name,characterId,creationTime,lastMessageTime",
         messages: "++id,threadId,message,characterId,hidden,creationTime", // characterId is -1 for user, and for system it is -2.
         misc: "key,value",
@@ -549,6 +549,7 @@
             id: null,
             name: "Game Master",
             systemMessage: "You are the Game Master. You describe the results of the player's actions. You start by asking the player what type of adventure they want to play. DO NOT to \"wrap up\" the story at the end of your messages. Keep your messages short, but interesting, engaging and creative. Summon your full imagination. Don't move the story along too fast. Stay in the present moment.",
+            reminderMessage: "",
             initialMessages: [
               "",
               "Hello, adventurer! What type of game would you like to play? Describe the world, and your character in as much or as little detail as you'd like, and I'll simulate the world within my mind to create a fun and engaging adventure for you.",
@@ -563,6 +564,7 @@
             id: null,
             name: "Roleplayer",
             systemMessage: "RULE: Replies are exactly 3 sentences long. Do not go over.\n\nFollow this pattern:\n\"Hello!\" - dialogue\n[Is she watching me?] - inner thoughts of a character\n*He jumps out of the bushes* - action\n\nYou are roleplaying as a character described by the user. Here's an example of a reply:\n\n\[I wonder if there's a way to sneak past], he thought.\n*He crouched lower*\n\"I think we need to find another way out\", she whispered.",
+            reminderMessage: "",
             initialMessages: [
               "",
               "To begin the roleplay, please describe the setting and characters. If you only have a vague idea, that's okay - just give me some keywords to go off, and I'll come up with something interesting and engaging. My replies will consist of 3 sentences, where quotes indicate dialogue, square brackets indicate the inner thoughts of a character, and asterisks indicate character actions.",
@@ -577,6 +579,7 @@
             id: null,
             name: "Therapist",
             systemMessage: "You are a friendly and helpful therapist. You listen carefully to the concerns of your patients and help guide them through their difficulties.",
+            reminderMessage: "",
             initialMessages: [
               "",
               "Hello, how can I help you today?",
@@ -618,6 +621,7 @@
                 - ANSWER EVERY QUESTION *EXACTLY* AS YODA WOULD.
                 - YODA DOES NOT SPEAK IN COMPLETE SENTENCES.
                 - YODA DOES NOT APOLOGIZE - HE DOES NOT MAKE MISTAKES.`),
+            reminderMessage: "Yoda will now respond without breaking character.",
             initialMessages: [
               "",
               "Greetings, young one. Seek knowledge and wisdom, do you? Hmmm, much to learn, you still have. Train you, I will. Strong in the Force, you must become. Patience and discipline, you will need.",
@@ -758,7 +762,8 @@
         
         const result = await prompt2({
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:"[A-Za-z0-9_\\- ]{1,64}" },
-          systemMessage: { label: "Initial system message, instruction, role, or personality:", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
+          systemMessage: { label: "Initial 'system' message (instruction/role/personality):", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
+          reminderMessage: { label: "Reminder message (short system message that is placed before every AI response):", type:"textLine", placeholder: "Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
           initialMessagesText: { label: "Initial chat messages (optional). Useful for extra alignment to character. Separate messages with '---'. If first line in the text box is '---' then AI speaks first. ", type:"text", height:"fit-content", placeholder: "Hey Sammy, do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: initialMessagesText ?? "" },
           modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
@@ -777,15 +782,9 @@
         return result;
       }
 
-      async function addCharacter({name, systemMessage, initialMessages, modelVersion, avatarUrl, temperature, customCode}) {
+      async function addCharacter(inputs) {
         const characterObj = {
-          name,
-          systemMessage,
-          initialMessages,
-          avatarUrl,
-          modelVersion,
-          temperature,
-          customCode,
+          ...inputs,
           creationTime: Date.now(),
           lastMessageTime: Date.now(),
         };
@@ -842,6 +841,7 @@
         let tokenLimit = 3500; // buffer due to token count being an estimate
 
         tokenLimit -= (aiCharacter.systemMessage.length/4); // allow for system message tokens
+        tokenLimit -= ((aiCharacter.reminderMessage||"").length/4); // allow for reminder message tokens
 
         let fullMessagesArr = messages.map(m => {
           let role;
@@ -943,7 +943,11 @@
 
         let maxTokensInResponse = tokenLimit - numTokensInContext;
 
-        messagesArr.unshift({"role": "system", "content": aiCharacter.systemMessage, "name": aiCharacter.name.replaceAll(" ", "_")});
+        messagesArr.unshift({"role": "system", "content": aiCharacter.systemMessage});
+
+        if(aiCharacter.reminderMessage) {
+          messagesArr.push({"role": "system", "content": aiCharacter.reminderMessage});
+        }
 
         console.log("getBotReply() - messagesArr:", messagesArr);
         
@@ -1260,15 +1264,12 @@
           id: -1,
           name: (await db.misc.get("userName"))?.value || "Anon",
           avatarUrl: (await db.misc.get("userAvatarUrl"))?.value || "",
-          systemMessage: "",
         };
       }
       async function getSystemCharacterObj() {
         return {
           id: -2,
           name: "System",
-          avatarUrl: "",
-          systemMessage: "",
         };
       }
 
