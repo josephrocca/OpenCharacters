@@ -243,3 +243,16 @@ export async function sha256Text(text) {
   const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   return hashHex;
 }
+
+
+export function dedent(str) {
+  // find the first non-whitespace character on each line, and then we find the minimum indent of all lines
+  // then we remove that many spaces from the beginning of each line
+  let match = str.match(/^[ \t]*(?=\S)/gm);
+  if (!match) {
+    return str;
+  }
+  let indent = Math.min(...match.map(x => x.length));
+  let re = new RegExp(`^[ \\t]{${indent}}`, 'gm');
+  return indent > 0 ? str.replace(re, '') : str;
+}
