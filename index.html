@@ -1438,7 +1438,7 @@
             if(m.characterId == threadCharacter.id) author = "ai";
             if(m.characterId == -1) author = "user";
             if(m.characterId == -2) author = "system";
-            return {id:i, author, content:m.message, hidden:m.hidden};
+            return {author, content:m.message, hidden:m.hidden};
           });
           let functionArgs = [inputMessages];
           let outputMessages = await securelyExecuteCustomCodeFunction(threadId, "processMessages", functionArgs);
