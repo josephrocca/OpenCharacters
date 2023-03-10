@@ -60,7 +60,7 @@ export async function prompt2(specs, opts={}) {
           <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
-              <textarea data-spec-key="${sanitizeHtml(key)}" data-height="fit-content" style="width:100%; ${spec.height === "fit-content" ? "" : `height:${spec.height}`}; min-height:4rem; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
+              <textarea data-spec-key="${sanitizeHtml(key)}" data-height="fit-content" style="width:100%; ${spec.height === "fit-content" ? "" : `height:${spec.height}`}; min-height:${spec.minHeight ?? "4rem"}; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
             </div>
           </div>
         </section>`;
@@ -91,7 +91,10 @@ export async function prompt2(specs, opts={}) {
   document.body.appendChild(ctn);
   
   setTimeout(() => { // settimeout to ensure rendered
-    ctn.querySelectorAll("textarea[data-height=fit-content]").forEach(el => el.style.height = Math.max(70, (el.scrollHeight+5)) + "px");
+    ctn.querySelectorAll("textarea[data-height=fit-content]").forEach(el => {
+      let minHeight = el.offsetHeight; // textareas will always have min-height set, so we can use that via offsetHeight
+      el.style.height = Math.max(minHeight, (el.scrollHeight+5)) + "px";
+    });
   }, 10);
 
   let values = await new Promise((resolve) => {
