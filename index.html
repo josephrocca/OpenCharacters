@@ -370,6 +370,12 @@
             </div>
           </div>
         `).join("");
+
+        // if message feed is visible, set selected thread to the currently-visible chat thread
+        if($.messageFeed.offsetWidth > 0 && $.messageFeed.dataset.threadId) {
+          $.chatThreads.querySelector(`.thread[data-thread-id="${$.messageFeed.dataset.threadId}"]`).classList.add("selected");
+        }
+
         $.chatThreads.querySelectorAll(".thread").forEach(thread => {
           thread.addEventListener("click", async function() {
             const threadId = parseInt(thread.dataset.threadId);
@@ -762,6 +768,12 @@
         let id = await db.messages.add(messageObj);
         // update the thread's lastMessageTime.
         await db.threads.update(messageObj.threadId, { lastMessageTime: messageObj.creationTime });
+        
+        // if this isn't at the top of the thread list, re-render the thread list
+        if($.chatThreads.firstElementChild.dataset.threadId !== messageObj.threadId.toString()) {
+          await renderThreadList();
+        }
+
         return id;
       }
 
@@ -1099,6 +1111,10 @@
           await db.messages.update(messageObj.id, { message });
           // update thread's lastMessageTime
           await db.threads.update(threadId, { lastMessageTime: Date.now() });
+          // if this isn't at the top of the thread list, re-render the thread list
+          if($.chatThreads.firstElementChild.dataset.threadId !== threadId.toString()) {
+            await renderThreadList();
+          }
         }
       }
 
