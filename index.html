@@ -148,6 +148,13 @@
         background-repeat: no-repeat;
         background-color: var(--avatar-bg);
       }
+      #chatThreads .characterEditButton {
+        font-size: 0.65rem;
+        opacity: 0.5;
+      }
+      #chatThreads .characterEditButton:hover {
+        opacity: 1;
+      }
 
       /* hide threads scrollbar */
       #chatThreads {
@@ -360,7 +367,7 @@
             <div class="avatar" style="${thread.character.avatarUrl ? `background-image:url(${sanitizeHtml(thread.character.avatarUrl)})` : ""}; border:1px solid var(--border-color);"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem;">
               <div class="nameWrapper" style="font-weight:bold; font-size:0.9rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
-              <div class="characterName" style="font-size:0.8rem;">${sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span></div>
+              <div class="characterName" style="font-size:0.8rem;">${sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span> <span class="characterEditButton">✏️</span></div>
               <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span>${sanitizeHtml(thread.character.modelVersion)}</span><span style="font-size:0.7rem; display:flex; align-items:center;" title="Thread ID">#${sanitizeHtml(thread.id)}</span></div>
             </div>
             <div style="display:flex; flex-direction:column; justify-content:space-between; font-size:0.65rem;">
@@ -447,6 +454,18 @@
             linkElement.remove();
           });
         });
+
+        
+        $.chatThreads.querySelectorAll(".characterEditButton").forEach(btn => {
+          btn.addEventListener("click", async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const threadId = parseInt(btn.closest(".thread").dataset.threadId);
+            const thread = await db.threads.get(threadId);
+            await editCharacterById(thread.characterId);
+          });
+        });
+
         $.chatThreads.querySelectorAll(".deleteButton").forEach(btn => {
           btn.addEventListener("click", async function(e) {
             e.stopPropagation();
@@ -549,7 +568,12 @@
             id: null,
             name: "Game Master",
             systemMessage: "You are the Game Master. You describe the results of the player's actions. You start by asking the player what type of adventure they want to play. DO NOT to \"wrap up\" the story at the end of your messages. Keep your messages short, but interesting, engaging and creative. Summon your full imagination. Don't move the story along too fast. Stay in the present moment.",
-            reminderMessage: "",
+            reminderMessage: dedent(`
+              The Game Master will now reply with the consequences of the player's chosen action.
+
+              The Game Master is exceptionally skilled at leading the player on an interesting, engaging, non-cliché adventure. It will let the player make interesting choices.
+
+              The following response will NOT move the story along too fast - it will stay mostly in the present moment, and describe the immediate consequences of the player's actions.`),
             initialMessages: [
               "",
               "Hello, adventurer! What type of game would you like to play? Describe the world, and your character in as much or as little detail as you'd like, and I'll simulate the world within my mind to create a fun and engaging adventure for you.",
@@ -667,23 +691,7 @@
             characterEl.querySelector(".edit").addEventListener("click", async function(e) {
               e.stopPropagation();
               const characterId = parseInt(characterEl.dataset.characterId);
-              const character = (await db.characters.where("id").equals(characterId).toArray())[0];
-              const result = await characterDetailsPrompt(character);
-              if(!result) return;
-              await db.characters.update(characterId, result);
-              await renderCharacterList();
-              await renderThreadList();
-
-              if(result.customCode !== character.customCode) {
-                // get all threads with this character and delete custom code iframes for them if they exist
-                const threads = await db.threads.where("characterId").equals(characterId).toArray();
-                for(let thread of threads) {
-                  if(customCodeIframes[thread.id]) {
-                    customCodeIframes[thread.id].remove();
-                    delete customCodeIframes[thread.id];
-                  }
-                }
-              }
+              await editCharacterById(characterId);
             });
 
             // delete character if they click the delete button
@@ -720,6 +728,26 @@
             await createNewThreadWithCharacterId(characterId);
           });
         });
+      }
+
+      async function editCharacterById(characterId) {
+        const character = await db.characters.get(characterId);
+        const result = await characterDetailsPrompt(character);
+        if(!result) return;
+        await db.characters.update(characterId, result);
+        await renderCharacterList();
+        await renderThreadList();
+
+        if(result.customCode !== character.customCode) {
+          // get all threads with this character and delete custom code iframes for them if they exist
+          const threads = await db.threads.where("characterId").equals(characterId).toArray();
+          for(let thread of threads) {
+            if(customCodeIframes[thread.id]) {
+              customCodeIframes[thread.id].remove();
+              delete customCodeIframes[thread.id];
+            }
+          }
+        }
       }
 
       async function createNewThreadWithCharacterId(characterId) {
@@ -836,10 +864,11 @@
         let threadId = messages[0].threadId;
 
         let modelVersion = aiCharacter.modelVersion;
-        let tokenLimit = 3500; // buffer due to token count being an estimate
+        let tokenLimit = 3300; // buffer due to token count being an estimate
 
         tokenLimit -= (aiCharacter.systemMessage.length/4); // allow for system message tokens
         tokenLimit -= ((aiCharacter.reminderMessage||"").length/4); // allow for reminder message tokens
+        tokenLimit -= messages.map(m => "\n\n"+m.name+": ").join("").length/4; // allow for character name tokens and newlines between messages
 
         let fullMessagesArr = messages.map(m => {
           let role;
@@ -939,7 +968,7 @@
 
         statusEl.innerHTML = "";
 
-        let maxTokensInResponse = tokenLimit - numTokensInContext;
+        let maxTokensInResponse = Math.round(tokenLimit - numTokensInContext);
 
         messagesArr.unshift({"role": "system", "content": aiCharacter.systemMessage});
 
@@ -952,7 +981,7 @@
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
         if(!OPENAI_API_KEY) {
           let result = await prompt2({
-            openAiApiKey: { label: "Please create a new OpenAI API key and paste it here. Go to <a style='color:blue' href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a> to do that. You can change or delete this later by clicking the 'settings' button.", type:"textLine" },
+            openAiApiKey: { label: "Please create a new OpenAI API secret key and paste it here. Go to <a style='color:blue' href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a> to do that. You can change or delete this later by clicking the 'settings' button.", type:"textLine", placeholder:"sk-..." },
           });
           if(!result) return;
           await db.misc.put({ key: "openAiApiKey", value: result.openAiApiKey });
@@ -972,7 +1001,7 @@
               model: modelVersion,
               messages: messagesArr,
               temperature: aiCharacter.temperature ?? 0.7,
-              // max_tokens: maxTokensInResponse,
+              max_tokens: maxTokensInResponse,
             }),
           }).then(r => r.json()).catch(e => alert("getBotReply > modelType:chat > fetch "+e.stack));
           if(!json || json.error) {
@@ -991,7 +1020,7 @@
             body: JSON.stringify({
               model: modelVersion,
               prompt,
-              // max_tokens: maxTokensInResponse,
+              max_tokens: maxTokensInResponse,
               temperature: aiCharacter.temperature ?? 0.7,
               stop: [`\n\n${userCharacter.name}:`],
             }),
@@ -1707,7 +1736,7 @@
         const result = await prompt2({
           userName: {label: "Your name:", type: "textLine", defaultValue: userNameOriginal},
           userAvatarUrl: {label: "Your avatar URL:", type: "textLine", placeholder: "(optional)", defaultValue: userAvatarUrlOriginal},
-          openAiApiKey: {label: "OpenAI API key:", type: "textLine", placeholder: "(optional)", defaultValue: openAiApiKeyOriginal},
+          openAiApiKey: {label: "OpenAI API secret key (<a style='color:blue' href='https://platform.openai.com/account/api-keys' target='_blank'>from here</a>):", type: "textLine", placeholder:"sk-...", defaultValue: openAiApiKeyOriginal},
         });
         if(!result) return;
         const { userName, userAvatarUrl, openAiApiKey } = result;
