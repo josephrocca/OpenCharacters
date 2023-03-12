@@ -257,5 +257,6 @@ export function dedent(str) {
   }
   let indent = Math.min(...match.map(x => x.length));
   let re = new RegExp(`^[ \\t]{${indent}}`, 'gm');
-  return indent > 0 ? str.replace(re, '') : str;
+  let result = indent > 0 ? str.replace(re, '') : str;
+  return result.trim(); // trim because with indented multi-line strings, the first line will almost always have a newline at the beginning, assuming regular code formatting
 }
