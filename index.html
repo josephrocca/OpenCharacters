@@ -969,7 +969,12 @@
                   {role: "system", content: "You are a text summarization assistant. You respond only with summary that the user requests - nothing more, nothing less."},
                   {role: "user", content: messageBatchSummarizationInstruction},
                 ];
-                summary = await getChatCompletion({messages, model:"gpt-3.5-turbo", temperature:0.7});
+                while(1) {
+                  summary = await getChatCompletion({messages, model:"gpt-3.5-turbo", temperature:0.7});
+                  if(summary) break;
+                  statusEl.innerHTML = `error, retrying...`;
+                  await delay(3000);
+                }
                 console.log("summary:", summary);
                 log(`<b>computed summary:</b> ${summary}`);
                 await db.summaries.put({hash, summary, threadId});
@@ -1496,7 +1501,6 @@
         if(now-utcMs > 1000*60*60*24) return new Date(utcMs).toISOString().split('T')[0].replace(/-/g, "/")+" "+new Date(utcMs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}).replace(/^0([0-9]):/, "$1:");
         else return new Date(utcMs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}).replace(/^0([0-9]):/, "$1:");
       }
-
 
       // db naming --> public custom code API naming
       const characterPropertiesVisibleToCustomCode = {
