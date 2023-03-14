@@ -55,7 +55,7 @@ You can also access and edit character data via `oc.character.propertyName`. Her
 
 Yes, a character can even edit its own custom code!
 
-Here's one which allows the AI to see the contents of webpages if you put URLs in your messages:
+Here's some custom code which allows the AI to see the contents of webpages if you put URLs in your messages:
 
 ```js
 oc.thread.on("MessageAdded", async function () {
@@ -68,15 +68,13 @@ oc.thread.on("MessageAdded", async function () {
     // NOTE: you need to replace corsproxy.com with an actual cors proxy - you can make one easily using replit or glitch.com, for example
     let html = await fetch("https://corsproxy.com/?url="+encodeURIComponent(urlsInLastMessage.at(-1)).then(r => r.text()));
     let doc = new DOMParser().parseFromString(html, "text/html");
-    let text = [...doc.querySelectorAll("h1,h2,h3,h4,p")].map(el => el.textContent).join("\n");
+    let text = [...doc.querySelectorAll("h1,h2,h3,h4,p,pre")].map(el => el.textContent).join("\n");
     text = text.slice(0, 1000); // only grab first 1000 characters
     messages.push({
       author: "system",
       hidden: true, // hide the message so it doesn't get in the way of the conversation
       content: "Here's the content of the webpage that was linked in the previous message: \n\n"+text,
     });
-  } else {
-    return messages;
   }
 });
 ```
