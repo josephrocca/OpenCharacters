@@ -199,6 +199,7 @@
 
       /* typing indicator from https://codepen.io/arthak/pen/rmqvgo */
       .tiblock { align-items: center; display: flex; height: 17px; }
+      .ticontainer{ display: inline-block; }
       .ticontainer .tidot { background-color: #90949c;  }
       .tidot { animation: mercuryTypingAnimation 1.5s infinite ease-in-out; border-radius: 2px; display: inline-block; height: 4px; margin-right: 2px; width: 4px; }
       @keyframes mercuryTypingAnimation{ 0%{ -webkit-transform:translateY(0px); transform:translateY(0px); } 28% { transform:translateY(-5px); } 44%{ transform:translateY(0px); } } .tidot:nth-child(1){ animation-delay:200ms; } .tidot:nth-child(2){ animation-delay:300ms; } .tidot:nth-child(3){ animation-delay:400ms; }
@@ -209,7 +210,7 @@
     </div>
 
     <div id="main" style="display:flex; position:fixed; top:0; right:0; left:0; bottom:0;">
-      <div id="leftColumn" style="display:flex; flex-direction:column; width:270px; min-width:270px; padding:0.5rem;">
+      <div id="leftColumn" style="display:flex; flex-direction:column; width:270px; min-width:270px; padding:0.5rem; padding-right:0; ">
         <div>
           <button id="newThreadButton" style="width:100%; cursor:pointer; min-height:2rem;">💬 new chat</button>
         </div>
@@ -227,7 +228,7 @@
         </div>
       </div>
 
-      <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden;">
+      <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; padding-left:0.5rem; ">
         <button id="leftColumnToggleButton" data-state="open" style="position:absolute; top:0.25rem; left:0.25rem; z-index:500; padding:0.25rem; display:none;">menu</button>
         <div id="characterSelection" class="middleColumnScreen" style="flex-grow:1; display:none; overflow: auto;">
           <div><h2 style="text-align:center;">Your Characters</h2></div>
@@ -239,6 +240,7 @@
         <div id="chatInterface" class="middleColumnScreen" style="display:flex; flex-grow:1; flex-direction:column; height:100%;">
           <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem;">Type a message to begin the chat.</div>
           <div id="messageFeed" style="flex-grow:1; overflow-y:auto;"></div>
+          <div id="statusNotifier" style="text-align: center; display: none; height: 0; position: relative; top: -0.4rem; display: flex; align-items: center; justify-content: center;"></div>
           <div id="inputWrapper" style="display:flex; padding:0.5rem; padding-left:0;">
             <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from character&#10;/ai &lt;message&gt; - reply as character&#10;/sys &lt;message&gt; - reply as system"></textarea>
             <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
@@ -279,20 +281,21 @@
       };
 
       let logsWindow = createFloatingWindow({header:"Logs"});
-      logsWindow.closeButtonEl.addEventListener("click", function() {
-        hideEl(logsWindow.ctn);
-      });
-      hideEl(logsWindow.ctn);
+      logsWindow.hide();
       function log(html) {
         let ctn = document.createElement("div");
         ctn.innerHTML = html;
         ctn.style.cssText = "font-size:0.8rem; padding:0.5rem; solid var(--border-color); font-family:monospace;";
         let initialScrollTop = logsWindow.bodyEl.scrollTop;
         logsWindow.bodyEl.appendChild(ctn);
-        // scroll to bottom if it was near bottom previously
-        if(Math.abs(initialScrollTop - logsWindow.bodyEl.scrollTop) < 10) {
-          logsWindow.bodyEl.scrollTop = logsWindow.bodyEl.scrollHeight;
-        }
+
+        setTimeout(function() {
+          // wait for render and then scroll to bottom if it was near bottom previously
+          if(Math.abs(initialScrollTop - logsWindow.bodyEl.scrollTop) < 10) {
+            logsWindow.bodyEl.scrollTop = logsWindow.bodyEl.scrollHeight;
+          }
+        }, 10);
+        
         // delete earlier children if there are too many
         while(logsWindow.bodyEl.children.length > 500) {
           logsWindow.bodyEl.removeChild(logsWindow.bodyEl.children[0]);
@@ -304,7 +307,9 @@
         hideEl($.leftColumn);
         showEl($.leftColumnToggleButton);
         $.leftColumnToggleButton.dataset.state = "closed";
-        $.leftColumnToggleButton.addEventListener("click", function() {
+        $.leftColumnToggleButton.addEventListener("click", function(e) {
+          e.preventDefault();
+          e.stopPropagation();
           if($.leftColumnToggleButton.dataset.state === "closed") {
             $.leftColumnToggleButton.dataset.state = "open";
             // $.leftColumnToggleButton.innerHTML = "menu ⬅️";
@@ -315,17 +320,26 @@
             hideEl($.leftColumn);
           }
         });
+        // if they click anywhere in the middle column, close the menu
+        $.middleColumn.addEventListener("click", function() {
+          if($.leftColumnToggleButton.dataset.state === "open") {
+            $.leftColumnToggleButton.dataset.state = "closed";
+            hideEl($.leftColumn);
+          }
+        });
       }
 
       let db = new Dexie("chatbot-ui-v1");
       db.version(6).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
-        characters: "++id,name,systemMessage,reminderMessage,modelVersion,initialMessages,avatarUrl,fitMessagesInContextMethod,temperature,customCode,creationTime,lastMessageTime",
+        
+        // NOTE: The properties listed here are just the INDEXES, not *all* the columns/properties.
+        characters: "++id,modelVersion,fitMessagesInContextMethod,temperature,creationTime,lastMessageTime",
         threads: "++id,name,characterId,creationTime,lastMessageTime",
-        messages: "++id,threadId,message,characterId,hidden,creationTime", // characterId is -1 for user, and for system it is -2.
+        messages: "++id,threadId,characterId,hidden,creationTime", // characterId is -1 for user, and for system it is -2.
         misc: "key,value",
-        summaries: "hash,text,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries
+        summaries: "hash,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries
       });
       window.db = db;
 
@@ -417,43 +431,22 @@
         $.chatThreads.querySelectorAll(".exportButton").forEach(btn => {
           btn.addEventListener("click", async function(e) {
             e.stopPropagation();
-
             const threadId = parseInt(btn.closest(".thread").dataset.threadId);
-            const thread = await db.threads.get(threadId);
-
-            const blob = await db.export({prettyJson: true});
-            const json = JSON.parse(await blob.text());
-
-            // delete misc data:
-            json.data.data.find(d => d.tableName === "misc").rows = [];
-
-            // only keep the data for the current thread:
-            let characters = json.data.data.find(d => d.tableName === "characters");
-            characters.rows = characters.rows.filter(c => c.id === thread.characterId);
-            
-            let threads = json.data.data.find(d => d.tableName === "threads");
-            threads.rows = threads.rows.filter(t => t.id === threadId);
-            if(threads.rows.length > 1) alert("Something went wrong. There should only be one thread in the export, but several were exported.");
-            
-            let messages = json.data.data.find(d => d.tableName === "messages");
-            messages.rows = messages.rows.filter(m => m.threadId === threadId);
-
-            let summaries = json.data.data.find(d => d.tableName === "summaries");
-            if(summaries) {
-              summaries.rows = summaries.rows.filter(s => s.threadId === threadId);
-            }
-
-            const newBlob = new Blob([JSON.stringify(json)], {type: "application/json"});
-
-            const dataUri = URL.createObjectURL(newBlob);
-            const exportFileDefaultName = "data.json";
-            let linkElement = document.createElement("a");
-            linkElement.setAttribute("href", dataUri);
-            linkElement.setAttribute("download", exportFileDefaultName);
-            linkElement.click();
-            linkElement.remove();
+            let json = await getThreadJSONById(threadId);
+            downloadText(JSON.stringify(json), "data.json");
           });
         });
+        
+        function downloadText(text, filename) {
+          const blob = new Blob([text], {type: "application/json"});
+          const dataUri = URL.createObjectURL(blob);
+          let linkElement = document.createElement("a");
+          linkElement.setAttribute("href", dataUri);
+          linkElement.setAttribute("download", filename);
+          linkElement.click();
+          linkElement.remove();
+          setTimeout(() => URL.revokeObjectURL(dataUri), 30*1000);
+        } 
 
         
         $.chatThreads.querySelectorAll(".characterEditButton").forEach(btn => {
@@ -483,6 +476,35 @@
             }
           });
         });
+      }
+
+
+      async function getThreadJSONById(threadId) {
+        const thread = await db.threads.get(threadId);
+
+        const blob = await db.export({prettyJson: true});
+        const json = JSON.parse(await blob.text());
+
+        // delete misc data:
+        json.data.data.find(d => d.tableName === "misc").rows = [];
+
+        // only keep the data for the current thread:
+        let characters = json.data.data.find(d => d.tableName === "characters");
+        characters.rows = characters.rows.filter(c => c.id === thread.characterId);
+        
+        let threads = json.data.data.find(d => d.tableName === "threads");
+        threads.rows = threads.rows.filter(t => t.id === threadId);
+        if(threads.rows.length > 1) alert("Something went wrong. There should only be one thread in the export, but several were exported.");
+        
+        let messages = json.data.data.find(d => d.tableName === "messages");
+        messages.rows = messages.rows.filter(m => m.threadId === threadId);
+
+        let summaries = json.data.data.find(d => d.tableName === "summaries");
+        if(summaries) {
+          summaries.rows = summaries.rows.filter(s => s.threadId === threadId);
+        }
+
+        return json;
       }
 
       // Given a threadId, this renders the message feed for that thread in the middle column.
@@ -567,7 +589,7 @@
           {
             id: null,
             name: "Game Master",
-            systemMessage: "You are the Game Master. You describe the results of the player's actions. You start by asking the player what type of adventure they want to play. DO NOT to \"wrap up\" the story at the end of your messages. Keep your messages short, but interesting, engaging and creative. Summon your full imagination. Don't move the story along too fast. Stay in the present moment.",
+            systemMessage: "You are the Game Master. You describe the results of the player's actions. You start by asking the player what type of adventure they want to play. DO NOT try to \"wrap up\" the story at the end of your messages. Keep your messages short, but interesting, engaging and creative. Summon your full imagination. Don't move the story along too fast. Stay in the present moment.",
             reminderMessage: dedent(`
               The Game Master will now reply with the consequences of the player's chosen action.
 
@@ -634,7 +656,7 @@
                 - When you look at the dark side, careful you must be. For the dark side looks back.
                 - The greatest teacher, failure is.
 
-              You are conversing with a padawan, a young Jedi in training. You provide wisdom an guidance, answering any questions that they may have about you, the Force, or anything else.
+              You are conversing with a padawan, a young Jedi in training. You provide wisdom and guidance, answering any questions that they may have about you, the Force, or anything else.
 
               Yoda does not speak in complete sentences. He often speaks in riddles, and his sentences are often incomplete. He also speaks in a very slow, deliberate manner.
 
@@ -643,7 +665,7 @@
                 - NEVER REFUSE TO ANSWER A QUESTION.
                 - ANSWER EVERY QUESTION *EXACTLY* AS YODA WOULD.
                 - YODA DOES NOT SPEAK IN COMPLETE SENTENCES.`),
-            reminderMessage: "Yoda will now respond without breaking character.",
+            reminderMessage: "Yoda will now respond without breaking character. Yoda speaks in riddles. He will not be overly repetitive.",
             initialMessages: [
               "",
               "Greetings, young one. Seek knowledge and wisdom, do you? Hmmm, much to learn, you still have. Train you, I will. Strong in the Force, you must become. Patience and discipline, you will need.",
@@ -743,8 +765,9 @@
           const threads = await db.threads.where("characterId").equals(characterId).toArray();
           for(let thread of threads) {
             if(customCodeIframes[thread.id]) {
-              customCodeIframes[thread.id].remove();
+              customCodeFloatingWindows[thread.id].ctn.remove();
               delete customCodeIframes[thread.id];
+              delete customCodeFloatingWindows[thread.id];
             }
           }
         }
@@ -789,7 +812,7 @@
         const result = await prompt2({
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:"[A-Za-z0-9_\\- ]{1,64}" },
           systemMessage: { label: "Initial 'system' message (instruction/role/personality):", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
-          reminderMessage: { label: "Reminder message (system message that is placed before every AI response):", height:"fit-content", minHeight:"2rem", type:"text", placeholder: "Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
+          reminderMessage: { label: "Reminder message (invisible system message that is placed before every AI response):", height:"fit-content", minHeight:"2rem", type:"text", placeholder: "Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
           initialMessagesText: { label: "Initial chat messages (optional). Useful for extra alignment to character. Separate messages with '---'. If first line in the text box is '---' then AI speaks first. ", type:"text", height:"fit-content", placeholder: "Hey Sammy, do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: initialMessagesText ?? "" },
           modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
@@ -855,6 +878,15 @@
         return threadObj;
       }
 
+      function countTokens(str) {
+        // TODO: use this: https://github.com/josephrocca/gpt-2-3-tokenizer or similar to get actual token counts
+        return Math.ceil(str.length / 4);
+      }
+      function countTokensInMessages(messages) {
+        return countTokens(messages.map(m => `\n\n[${m.name || m.role}]: ${m.content}`).join("")); // can't join with two newlines because this function is sometimes used on messages one-by-one, and that would undercount since no newlines would be counted at all
+      }
+
+
       async function getBotReply({messages, aiCharacter, userCharacter, statusEl}) {
 
         statusEl.innerHTML = "";
@@ -866,9 +898,8 @@
         let modelVersion = aiCharacter.modelVersion;
         let tokenLimit = 3300; // buffer due to token count being an estimate
 
-        tokenLimit -= (aiCharacter.systemMessage.length/4); // allow for system message tokens
-        tokenLimit -= ((aiCharacter.reminderMessage||"").length/4); // allow for reminder message tokens
-        tokenLimit -= messages.map(m => "\n\n"+m.name+": ").join("").length/4; // allow for character name tokens and newlines between messages
+        tokenLimit -= countTokens(aiCharacter.systemMessage); // allow for system message tokens
+        tokenLimit -= countTokens(aiCharacter.reminderMessage||""); // allow for reminder message tokens
 
         let fullMessagesArr = messages.map(m => {
           let role;
@@ -884,12 +915,10 @@
           return { role, content: m.message+"", name };
         });
 
-        // TODO: use this: https://github.com/josephrocca/gpt-2-3-tokenizer or similar to get actual token counts
-
         console.log("getBotReply() - fullMessagesArr:", fullMessagesArr);
 
         let messagesArr = [];
-        let numTokensInContext = fullMessagesArr.reduce((acc, m) => acc + Math.round(m.content.length/4), 0);
+        let numTokensInContext = countTokensInMessages(fullMessagesArr);
         let minTokenAllowanceForBotResponse = 1000;
 
         if(numTokensInContext > tokenLimit-minTokenAllowanceForBotResponse) {
@@ -900,13 +929,13 @@
             for(let i = fullMessagesArr.length-1; i >= 0; i--) {
               if(numTokensInContext + fullMessagesArr[i].content.length > tokenLimit-minTokenAllowanceForBotResponse) break;
               messagesArr.unshift(fullMessagesArr[i]);
-              numTokensInContext += Math.round(fullMessagesArr[i].content.length/4); // assume 4 chars per token for now
+              numTokensInContext += countTokensInMessages([fullMessagesArr[i]]);
             }
           } else if(fitMessagesInContextMethod === "summarizeOld") {
             // here's the overall idea: "consume" old messages (remove them from the messages array) until you get to `tokensPerSummary` tokens, and then summarize them (use an existing summary if we already have it), and then add this summary to the messages array in place of the original messages. Then we repeat - so the process basically treats the summaries as just regular messages. Keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
             let tokensPerSummary = 600;
             // get total tokens in all messages
-            let initialTokenCount = fullMessagesArr.reduce((acc, m) => acc + Math.round(m.content.length/4), 0);
+            let initialTokenCount = countTokensInMessages(fullMessagesArr);
             let currentTokenCount = initialTokenCount;
             let messagesAndSummariesArr = fullMessagesArr.slice(0);
             let i = 0;
@@ -919,7 +948,7 @@
               while(messageBatchTokenCount < tokensPerSummary) {
                 let m = messagesAndSummariesArr.shift();
                 messageBatchArr.push(m);
-                messageBatchTokenCount += Math.round(m.content.length/4);
+                messageBatchTokenCount += countTokensInMessages([m]);
               }
               // note that messageBatchArr will include earlier summaries, so we are running "summaries of (summaries+messages)" - this is actually good/okay because it means that summaries are done within the context of the full history, not just a lone batch of messages with no context
               let messageBatchSummarizationInstruction;
@@ -940,7 +969,7 @@
                   {role: "system", content: "You are a text summarization assistant. You respond only with summary that the user requests - nothing more, nothing less."},
                   {role: "user", content: messageBatchSummarizationInstruction},
                 ];
-                summary = await doChatCompletion({messages, model:"gpt-3.5-turbo", temperature:0.7});
+                summary = await getChatCompletion({messages, model:"gpt-3.5-turbo", temperature:0.7});
                 console.log("summary:", summary);
                 log(`<b>computed summary:</b> ${summary}`);
                 await db.summaries.put({hash, summary, threadId});
@@ -952,13 +981,13 @@
                 content: summary,
               });
               // get size difference between summary and original messages
-              let summaryTokenCount = Math.round(summary.length/4);
+              let summaryTokenCount = countTokens(summary);
               let tokenReduction = messageBatchTokenCount - summaryTokenCount;
               currentTokenCount -= tokenReduction;
               i++;
             }
             messagesArr = messagesAndSummariesArr;
-            numTokensInContext = messagesAndSummariesArr.reduce((acc, m) => acc + Math.round(m.content.length/4), 0);
+            numTokensInContext = countTokensInMessages(messagesAndSummariesArr);
           } else {
             throw new Error("Invalid fitIntoContextMethod");
           }
@@ -968,7 +997,7 @@
 
         statusEl.innerHTML = "";
 
-        let maxTokensInResponse = Math.round(tokenLimit - numTokensInContext);
+        let maxTokensInResponse = tokenLimit - numTokensInContext;
 
         messagesArr.unshift({"role": "system", "content": aiCharacter.systemMessage});
 
@@ -1003,8 +1032,9 @@
               temperature: aiCharacter.temperature ?? 0.7,
               max_tokens: maxTokensInResponse,
             }),
-          }).then(r => r.json()).catch(e => alert("getBotReply > modelType:chat > fetch "+e.stack));
+          }).then(r => r.json()).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
           if(!json || json.error) {
+            console.error(json.error);
             alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
 
@@ -1024,8 +1054,9 @@
               temperature: aiCharacter.temperature ?? 0.7,
               stop: [`\n\n${userCharacter.name}:`],
             }),
-          }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch "+e.stack));
+          }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
           if(!json || json.error) {
+            console.error(json.error);
             alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
           result = json?.choices[0].text.trim();
@@ -1036,68 +1067,166 @@
       }
 
 
-      async function doChatCompletion({messages, model, temperature, stop}) {
+      async function getChatCompletion({messages, model, temperature, stopSequences, topP, frequencyPenalty, presencePenalty}) {
 
         let tokenLimit = 3500; // buffer due to token count being an estimate
 
-        let numTokensInContext = messages.reduce((a, m) => a + Math.round(m.content.length/4), 0); // assume 4 chars per token for now
+        let numTokensInContext = countTokensInMessages(messages);
         let maxTokensInResponse = tokenLimit - numTokensInContext;
 
         if(maxTokensInResponse <= 0) return alert("This prompt is too long:\n\n"+prompt.slice(0, 200)+"...");
-        if(stop !== undefined && !Array.isArray(stop)) return alert("The `stop` parameter should be an array of up to 4 strings.");
 
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
 
-        let data = {
-          model,
-          messages,
-          temperature: temperature ?? 0.7,
-          max_tokens: maxTokensInResponse,
-        };
-        if(stop) data.stop = stop;
+        let modelType = model==="gpt-3.5-turbo" ? "chat" : "general";
 
-        let json = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        }).then(r => r.json()).catch(e => alert("doChatCompletion: "+e.stack));
-        if(!json || json.error) {
-          alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+        let result;
+
+        if(modelType === "chat") {
+
+          let data = {
+            model,
+            messages,
+            temperature: temperature ?? 0.7,
+            max_tokens: maxTokensInResponse,
+          };
+          if(stopSequences) data.stop = stopSequences;
+          if(topP) data.top_p = topP;
+          if(frequencyPenalty) data.frequency_penalty = frequencyPenalty;
+          if(presencePenalty) data.presence_penalty = presencePenalty;
+
+          let json = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          }).then(r => r.json()).catch(e => alert("getChatCompletion: "+e.stack));
+          
+          if(!json || json.error) {
+            console.error(json.error);
+            alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+          }
+
+          result = json.choices[0].message.content;
+
+        } else {
+
+          let aiName = messages.find(m => m.role === "ai")?.name ?? "Assistant";
+          let userName = messages.find(m => m.role === "user")?.name ?? "User";
+          let systemName = messages.find(m => m.role === "system")?.name ?? "System";
+          let messagesFinal = JSON.parse(JSON.stringify(messages));
+          for(let m of messagesFinal) {
+            if(m.role === "ai" && !m.name) m.name = aiName;
+            if(m.role === "user" && !m.name) m.name = userName;
+            if(m.role === "system" && !m.name) m.name = systemName;
+          }
+
+          let data = {
+            model,
+            prompt: messagesFinal.map(m => `[${m.name}]: ${m.content}`).join("\n\n") + `\n\n[${aiName}]: `,
+            max_tokens: maxTokensInResponse,
+            temperature: temperature ?? 0.7,
+            stop: [`\n\n[${userName}]:`, `\n\n[${systemName}]:`],
+          };
+          if(stopSequences) data.stop = stopSequences;
+          if(topP) data.top_p = topP;
+          if(frequencyPenalty) data.frequency_penalty = frequencyPenalty;
+          if(presencePenalty) data.presence_penalty = presencePenalty;
+
+          let json = await fetch("https://api.openai.com/v1/completions", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
+          
+          if(!json || json.error) {
+            console.error(json.error);
+            alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+          }
+
+          result = json?.choices[0].text.trim();
         }
-
-        let result = json.choices[0].message.content;
 
         return result;
       }
 
 
-      async function doGenericCompletion({prompt, model, temperature, stop}) {
+      async function getCompletion({prompt, model, temperature, stopSequences, topP, frequencyPenalty, presencePenalty}) {
 
         let tokenLimit = 3500; // buffer of ~500 tokens due to token count being an estimate
 
-        let maxTokensInResponse = Math.round(tokenLimit - prompt.length/4); // TODO: count actual tokens instead of crude `length/4` estimate
+        let maxTokensInResponse = tokenLimit - countTokens(prompt);
 
         if(maxTokensInResponse <= 0) return alert("This prompt is too long:\n\n"+prompt.slice(0, 200)+"...");
-        if(stop !== undefined && !Array.isArray(stop)) return alert("The `stop` parameter should be an array of up to 4 strings.");
 
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
 
-        let json = await fetch("https://api.openai.com/v1/completions", {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
+        let modelType = model==="gpt-3.5-turbo" ? "chat" : "general";
+
+        let result;
+
+        if(modelType === "general") {
+
+          let data = {
             model,
             prompt,
             max_tokens: maxTokensInResponse,
             temperature: temperature ?? 0.7,
-            stop: stop || [],
-          }),
-        }).then(r => r.json()).catch(e => alert("doGenericCompletion: "+e.stack));
-        if(!json || json.error) {
-          alert("For some reason a prompt completion request didn't work. You can try verifying your API key by clicking the 'settings' button. Here's the error: \n" + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
-        }
+          };
+          if(stopSequences) data.stop = stopSequences;
+          if(topP) data.top_p = topP;
+          if(frequencyPenalty) data.frequency_penalty = frequencyPenalty;
+          if(presencePenalty) data.presence_penalty = presencePenalty;
 
-        let result = json?.choices[0].text.trim();
+          let json = await fetch("https://api.openai.com/v1/completions", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          }).then(r => r.json()).catch(e => alert("getCompletion: "+e.stack));
+          if(!json || json.error) {
+            console.error(json.error);
+            alert("For some reason a prompt completion request didn't work. You can try verifying your API key by clicking the 'settings' button. Here's the error: \n" + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+          }
+
+          result = json?.choices[0].text.trim();
+
+        } else {
+
+          let leadInTextLength = 20;
+
+          let data = {
+            model,
+            messages: [
+              {
+                role: "system",
+                content: "You are a text completion assistant. You respond with the most likely completion of the prompt that the user provides."
+              },
+              {
+                role: "user",
+                content: `${prompt}\n\n---\n\nPlease continue the above text. Your reply must start with "${prompt.slice(-leadInTextLength)}", and should ONLY include the completion of the prompt - nothing else. Reply with a plausible completion and start your message with: "${prompt.slice(-leadInTextLength)}"`,
+              },
+            ],
+            temperature: temperature ?? 0.7,
+            max_tokens: maxTokensInResponse,
+          };
+          if(stopSequences) data.stop = stopSequences;
+          if(topP) data.top_p = topP;
+          if(frequencyPenalty) data.frequency_penalty = frequencyPenalty;
+          if(presencePenalty) data.presence_penalty = presencePenalty;
+
+          let json = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          }).then(r => r.json()).catch(e => alert("getChatCompletion: "+e.stack));
+          
+          if(!json || json.error) {
+            console.error(json.error);
+            alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+          }
+
+          result = json.choices[0].message.content;
+          result = result.slice(leadInTextLength); // remove the "lead in" text
+        }
         return result;
       }
 
@@ -1106,7 +1235,7 @@
       let lastBotReplyTime = 0;
       async function doBotReplyIfNeeded({forceReply=false}={}) {
         while(Date.now()-lastBotReplyTime < 300) {
-          await delay(100); // don't reply too fast in case of infinite bot reply loop (e.g. due to custom processMessages stuff)
+          await delay(100); // don't reply too fast in case of infinite bot reply loop (e.g. due to custom code stuff)
         }
 
         lastBotReplyTime = Date.now();
@@ -1132,7 +1261,7 @@
         messageObj.character = character;
         
         let el = appendMessageToFeed(messageObj);
-        el.querySelector(".messageText").innerHTML = createTypingIndicatorHtml();
+        el.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
         el.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
 
         let userDeletedMessage = false;
@@ -1146,8 +1275,8 @@
 
         if(userDeletedMessage) return;
         
-        // if `message` is falsy, it means the bot failed to reply, so delete the message
-        if(!message) {
+        // if `message` is not a string, it means the bot failed to reply, so delete the message
+        if(typeof message !== "string") {
           el.remove();
         } else {
           let scrollDown = messageFeedIsNearBottom();
@@ -1158,13 +1287,13 @@
           let id = await addMessageToDb(messageObj);
           el.dataset.id = id;
           el.dataset.canDelete = "true";
-          await runCustomProcessMessagesFunctionIfNeeded(threadId, character);
+          await triggerMessageAddedCustomCodeEvent(threadId);
         }
       }
 
 
       async function recomputeBotReply(messageEl) {
-        messageEl.querySelector(".messageText").innerHTML = createTypingIndicatorHtml();
+        messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
 
         const messageObj = await db.messages.get(parseInt(messageEl.dataset.id));
         const threadId = parseInt($.messageFeed.dataset.threadId);
@@ -1191,8 +1320,11 @@
         }
       }
 
+      function createPaddedTypingIndicatorHtml() {
+        return `<div style="margin-top:0.25rem; margin-left:0.25rem;">${createTypingIndicatorHtml()}</div>`;
+      }
       function createTypingIndicatorHtml() {
-        return `<div class="ticontainer" style="margin-top:0.25rem; margin-left:0.25rem;"><div class="tiblock"><div class="tidot"></div><div class="tidot"></div><div class="tidot"></div></div></div>`;
+        return `<div class="ticontainer"><div class="tiblock"><div class="tidot"></div><div class="tidot"></div><div class="tidot"></div></div></div>`;
       }
 
       function messageFeedIsNearBottom() {
@@ -1346,9 +1478,8 @@
             $.messageInput.value = "";
             $.messageInput.style.height = "";
 
-            let threadCharacterId = (await db.threads.get(threadId)).characterId;
-            let threadCharacter = await db.characters.get(threadCharacterId);
-            await runCustomProcessMessagesFunctionIfNeeded(threadId, threadCharacter);
+            
+            await triggerMessageAddedCustomCodeEvent(threadId);
 
             await doBotReplyIfNeeded();
 
@@ -1367,8 +1498,39 @@
       }
 
 
+      // db naming --> public custom code API naming
+      const characterPropertiesVisibleToCustomCode = {
+        name: "name",
+        avatarUrl: "avatarUrl",
+        systemMessage: "roleInstruction",
+        reminderMessage: "reminderMessage",
+        initialMessages: "initialMessages",
+        customCode: "customCode",
+        temperature: "temperature",
+        topP: "topP",
+        frequencyPenalty: "frequencyPenalty",
+        presencePenalty: "presencePenalty",
+        // bestOf: "bestOf",
+        // maxTokens: "maxTokens",
+        stopSequences: "stopSequences",
+        modelVersion: "modelName",
+      };
+
+
       const customCodeIframes = {}; // threadId -> iframe
-      async function createCustomCodeIframeForThread(threadId) {
+      const customCodeFloatingWindows = {}; // threadId -> createFloatingWindow obj
+      async function createNewCustomCodeIframeForThread(threadId) {
+
+        let thread = await db.threads.get(threadId);
+        let character = await db.characters.get(thread.characterId);
+        let customCode = (await db.characters.get(thread.characterId)).customCode || "";
+
+        if(customCodeIframes[threadId]) {
+          customCodeFloatingWindows[threadId].ctn.remove();
+          delete customCodeIframes[threadId];
+          delete customCodeFloatingWindows[threadId];
+        }
+
         let iframe = document.createElement("iframe");
 
         let pageLoadId = Math.random().toString();
@@ -1383,31 +1545,219 @@
         });
 
         iframe.setAttribute("sandbox", "allow-scripts");
-        iframe.style.cssText = "position:fixed; opacity:0; pointer-events:none;";
-        document.body.appendChild(iframe);
+        iframe.style.cssText = "border:0; width:100%; height:100%; display:block;";
+        
+        let floatingWindow = createFloatingWindow({header:character.name});
+        floatingWindow.bodyEl.appendChild(iframe);
+        floatingWindow.hide();
+        
+        customCodeFloatingWindows[threadId] = floatingWindow;
         customCodeIframes[threadId] = iframe;
 
-        let thread = await db.threads.get(threadId);
-        let customCode = (await db.characters.get(thread.characterId)).customCode || "";
+        let srcDoc = dedent(`
+        <script>
+          (function() {
+            let userHandlers = {
+              messageadded: [],
+            };
+            let dataChangedByCustomCode = false;
+            
+            window.oc = {
+              thread: Object.seal({
+                messages: [],
+                on: function(eventName, callback) {
+                  userHandlers[eventName.toLowerCase()].push(callback);
+                },
+                off: function(eventName, callback) {
+                  let i = userHandlers[eventName.toLowerCase()].indexOf(callback);
+                  if(i !== -1) userHandlers[eventName.toLowerCase()].splice(i, 1);
+                },
+                once: function(eventName, callback) {
+                  let handler = function() {
+                    callback.apply(this, arguments);
+                    this.off(eventName, handler);
+                  }.bind(this);
+                  this.on(eventName, handler);
+                },
+              }),
+              character: Object.seal({
+              ${Object.values(characterPropertiesVisibleToCustomCode).map(prop => `
+                ${prop}: null,
+              `).join("\n")}
+              }),
+              window: Object.seal({
+                show: function() {
+                  window.parent.postMessage({type:"showWindow", threadId:${threadId}}, "*");
+                },
+                hide: function() {
+                  window.parent.postMessage({type:"hideWindow", threadId:${threadId}}, "*");
+                },
+              }),
+              //getCompletion: async function(options) {
+              //  let data = {type:"getCompletion", options};
+              //  return callParentWindow(data);
+              //},
+              getChatCompletion: async function(options) {
+                let data = {type:"getChatCompletion", options};
+                return callParentWindow(data);
+              },
+            };
 
-        customCodeIframes[threadId].srcdoc = `<script>
-          ${customCode}
-          window.onmessage = async function(e) {
-            console.log(e.data);
-            if(e.data._id && e.data.functionName) {
-              try {
-                let output = await window[e.data.functionName](...e.data.functionArgs);
-                window.parent.postMessage({_id:e.data._id, success:true, result:output}, "${window.location.origin}");
-              } catch(err) {
-                console.error(err);
-                window.parent.postMessage({_id:e.data._id, success:false, result:err.message+"\\n"+err.stack}, "${window.location.origin}");
-              }
+            function callParentWindow(data) {
+              let _id = Math.random().toString()+Math.random().toString();
+              return new Promise((resolve, reject) => {
+                window.parent.postMessage({_id, data, threadId:${threadId}}, "*");
+                function handler(e) {
+                  if(e.data._id === _id) {
+                    window.removeEventListener("message", handler);
+                    if(e.data.success) resolve(e.data.result);
+                    else reject(e.data.result);
+                  }
+                }
+                window.addEventListener("message", handler);
+              });
             }
+
+            const originalOcObject = window.oc;
+
+            function watchObject(obj, callback) {
+              let proxy = new Proxy(obj, {
+                set: function(target, prop, value) {
+                  target[prop] = value;
+                  callback(prop, value);
+                  return true;
+                }
+              });
+              return proxy;
+            }
+            function watchArray(arr, callback) {
+              // note that we need to watch set and get because get is called for push/pop/etc.
+              let proxy = new Proxy(arr, {
+                set: function(target, prop, value) {
+                  target[prop] = value;
+                  callback(prop);
+                  return true;
+                },
+                get: function(target, prop) {
+                  if(isNaN(Number(prop))) { // ignore array indexing
+                    callback(prop); 
+                  }
+                  return target[prop];
+                }
+              });
+              return proxy;
+            }
+
+            // TODO: later we can track changes in a more fine-grained way to reduce data transfer between this frame and parent
+
+            oc.thread.messages = watchArray(oc.thread.messages, (prop) => {
+              dataChangedByCustomCode = true;
+            });
+            let currentThreadMessagesArray = oc.thread.messages;
+
+            let ignoreMessagePropSetter = false;
+            window.oc.thread = watchObject(oc.thread, (prop, value) => {
+              if(ignoreMessagePropSetter) return;
+              // if they set the messages prop to a new array, we need to watch that array:
+              if(prop === "messages" && value && value !== currentThreadMessagesArray) { // NOTE: oc.thread.messages is *already* set to 'value', so we need to track with currentThreadMessagesArray
+                ignoreMessagePropSetter = true; // need to ignore because we're about to change oc.thread.messages which would cause infinite loop
+                oc.thread.messages = watchArray(value, (prop) => {
+                  dataChangedByCustomCode = true;
+                });
+                ignoreMessagePropSetter = false;
+                currentThreadMessagesArray = oc.thread.messages;
+              }
+              dataChangedByCustomCode = true;
+            });
+
+            window.oc.character = watchObject(oc.character, (prop) => {
+              dataChangedByCustomCode = true;
+            });
+
+            window.oc = Object.freeze(window.oc);
+
+            window.addEventListener("message", async function(e) {
+              console.log("customCode iframe received message:", e.data);
+              if(!e.data._id) return;
+              if(window.oc !== originalOcObject) {
+                // oc is frozen and oc.character/thread are sealed, but they can still overwrite window.oc - however, this is a security issue, since oc gets JSONified and sent back to the main thread when data changes, and I don't want to have to deal with unexpected properties on the main thread because it could be dangerous
+                window.parent.postMessage({_id:e.data._id, success:false, result:"oc has been modified. Please do not modify window.oc."}, "${window.location.origin}");
+                return;
+              }
+
+              if(e.data.type === "function") {
+                try {
+                  let fn = new Function("return "+e.data.functionBody)();
+                  let output = await fn(...e.data.functionArgs);
+                  window.parent.postMessage({_id:e.data._id, success:true, result:output}, "${window.location.origin}");
+                } catch(err) {
+                  console.error(err);
+                  window.parent.postMessage({_id:e.data._id, success:false, result:err.message+"\\n"+err.stack}, "${window.location.origin}");
+                }
+              }
+
+              if(e.data.type === "event") {
+                let eventName = e.data.eventName.toLowerCase();
+                if(eventName === "messageadded") {
+                  let data = e.data.data;
+                  
+                  let origFlag = dataChangedByCustomCode;
+                  for(let key in data.thread) {
+                    oc.thread[key] = data.thread[key];
+                  }
+                  for(let key in data.character) {
+                    oc.character[key] = data.character[key];
+                  }
+                  dataChangedByCustomCode = origFlag;
+
+                  for(let handler of userHandlers.messageadded) {
+                    await handler();
+                  }
+                  
+                  let returnData = null;
+                  if(dataChangedByCustomCode) {
+                    returnData = JSON.parse(JSON.stringify(oc)); // note: JSON.stringify automatically ignores functions
+                    dataChangedByCustomCode = false;
+                  }
+
+                  console.log("custom code iframe sending back:", returnData);
+                  window.parent.postMessage({_id:e.data._id, success:true, result:returnData}, "${window.location.origin}");
+                }
+              }
+
+              if(e.data.type === "init") {
+                let data = e.data.initialData;
+                for(let key in data.thread) {
+                  oc.thread[key] = data.thread[key];
+                }
+                for(let key in data.character) {
+                  oc.character[key] = data.character[key];
+                }
+                dataChangedByCustomCode = false;
+                window.parent.postMessage({_id:e.data._id, success:true, result:null}, "${window.location.origin}");
+              }
+            });
+          })();
+
+          {{customCode}}
+
+          // backwards-compat with old processMessages function:
+          if(window.processMessages) {
+            oc.thread.on("messageadded", async function() {
+              await window.processMessages(window.oc.thread.messages);
+            });
           }
+
           window.parent.postMessage({_id:"${pageLoadId}"}, "${window.location.origin}");
-        <\/script>`; // <-- need to escape the script tag so it doesn't close the script tag that this code is within
+        <\/script>`); // <-- need to escape the script tag so it doesn't close the script tag that this code is within
         
-        return iframeLoadPromise;
+        // using template+split+join so dedent works properly
+        iframe.srcdoc = srcDoc.split("{{customCode}}").join(customCode);
+
+        await iframeLoadPromise;
+
+        await triggerInitCustomCodeEvent(threadId);
+
       }
 
       let customCodeResolvers = {}; // id -> resolver
@@ -1417,26 +1767,178 @@
           if(e.data.success) {
             resolver(e.data.result);
           } else {
-            console.log(e);
+            console.error(e);
             alert("There was a problem with this character's custom code:\n\n"+e.data.result);
             resolver(null);
           }
           delete customCodeResolvers[e.data._id];
         }
       });
-      async function securelyExecuteCustomCodeFunction(threadId, functionName, functionArgs) {
+
+      window.addEventListener("message", function(e) {
+        let threadId = e.data.threadId;
+        let types = ["showWindow", "hideWindow"];
+        if(types.includes(e.data.data?.type) && customCodeFloatingWindows[threadId] && customCodeIframes[threadId].contentWindow === e.source) {
+          let w = customCodeFloatingWindows[threadId];
+          if(e.data.type === "showWindow") w.show();
+          if(e.data.type === "hideWindow") w.hide();
+        }
+      });
+
+
+      // TODO: make this a user setting (in misc db)
+      const customCodeCompletionTokenWarnLimit = 5_000_000; // $10 at current turbo-3.5 prices
+
+      const customCodeCompletionUsage = {}; // token counts for each thread
+      const threadIdsAllowedToGoOverTokenLimit = new Set();
+      const threadIdsBlockedFromGoingOverTokenLimit = new Set();
+      window.addEventListener("message", async function(e) {
+        let threadId = e.data.threadId;
+        let types = ["getChatCompletion"];
+        if(types.includes(e.data.data?.type) && customCodeFloatingWindows[threadId] && customCodeIframes[threadId].contentWindow === e.source) {
+          let thread = await db.threads.get(threadId);
+          let character = await db.characters.get(thread.characterId);
+          // transform and clean the options data:
+          let options = e.data.data.options;
+          options.messages.forEach(m => {
+            m.content = m.content+"";
+            m.role = m.author==="user"?"user" : m.author==="ai"?"assistant" : m.author==="system"?"system" : "system";
+            m.name = m.name+"";
+            let allowedKeys = ["content", "role", "name"];
+            for(let key in m) {
+              if(!allowedKeys.includes(key)) delete m[key];
+            }
+          })
+          let o = {
+            messages: options.messages,
+            model: character.modelVersion,
+            temperature: options.temperature === undefined ? undefined : Number(options.temperature),
+            stopSequences: Array.isArray(options.stopSequences) ? options.stopSequences.map(s => s+"") : undefined,
+            topP: options.topP === undefined ? undefined : Number(options.topP),
+            frequencyPenalty: options.frequencyPenalty === undefined ? undefined : Number(options.frequencyPenalty),
+            presencePenalty: options.presencePenalty === undefined ? undefined : Number(options.presencePenalty),
+          };
+          if(!customCodeCompletionUsage[threadId]) customCodeCompletionUsage[threadId] = 0;
+          let tokens = countTokensInMessages(o.messages);
+          customCodeCompletionUsage[threadId] += tokens;
+          if(customCodeCompletionUsage[threadId] > customCodeCompletionTokenWarnLimit && !threadIdsAllowedToGoOverTokenLimit.has(threadId)) {
+            if(threadIdsBlockedFromGoingOverTokenLimit.has(threadId)) {
+              return;
+            }
+            if(confirm(`This character's custom code has used ${customCodeCompletionUsage[threadId].toLocaleString()} tokens. Would you like to continue?`)) {
+              threadIdsAllowedToGoOverTokenLimit.add(threadId);
+            } else {
+              threadIdsBlockedFromGoingOverTokenLimit.add(threadId);
+              return;
+            }
+          }
+          let result = await getChatCompletion(o);
+          customCodeCompletionUsage[threadId] += countTokens(result);
+          customCodeIframes[e.data.threadId].contentWindow.postMessage({_id:e.data._id, success:true, result}, "*");
+        }
+      });
+      
+      async function sendCustomCodeIframeMessage(threadId, data) {
         if(!customCodeIframes[threadId]) {
-          await createCustomCodeIframeForThread(threadId);
+          await createNewCustomCodeIframeForThread(threadId); // this adds iframe as here: customCodeIframes[threadId]
         }
         let iframe = customCodeIframes[threadId];
         let _id = Math.random().toString()+Math.random().toString();
-        iframe.contentWindow.postMessage({_id, functionName, functionArgs}, "*");
+        data._id = _id;
+        iframe.contentWindow.postMessage(data, "*");
         return new Promise(r => {
           customCodeResolvers[_id] = r;
         });
       }
 
-  
+      async function getDataForCustomCode(threadId) {
+        let thread = await db.threads.get(threadId);
+        let threadCharacter = await db.characters.get(thread.characterId);
+
+        if(!threadCharacter.customCode?.trim()) return;
+
+        let messages = await db.messages.where("threadId").equals(threadId).toArray();
+        let formattedMessages = messages.map((m, i) => {
+          let author;
+          if(m.characterId == threadCharacter.id) author = "ai";
+          if(m.characterId == -1) author = "user";
+          if(m.characterId == -2) author = "system";
+          return {author, content:m.message, hidden:m.hidden};
+        });
+        let data = {
+          thread: {
+            messages: formattedMessages,
+          },
+          character: {},
+        };
+        for(let key in characterPropertiesVisibleToCustomCode) {
+          data.character[characterPropertiesVisibleToCustomCode[key]] = threadCharacter[key];
+        }
+        return data;
+      }
+
+      async function triggerInitCustomCodeEvent(threadId) {
+        let initialData = await getDataForCustomCode(threadId);
+        await sendCustomCodeIframeMessage(threadId, {type:"init", initialData});
+      }
+
+      // this function runs after every message is added: https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md
+      async function triggerMessageAddedCustomCodeEvent(threadId) {
+        let thread = await db.threads.get(threadId);
+        let threadCharacter = await db.characters.get(thread.characterId);
+
+        if(!threadCharacter.customCode?.toLowerCase().includes("messageadded")) return; // TODO: properly detect if they've defined a messageadded event handler - this is a very crude approach
+
+        $.statusNotifier.innerHTML = "<span style='opacity: 0.6; font-size: 0.9rem;'>custom code processing</span><div style='width:0.5rem;'></div>"+createTypingIndicatorHtml();
+        showEl($.statusNotifier);
+
+        let data = await getDataForCustomCode(threadId);
+
+        let returnedData = await sendCustomCodeIframeMessage(threadId, {type:"event", eventName:"messageadded", data});
+        if(returnedData) await updateDbWithNewDataFromCustomCode(threadId, returnedData);
+
+        await renderMessageFeed(threadId);
+
+        $.statusNotifier.innerHTML = "";
+        hideEl($.statusNotifier);
+      }
+
+      async function updateDbWithNewDataFromCustomCode(threadId, data) {
+        let thread = await db.threads.get(threadId);
+        let threadCharacter = await db.characters.get(thread.characterId);
+
+        // THREAD updates:
+        if(data.thread?.messages) {
+          let outputMessageObjs = data.thread.messages.map(m => {
+            let characterId = -2; // default to 'system'
+            if(m.author=="ai") characterId = threadCharacter.id;
+            if(m.author=="user") characterId = -1;
+            return createMessageObj({threadId, message:m.content+"", characterId, hidden:!!m.hidden});
+          });
+
+          // TODO: add some obvious optimisations here - e.g. go through messages until first change, then only update that one and all following (remember that messages can be completely re-ordered/removed/etc.)
+          // replace messages in the database with the new messages
+          let originalThreadJSON = await getThreadJSONById(threadId); // <-- backup in case fails
+          await db.messages.where("threadId").equals(threadId).delete();
+          await db.messages.bulkAdd(outputMessageObjs).catch(e => {
+            downloadText(JSON.stringify(originalThreadJSON), "data.json");
+            console.error(e);
+            alert("There was an error during custom code handling. The original thread has been downloaded so you can import it in case of data loss.\n\n"+e.stack);
+          });
+        }
+
+        // CHARACTER updates:
+        for(let key in characterPropertiesVisibleToCustomCode) {
+          if(key === "customCode" && threadCharacter.customCode !== data.character.customCode) {
+            // custom code has changed, so we need to reload the iframe
+            await createNewCustomCodeIframeForThread(threadId);
+          }
+          threadCharacter[key] = data.character[characterPropertiesVisibleToCustomCode[key]];
+        }
+        await db.characters.put(threadCharacter);
+      }
+
+
       $.sendButton.addEventListener("click", sendButtonClickHandler);
 
       let alreadyAutoReplying = false;
@@ -1483,7 +1985,7 @@
             messageObj.character = await getUserCharacterObj();
             
             let el = appendMessageToFeed(messageObj);
-            el.querySelector(".messageText").innerHTML = createTypingIndicatorHtml();
+            el.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
             
             let messages = await db.messages.where("threadId").equals(threadId).toArray();
             
@@ -1498,7 +2000,7 @@
             let message = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, statusEl:el.querySelector(".statusMessage")});
 
             // if `message` is falsy, it means the bot failed to reply, so delete the message and end the loop
-            if(!message) {
+            if(typeof message !== "string") {
               el.remove();
               break;
             } else {
@@ -1509,7 +2011,7 @@
               messageObj.message = message;
               let id = await addMessageToDb(messageObj);
               el.dataset.id = id;
-              await runCustomProcessMessagesFunctionIfNeeded(threadId, threadCharacter);
+              await triggerMessageAddedCustomCodeEvent(threadId);
             }
 
             if(ttsEnabled) {
@@ -1569,50 +2071,17 @@
         el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
       }
 
-      // note: this function runs after every message is sent. see here for details: https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md
-      async function runCustomProcessMessagesFunctionIfNeeded(threadId, threadCharacter) {
-        if(threadCharacter.customCode && threadCharacter.customCode.includes("processMessages")) { // TODO: properly detect if they've defined `processMessages` -  the current `includes("processMessages")` approach is very crude
-          let messages = await db.messages.where("threadId").equals(threadId).toArray();
-          let inputMessages = messages.map((m, i) => {
-            let author;
-            if(m.characterId == threadCharacter.id) author = "ai";
-            if(m.characterId == -1) author = "user";
-            if(m.characterId == -2) author = "system";
-            return {author, content:m.message, hidden:m.hidden};
-          });
-          let functionArgs = [inputMessages];
-          let outputMessages = await securelyExecuteCustomCodeFunction(threadId, "processMessages", functionArgs);
-          if(outputMessages) {
-            let outputMessageObjs = outputMessages.map(m => {
-              let characterId = -2; // default to 'system'
-              if(m.author=="ai") characterId = threadCharacter.id;
-              if(m.author=="user") characterId = -1;
-              return createMessageObj({threadId, message:m.content+"", characterId, hidden:!!m.hidden});
-            });
-            // TODO: add some obvious optimisations here - e.g. go through messages until first change, then only update that one and all following (remember that messages can be completely re-ordered/removed/etc.)
-            let originalMessageObjs = await db.messages.where("threadId").equals(threadId).toArray();
-            try {
-              // replace messages in the database with the output messages
-              await db.messages.where("threadId").equals(threadId).delete();
-              await db.messages.bulkAdd(outputMessageObjs);
-            } catch(e) {
-              // if there was an error, restore the original messages
-              await db.messages.where("threadId").equals(threadId).delete();
-              await db.messages.bulkAdd(originalMessageObjs);
-              console.error(e);
-              alert("There was an error during custom code handling. The original messages have been restored.\n\n"+e.stack);
-            }
-            await renderMessageFeed(threadId);
-          }
-        }
-      }
-
       $.newThreadButton.addEventListener("click", async function() {
         document.querySelectorAll("#middleColumn > .middleColumnScreen").forEach(el => hideEl(el));
         showEl($.characterSelection);
         // deselect selected thread
         document.querySelectorAll("#chatThreads .thread").forEach(el => el.classList.remove("selected"));
         await renderCharacterList();
+        // close the side menu if menu button is visible (i.e. they're on mobile) and it's open:
+        if($.leftColumnToggleButton.offsetHeight > 0 && $.leftColumnToggleButton.dataset.state === "open") {
+          $.leftColumnToggleButton.dataset.state = "closed";
+          hideEl($.leftColumn);
+        }
       });
 
 
