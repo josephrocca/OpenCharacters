@@ -56,7 +56,7 @@ You can also access and edit character data via `oc.character.propertyName`. Her
 Yes, a character can even edit its own custom code!
 
 Note that currently only the `temperature` setting is available in the character editor, so if you e.g. wanted to add a stop sequence for your character so it stops whenever it writes ":)" and also set presence pentalty to 1, then you could do it by adding this text to the custom code text box in the character editor:
-```
+```js
 oc.character.stopSequences = [":)"];
 oc.character.presencePenalty = 1;
 ```
