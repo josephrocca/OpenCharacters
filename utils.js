@@ -142,7 +142,7 @@ export function createFloatingWindow(opts={}) {
       <div>${opts.header || ""}</div>
       <div class="closeButton" style="min-width: 1.3rem; background: #9e9e9e; display: flex; justify-content: center; align-items: center; cursor: pointer; border-radius:${opts.borderRadius};">✖</div>
     </div>
-    <div class="body" style="overflow:auto; padding:0.5rem;">${opts.body || ""}</div>
+    <div class="body" style="overflow:auto; width:100%; height:100%;">${opts.body || ""}</div>
     <div class="cornerResizeHandle" style="position:absolute; bottom:0; right:0; cursor:se-resize; user-select:none;width: 0; height: 0; border-style: solid; border-width: 0 0 10px 10px; border-color: transparent transparent #9e9e9e transparent;"></div>
   </div>
   `;
@@ -199,12 +199,30 @@ export function createFloatingWindow(opts={}) {
   });
 
   document.body.appendChild(windowEl);
-  return {
+
+  const api = {
     ctn: windowEl,
     headerEl,
     bodyEl,
-    closeButtonEl,
+    hide: function() {
+      // we don't just display:none because IIUC that can cause iframes in bodyEl to do weird stuff: https://github.com/whatwg/html/issues/1813
+      windowEl.style.opacity = "0";
+      windowEl.style.pointerEvents = "none";
+    },
+    show: function() {
+      windowEl.style.opacity = "1";
+      windowEl.style.pointerEvents = "auto";
+    },
+    delete: function() {
+      windowEl.remove();
+    }
   };
+
+  closeButtonEl.addEventListener("click", () => {
+    api.delete();
+  });
+
+  return api;
 }
 
 
