@@ -87,14 +87,25 @@ oc.thread.on("MessageAdded", async function () {
 
 Custom code is executed securely (i.e. in a sandboxed iframe), so if you're using a character that was created by someone else (and that has some custom code), then their code won't be able to access your OpenAI API key, or your messages with other characters, for example. The custom code only has access to the character data and the messages for your current conversation.
 
+Here's some custom code that adds a `/name` command that changes the name of the character. It intercepts the user messages, and if it begins with `/name`, then it changes `oc.character.name` to whatever comes after `/name`, and then deletes the message.
+```js
+oc.thread.on("MessageAdded", async function () {
+  let m = oc.thread.messages.at(-1); // most recent message
+  if(m.author === "user" && m.content.startsWith("/name ")) {
+    oc.character.name = m.content.replace(/^\/name /, "");
+    oc.thread.messages.pop(); // remove the message
+  }
+});
+```
 
-## Visual Display and User Inputs
+
+### Visual Display and User Inputs
 
 Your custom code runs inside an iframe. You can visually display the iframe using `oc.window.show()` (and hide with `oc.window.hide()`). The user can drag the embed around on the page and resize it. All your custom code is running within the iframe embed whether it's currently displayed or not. You can display content in the embed by just executing custom code like `document.body.innerHTML = "hello world"`.
 
 You can use the embed to e.g. display a dynamic video/gif avatar for your character that changes depending on the emotion that is evident in the characters messages. Or to e.g. display the result of the p5.js code that the character is helping you write. And so on.
 
-## Using the GPT API in Your Custom Code
+### Using the GPT API in Your Custom Code
 
 You may want to use GPT/LLM APIs in your message processing code. For example, you may want to classify the sentiment of a message in order to display the correct avatar (see "Visual Display ..." section), or you may want to implement your own custom chat-summarization system, for example. In this case, you can use `oc.getChatCompletion`.
 
@@ -108,6 +119,18 @@ let result = await oc.getChatCompletion({
 });
 ```
 The `messages` parameter is the only required one.
+
+Here's an example of some custom code that edits all messages to include more emojis:
+
+```js
+oc.thread.on("MessageAdded", async function() {
+  let lastMessage = oc.thread.messages.at(-1);
+  let result = await oc.getChatCompletion({
+    messages: [{author:"user", content:`Please edit the following message to have more emojis:\n\n---\n${lastMessage.content}\n---\n\nReply with only the above message (the content between ---), but with more (relevant) emojis.`}],
+  });
+  lastMessage.content = result.trim().replace(/^---|---$/g, "").trim();
+});
+```
 
 ## Storing Data (not yet implemented! open an issue if you want it)
 
