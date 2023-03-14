@@ -9,9 +9,9 @@ Some examples of what you can do with this:
  * Give your character the ability to create pictures using Stable Diffusion
  * Auto-delete/retry messages from your character that contain certain keywords
 
-## The `processMessages` Function
+## The `oc` Object
 
-You can define an `async` function called `processMessages` that accepts a single input: `messages`, which is an array that looks like this:
+Within your custom code, you can access and update `oc.thread.messages`. It's an array that looks like this:
 ```json5
 [
   {
@@ -28,31 +28,44 @@ You can define an `async` function called `processMessages` that accepts a singl
 ```
 The most recent message is at the bottom. The `author` field can be `user`, `ai`, or `system`. Use "system" for guiding the AI's behavior, and including context/info where it wouldn't make sense to have that context/info come from the user or the AI.
 
-Your `processMessages` function can alter messages, and add messages to this array, and then it should return that updated `messages` array.
-
-The `processMessages` function is executed after *every* turn in the conversation. It 'sees' all the messages posted so far.
-
-Below is a example of a `processMessages` function that you could put in the "custom code" text area of a character. This `processMessages` function simply replaces all instances of `:)` with `૮ ˶ᵔ ᵕ ᵔ˶ ა`.
-
+Here's an example that replaces `:)` with `૮ ˶ᵔ ᵕ ᵔ˶ ა` in every message *whenever a new message is added to the thread*:
 ```js
-async function processMessages(messages) {
-  for(let m of messages) {
+oc.thread.on("MessageAdded", function() {
+  for(let m of oc.thread.messages) {
     m.content = m.content.replaceAll(":)", "૮ ˶ᵔ ᵕ ᵔ˶ ა");
   }
-  return messages;
-}
+});
 ```
+You can edit existing messages like in this example, and you can also delete them, or add new ones.
+
+You can also access and edit character data via `oc.character.propertyName`. Here are the property names that you can access and edit:
+
+ * name
+ * avatarUrl
+ * roleInstruction
+ * reminderMessage
+ * initialMessages
+ * customCode
+ * temperature
+ * topP
+ * frequencyPenalty
+ * presencePenalty
+ * stopSequences
+ * modelName
+
+Yes, a character can even edit its own custom code!
 
 Here's one which allows the AI to see the contents of webpages if you put URLs in your messages:
 
 ```js
-// note that you need to replace corsproxy.com with an actual cors proxy
-async function processMessages(messages) {
+oc.thread.on("MessageAdded", async function () {
+  let messages = oc.thread.messages;
   let lastMessage = messages.at(-1);
   if(lastMessage.author === "user") {
     let urlsInLastMessage = [...lastMessage.content.matchAll(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g)].map(m => m[0]);
     if(urlsInLastMessage.length === 0) return messages;
     // just grab contents for last URL
+    // NOTE: you need to replace corsproxy.com with an actual cors proxy - you can make one easily using replit or glitch.com, for example
     let html = await fetch("https://corsproxy.com/?url="+encodeURIComponent(urlsInLastMessage.at(-1)).then(r => r.text()));
     let doc = new DOMParser().parseFromString(html, "text/html");
     let text = [...doc.querySelectorAll("h1,h2,h3,h4,p")].map(el => el.textContent).join("\n");
@@ -65,28 +78,33 @@ async function processMessages(messages) {
   } else {
     return messages;
   }
-}
+});
 ```
 
-The function is executed securely (i.e. in a sandboxed iframe), so if you're using a character that was created by someone else (and that has some custom code), then their code won't be able to access your OpenAI API key, or your messages with other characters, for example. The `processMessages` function only has access to the `messages` array for your current conversation.
+Custom code is executed securely (i.e. in a sandboxed iframe), so if you're using a character that was created by someone else (and that has some custom code), then their code won't be able to access your OpenAI API key, or your messages with other characters, for example. The custom code only has access to the character data and the messages for your current conversation.
+
+
+## Visual Display and User Inputs
+
+Your custom code runs inside an iframe. You can visually display the iframe using `oc.window.show()` (and hide with `oc.window.hide()`). The user can drag the embed around on the page and resize it. All your custom code is running within the iframe embed whether it's currently displayed or not. You can display content in the embed by just executing custom code like `document.body.innerHTML = "hello world"`.
+
+You can use the embed to e.g. display a dynamic video/gif avatar for your character that changes depending on the emotion that is evident in the characters messages. Or to e.g. display the result of the p5.js code that the character is helping you write. And so on.
+
+## Using the GPT API in Your Custom Code
+
+You may want to use GPT/LLM APIs in your message processing code. For example, you may want to classify the sentiment of a message in order to display the correct avatar (see "Visual Display ..." section), or you may want to implement your own custom chat-summarization system, for example. In this case, you can use `oc.getChatCompletion`.
+
+Use it like this:
+```js
+let result = await oc.getChatCompletion({
+  messages: [{role:"system", content:"..."},{role:"user", content:"..."}, {role:"assistant", content:"..."}, ...],
+  temperature: 1,
+  stopSequences: ["\n"],
+  ...
+});
+```
+The `messages` parameter is the only required one.
 
 ## Storing Data (not yet implemented! open an issue if you want it)
 
 If you'd like to save some data that is generated by your custom code, then you can do that by using the special `storage` object. You can store data at the "character level" with `storage.character.blah = 10`, or at the thread level with `storage.thread.blah = 10`. The `storage.character` data will be available in all threads that use this character, whereas the `storage.thread` will only be available within this thread. Just use `storage.character` and `storage.thread` like as if they're regular JS objects, and the data will be automatically persisted until the user deletes the character or thread, respectively.
-
-## Visual Display and User Inputs (not yet implemented! open an issue if you want it)
-
-Your custom code runs inside an iframe. You can visually display the iframe using `embed.show()` (and hide with `embed.hide()`). You can resize it with `embed.resize(width, height)` where `width` and `height` are in pixels. You can move it with `embed.moveTo(x, y)`. You can get the size of the user's browser window with `embed.parent.width` and `embed.parent.height`. The user can drag the embed around on the page and resize it, so the positioning and sizing isn't very important. All your custom code is running within the embed whether it's currently displayed or not. You can display content in the embed by just executing custom code like `document.body.innerHTML = "hello world"`.
-
-You can use the embed to e.g. display a dynamic video/gif avatar for your character that changes depending on the emotion that is evident in the characters messages. Or to e.g. display the result of the p5.js code that the character is helping you write. And so on.
-
-You can also use the embed to collect input data from the user. For example, let's say you want to create a character that can access a Stable Diffusion API. If you want to share that character with the community, then you obviously wouldn't want to have your API key "hard-coded" into the character share URL. So you could just tell people "Hey, you need to edit the custom code - put your Stable Diffusion API key where it says API_KEY", but that's cumbersome, and it'd make it easy for people to accidentally share their API key with others. So instead you can create an input form within the embed, and then store the data with the `storage` object mentioned in the "Storing Data" section.
-
-## Using the GPT API in Your Custom Code (not yet implemented! open an issue if you want it)
-
-You may want to use GPT/LLM APIs in your message processing code. For example, you may want to classify the sentiment of a message in order to display the correct avatar (see "Visual Display ..." section), or you may want to implement your own custom chat-summarization system, for example. In this case, you have can use the global `api` object:
-
-* `api.chat`: is an async function that expects an object like `{messages:[{role:"system", content:"..."},{role:"user", content:"..."}, {role:"assistant", content:"..."}, ...], temperature:1, stop:["\n"]}`
-* `api.complete` is an async function that expects an object like `{prompt:"Please summarise this text: ...", temperature:1, stop:["\n"]}`
-
-During each conversational "turn" your custom code may make at most 10 API requests. This is to limit accidental API spamming which could quickly eat up user credits.
