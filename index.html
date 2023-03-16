@@ -816,9 +816,9 @@
           initialMessagesText: { label: "Initial chat messages (optional). Useful for extra alignment to character. Separate messages with '---'. If first line in the text box is '---' then AI speaks first. ", type:"text", height:"fit-content", placeholder: "Hey Sammy, do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: initialMessagesText ?? "" },
           modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
-          fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.summarizationMethod ?? "summarizeOld" },
+          fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
           temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.7 },
-          customCode: { hidden:true, label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
+          customCode: { hidden:true, height:"fit-content", label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
         }, {submitButtonText: "Save Character", showHiddenInputsText: "Show advanced options"});
         if(!result) return;
         
@@ -1706,12 +1706,14 @@
                   let data = e.data.data;
                   
                   let origFlag = dataChangedByCustomCode;
-                  for(let key in data.thread) {
-                    oc.thread[key] = data.thread[key];
-                  }
-                  for(let key in data.character) {
-                    oc.character[key] = data.character[key];
-                  }
+                  oc.thread.messages = data.thread.messages;
+                  // Don't know why I was originally doing this - it doesn't make sense. We'd be overwriting any changes that the custom code has made since last MessageAdded event. We only want to update message array.
+                  // for(let key in data.thread) {
+                  //   oc.thread[key] = data.thread[key];
+                  // }
+                  // for(let key in data.character) {
+                  //   oc.character[key] = data.character[key];
+                  // }
                   dataChangedByCustomCode = origFlag;
 
                   for(let handler of userHandlers.messageadded) {
@@ -1721,6 +1723,13 @@
                   let returnData = null;
                   if(dataChangedByCustomCode) {
                     returnData = JSON.parse(JSON.stringify(oc)); // note: JSON.stringify automatically ignores functions
+                    // delete any values that were the same as existing data so we only send back changes:
+                    for(let key in data.thread) {
+                      if(data.thread[key] === returnData.thread[key]) delete returnData.thread[key];
+                    }
+                    for(let key in data.character) {
+                      if(data.character[key] === returnData.character[key]) delete returnData.character[key];
+                    }
                     dataChangedByCustomCode = false;
                   }
 
@@ -1731,14 +1740,20 @@
 
               if(e.data.type === "init") {
                 let data = e.data.initialData;
+                let result = {thread:{}, character:{}}; // <-- it's possible the user has already set some character values in top-level custom code, so we send back to main thread to update db
                 for(let key in data.thread) {
                   oc.thread[key] = data.thread[key];
                 }
                 for(let key in data.character) {
-                  oc.character[key] = data.character[key];
+                  if(oc.character[key] === undefined || oc.character[key] === null) {
+                    oc.character[key] = data.character[key];
+                  } else {
+                    result.character[key] = oc.character[key];
+                  }
                 }
+                
+                window.parent.postMessage({_id:e.data._id, success:true, result}, "${window.location.origin}");
                 dataChangedByCustomCode = false;
-                window.parent.postMessage({_id:e.data._id, success:true, result:null}, "${window.location.origin}");
               }
             });
           })();
@@ -1883,7 +1898,8 @@
 
       async function triggerInitCustomCodeEvent(threadId) {
         let initialData = await getDataForCustomCode(threadId);
-        await sendCustomCodeIframeMessage(threadId, {type:"init", initialData});
+        let data = await sendCustomCodeIframeMessage(threadId, {type:"init", initialData});
+        await updateDbWithNewDataFromCustomCode(threadId, data)
       }
 
       // this function runs after every message is added: https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md
@@ -1932,12 +1948,16 @@
         }
 
         // CHARACTER updates:
+        let characterKeysChanged = Object.keys(data.character);
         for(let key in characterPropertiesVisibleToCustomCode) {
-          if(key === "customCode" && threadCharacter.customCode !== data.character.customCode) {
-            // custom code has changed, so we need to reload the iframe
-            await createNewCustomCodeIframeForThread(threadId);
+          let k = characterPropertiesVisibleToCustomCode[key]; // since "public api" naming is different to db naming
+          if(characterKeysChanged.includes(k)) {
+            if(key === "customCode" && threadCharacter.customCode !== data.character.customCode) {
+              // custom code has changed, so we need to reload the iframe
+              await createNewCustomCodeIframeForThread(threadId);
+            }
+            threadCharacter[key] = data.character[k];
           }
-          threadCharacter[key] = data.character[characterPropertiesVisibleToCustomCode[key]];
         }
         await db.characters.put(threadCharacter);
       }
