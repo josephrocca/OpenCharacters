@@ -3,6 +3,8 @@ Simple little web interface for creating characters and chatting with them. It's
 
 **Try it here:** https://josephrocca.github.io/OpenCharacters
 
+**Discord:** https://discord.gg/5tkWXJFqPV
+
 * You can get characters to chat with one another using the "reply with..." button (and you can enable text-to-speech to hear the characters converse)
 * You can share characters with a link - all character data is stored within the URL itself (again, there's no server, this whole project is just a one big HTML file)
 * You can give characters a [custom "message re-writing" functions](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md) so they can e.g. get access to the internet, or to a Stable Diffusion API, etc.
