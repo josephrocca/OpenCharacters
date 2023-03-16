@@ -1,7 +1,7 @@
 ![banner](https://user-images.githubusercontent.com/1167575/225629372-eb4de08a-ed62-4660-a83d-6e42a5c092d7.jpg)
 
 
-<p align="center">Like CharacterAI, but open source, and with much deeper character customization.</p>
+<p align="center">Similar to CharacterAI, but open source, and with much deeper character customization.</p>
 
 <p align="center"><b>⟶ <a href="https://josephrocca.github.io/OpenCharacters">Try it!</a> ⟵</b></p>
 
