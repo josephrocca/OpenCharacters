@@ -16,12 +16,12 @@ Within your custom code, you can access and update `oc.thread.messages`. It's an
 [
   {
     "author": "user",
-    "hidden": false,
+    "hiddenFrom": [], // can contain "user" and/or "ai"
     "content": "Hello",
   },
   {
     "author": "ai",
-    "hidden": false,
+    "hiddenFrom": [],
     "content": "Hello, how can I help you today?",
   }
 ]
@@ -78,7 +78,7 @@ oc.thread.on("MessageAdded", async function () {
     text = text.slice(0, 1000); // only grab first 1000 characters
     messages.push({
       author: "system",
-      hidden: true, // hide the message so it doesn't get in the way of the conversation
+      hiddenFrom: ["user"], // hide the message from user so it doesn't get in the way of the conversation
       content: "Here's the content of the webpage that was linked in the previous message: \n\n"+text,
     });
   }
