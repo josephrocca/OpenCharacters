@@ -14,12 +14,12 @@
 * Fully extensible with [custom code](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md)
   * Give your character access to the internet
   * Create your own slash commands
-  * Give your character a moving avatar
+  * Give your character a video avatar (custom code has its own iframe & can display arbitrary content)
   * Create your own memory structures (embedding, retrieval, etc.)
   * Give your character an internal thought process that runs alongside the chat
   * Give your character a voice via the browser's built-in TTS, or via an external API like ElevenLabs
   * Characters can edit their own personality and custom code - self-improving and change over time
-* Auto-summarization algorithm (for old messages) which extends 'effective' context massively
+* Auto-summarization algorithm (for old messages) which extends effective character memory/context size massively
 * Currently only supports OpenAI APIs, but can add more (like LLaMA) later
 * Send new feature ideas or bug reports [here](https://github.com/josephrocca/OpenCharacters/issues) or on our [Discord server](https://discord.gg/5tkWXJFqPV)
 
