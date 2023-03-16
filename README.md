@@ -1,4 +1,5 @@
-![banner](https://user-images.githubusercontent.com/1167575/225622937-729863d4-4cec-4902-be48-69cfc6e8361c.jpg)
+![banner](https://user-images.githubusercontent.com/1167575/225629372-eb4de08a-ed62-4660-a83d-6e42a5c092d7.jpg)
+
 
 <p align="center">Like CharacterAI, but open source, and with much deeper character customization.</p>
 
