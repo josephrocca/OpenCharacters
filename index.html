@@ -449,7 +449,12 @@
             e.stopPropagation();
             const threadId = parseInt(btn.closest(".thread").dataset.threadId);
             let json = await getThreadJSONById(threadId);
-            downloadText(JSON.stringify(json), "data.json");
+
+            let thread = await db.threads.get(threadId);
+            let character = await db.characters.get(thread.characterId);
+
+            let filename = encodeURIComponent(`${thread.name} - ${character.name}`.replaceAll(" ", "_")) + ".json";
+            downloadText(JSON.stringify(json), filename);
           });
         });
         
@@ -941,7 +946,7 @@
         return Math.ceil(str.length / 4);
       }
       function countTokensInMessages(messages) {
-        return countTokens(messages.map(m => `\n\n[${m.name || m.role}]: ${m.content}`).join("")); // can't join with two newlines because this function is sometimes used on messages one-by-one, and that would undercount since no newlines would be counted at all
+        return countTokens(messages.map(m => `\n\n[${m.name || m.role}]: ${m.content || m.message}`).join("")); // can't join with two newlines because this function is sometimes used on messages one-by-one, and that would undercount since no newlines would be counted at all
       }
 
 
@@ -952,6 +957,10 @@
           if(m.hiddenFrom && m.hiddenFrom.includes("ai")) return false;
           return true;
         });
+
+        for(let m of messages) {
+          m.message = m.message.replace(/<!--hidden-from-ai-start-->.+?<!--hidden-from-ai-end-->/gs, "");
+        }
 
         statusEl.innerHTML = "";
 
@@ -1788,7 +1797,7 @@
                   //   oc.character[key] = data.character[key];
                   // }
                   dataChangedByCustomCode = origFlag;
-
+                  
                   for(let handler of userHandlers.messageadded) {
                     await handler();
                   }
@@ -1895,7 +1904,7 @@
           options.messages.forEach(m => {
             m.content = m.content+"";
             m.role = m.author==="user"?"user" : m.author==="ai"?"assistant" : m.author==="system"?"system" : "system";
-            m.name = m.name+"";
+            if(m.name) m.name = m.name+"";
             let allowedKeys = ["content", "role", "name"];
             for(let key in m) {
               if(!allowedKeys.includes(key)) delete m[key];
