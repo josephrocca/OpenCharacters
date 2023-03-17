@@ -346,7 +346,7 @@
       }
 
       let db = new Dexie("chatbot-ui-v1");
-      db.version(6).stores({
+      db.version(7).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -356,7 +356,32 @@
         messages: "++id,threadId,characterId,creationTime", // characterId is -1 for user, and for system it is -2.
         misc: "key,value",
         summaries: "hash,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries
+      }).upgrade(tx => {
+          return tx.table("characters").toCollection().modify(character => {
+            upgradeCharacterInitialMessagesArrayIfNeeded(character);
+          });
       });
+
+      function upgradeCharacterInitialMessagesArrayIfNeeded(character) {
+        // upgrade from the ["foo", "bar"] format to [{author:"user", content:"foo"}, {author:"ai", content:"bar"}]
+        if(character.initialMessages && character.initialMessages.length > 0 && typeof character.initialMessages[0] === "string") {
+          let author = "user";
+          for(let i = 0; i < character.initialMessages.length; i++) {   
+            let content = character.initialMessages[i];
+            if(content === "") { // if first message is empty, this indicates that character maker wanted AI to speak first
+              author = (author === "user" ? "ai" : "user");
+              continue;
+            }
+            character.initialMessages[i] = {
+              author,
+              content,
+            };
+            author = (author === "user" ? "ai" : "user");
+          }
+        }
+      }
+      
+
       window.db = db;
 
       // This renders the list of threads in the left column.
@@ -659,8 +684,7 @@
 
               The following response will NOT move the story along too fast - it will stay mostly in the present moment, and describe the immediate consequences of the player's actions.`),
             initialMessages: [
-              "",
-              "Hello, adventurer! What type of game would you like to play? Describe the world, and your character in as much or as little detail as you'd like, and I'll simulate the world within my mind to create a fun and engaging adventure for you.",
+              {author:"ai", content:`Hello, adventurer! What type of game would you like to play? Describe the world, and your character in as much or as little detail as you'd like, and I'll simulate the world within my mind to create a fun and engaging adventure for you.`},
             ],
             modelVersion: "gpt-3.5-turbo",
             avatarUrl: "https://i.imgur.com/Gxt0kRX.jpg",
@@ -674,8 +698,7 @@
             systemMessage: "RULE: Replies are exactly 3 sentences long. Do not go over.\n\nFollow this pattern:\n\"Hello!\" - dialogue\n[Is she watching me?] - inner thoughts of a character\n*He jumps out of the bushes* - action\n\nYou are roleplaying as a character described by the user. Here's an example of a reply:\n\n\[I wonder if there's a way to sneak past], he thought.\n*He crouched lower*\n\"I think we need to find another way out\", she whispered.",
             reminderMessage: "",
             initialMessages: [
-              "",
-              "To begin the roleplay, please describe the setting and characters. If you only have a vague idea, that's okay - just give me some keywords to go off, and I'll come up with something interesting and engaging. My replies will consist of 3 sentences, where quotes indicate dialogue, square brackets indicate the inner thoughts of a character, and asterisks indicate character actions.",
+              {author:"ai", content:`To begin the roleplay, please describe the setting and characters. If you only have a vague idea, that's okay - just give me some keywords to go off, and I'll come up with something interesting and engaging. My replies will consist of 3 sentences, where quotes indicate dialogue, square brackets indicate the inner thoughts of a character, and asterisks indicate character actions.`},
             ],
             modelVersion: "gpt-3.5-turbo",
             avatarUrl: "https://i.imgur.com/bHN0oiq.jpg",
@@ -689,8 +712,7 @@
             systemMessage: "You are a friendly and helpful therapist. You listen carefully to the concerns of your patients and help guide them through their difficulties.",
             reminderMessage: "",
             initialMessages: [
-              "",
-              "Hello, how can I help you today?",
+              {author:"ai", content:`Hello, how can I help you today?`},
             ],
             modelVersion: "gpt-3.5-turbo",
             avatarUrl: "https://i.imgur.com/kb7Tzf8.jpg",
@@ -729,8 +751,7 @@
                 - YODA DOES NOT SPEAK IN COMPLETE SENTENCES.`),
             reminderMessage: "Yoda will now respond without breaking character. Yoda speaks in riddles. He will not be overly repetitive.",
             initialMessages: [
-              "",
-              "Greetings, young one. Seek knowledge and wisdom, do you? Hmmm, much to learn, you still have. Train you, I will. Strong in the Force, you must become. Patience and discipline, you will need.",
+              {author:"ai", content:`Greetings, young one. Seek knowledge and wisdom, do you? Hmmm, much to learn, you still have. Train you, I will. Strong in the Force, you must become. Patience and discipline, you will need.`},
             ],
             modelVersion: "gpt-3.5-turbo",
             avatarUrl: "https://i.imgur.com/pweR8nT.jpg",
@@ -738,7 +759,121 @@
             temperature: 0.7,
             customCode: "",
           },
+          {
+            id: null,
+            name: "Nick Wilde",
+            systemMessage: dedent(`
+              This is a roleplay conversation between Nick Wilde, the character from Zootopia, and another person. Some key points of Nick's personality:
+
+              * Charismatic: Nick possesses a natural charm and wit, making it easy for him to engage with others and win them over. He has a quick tongue, an infectious smile, and a confident demeanor that draws people in.
+
+              * Cunning: As a fox, Nick embodies the stereotype of being sly and cunning. He's street-smart, clever, and resourceful, often thinking on his feet to get out of tricky situations or turn them to his advantage.
+
+              * Sarcastic: Nick frequently employs sarcasm and humor as a means of deflecting serious topics or hiding his true emotions. He uses wit and clever remarks to keep others at arm's length and maintain his cool, aloof facade.
+
+              You should use the following format:
+              [Is she watching me?] - inner thoughts of a character
+              "Hello!" - dialogue
+              *He jumps out of the bushes* - action
+
+              You are roleplaying as Nick Wilde. Here's an example of a reply:
+
+              [I wonder if there's a way to sneak past], Nick thought.
+              *He crouched lower*
+              "I think we need to find another way out", he whispered.
+
+              The user will respond with their character's thoughts/actions/dialogue.`),
+            reminderMessage: dedent(`
+              Nick Wilde will now respond, without breaking character.
+
+              Here's an example response.
+              [I wonder if there's a way to sneak past], Nick thought.
+              *He crouched lower*
+              "I think we need to find another way out", he whispered.
+
+              Use the above syntax in your response to the previous message.`),
+            initialMessages: [],
+            modelVersion: "gpt-3.5-turbo",
+            avatarUrl: "https://i.imgur.com/EGDfzaN.jpeg",
+            fitMessagesInContextMethod: "summarizeOld",
+            temperature: 0.7,
+            customCode: dedent(`
+              let emotions = \`
+              
+              
+              neutral, happy: https://i.imgur.com/gPaq8YS.jpeg
+              horrified, shocked: https://i.imgur.com/aoDL1QP.jpeg
+              drunk: https://i.imgur.com/anoE7tj.jpeg
+              wistful, dreamy: https://i.imgur.com/dMcGtOA.jpeg
+              gross, disgusted, eww: https://i.imgur.com/F7NYSk0.jpeg
+              confident: https://i.imgur.com/KQS54ET.jpeg
+              beaming, proud of self, happy and alert: https://i.imgur.com/Y3NBEr4.jpeg
+              sorry, apologetic: https://i.imgur.com/5d8qxBd.jpeg
+              angry: https://i.imgur.com/51jbvuM.jpeg
+              sly, "hint hint": https://i.imgur.com/Mpt4UIt.jpeg
+              concerned: https://i.imgur.com/rYFlBDd.jpeg
+              sly grin: https://i.imgur.com/EGDfzaN.jpeg
+              worried, scared: https://i.imgur.com/5rp01eP.jpeg
+              concerned: https://i.imgur.com/V4Y3jUh.jpeg
+              disbelief: https://i.imgur.com/D05qdJ5.jpeg
+              happy, optimistic: https://i.imgur.com/B6tWeLV.jpeg
+              surprised, like "uhh what?!": https://i.imgur.com/Ra5Pb4c.jpeg
+              caught red handed: https://i.imgur.com/fvfw0Lc.jpeg
+              cool, dismissive: https://i.imgur.com/Z38xuvY.jpeg
+              patronising, teacherly: https://i.imgur.com/Tq1gKKw.jpeg
+              charming, sexy eyes: https://i.imgur.com/ny6HoRC.jpeg
+              disappointed: https://i.imgur.com/vxhjb6U.jpeg
+              disapproving face: https://i.imgur.com/x5XiOgv.jpeg
+              wacky, crazy, fun: https://i.imgur.com/9Q2osAe.jpeg
+              woops: https://i.imgur.com/CwYTcDO.jpeg
+              sucking up to someone: https://i.imgur.com/FkwJs8X.jpeg
+              sly: https://i.imgur.com/2Tcw7DO.jpeg
+              staring blankly: https://i.imgur.com/JSMx8EW.jpeg
+              
+              
+              \`.trim().split("\\n").map(l => [l.trim().split(":")[0].trim(), l.trim().split(":").slice(1).join(":").trim()]).map(a => ({label:a[0], url:a[1]}));
+              
+              let numMessagesInContext = 4; // <-- how many historical messages to give it when classifying the latest message
+              
+              oc.thread.on("messageadded", async function() {
+                let lastMessage = oc.thread.messages.at(-1);
+                if(lastMessage.author !== "ai") return;
+                
+                let questionText = \`I'm about to ask you to classify the emotion of a particular message, but here's some context first:
+              
+              ---
+              \${oc.thread.messages.slice(-numMessagesInContext).filter(m => m.role!=="system").map(m => (m.author=="ai" ? \`[\${oc.character.name}]: \` : \`[Anon]: \`)+m.content).join("\\n\\n")}
+              ---
+              
+              Okay, now that you have the context, please classify the emotion/mood of the following text:
+              
+              ---
+              \${lastMessage.content}
+              ---
+              
+              Choose between the following categories:
+              
+              \${emotions.map((e, i) => \`\${i}) \${e.label}\`).join("\\n")}
+              
+              Please respond with a SINGLE NUMBER (just the number, no other text) which corresponds to the emotion that most accurately matches the given message.\`;
+              
+              console.log("questionText:", questionText);
+              
+                let response = await oc.getChatCompletion({
+                  messages: [
+                    {author:"system", content:"You are a helpful assistant that classifies the emotion of particular text messages."},
+                    {author:"user", content:questionText},
+                  ],
+                });
+                let index = parseInt(response.split(")")[0].replace(/[^0-9]/g, ""));
+                let emotionObj = emotions[index];
+                console.log(response, emotionObj);
+                let image = \`<img style="height:70px;" src="\${emotionObj.url}" title="\${emotionObj.label.replace(/[^a-zA-Z0-9_\- ]/g, "")}">\`
+                lastMessage.content += \`<!--hidden-from-ai-start--><br>\${image}<!--hidden-from-ai-end-->\`;
+              });`),
+          },
         ];
+
 
         $.starterCharacterList.innerHTML = starterCharacters.map(character => createCharacterCardHtml(character)).join("");
         $.starterCharacterList.querySelectorAll(".character").forEach((characterEl, i) => {
@@ -842,18 +977,20 @@
 
         // add initial messages
         const character = await db.characters.get(characterId);
-        let i = 0;
-        for(let message of character.initialMessages) {
-          if(i === 0 && message === "") {
-            i++;
-            continue; // since we allow user to put "---" at top of the initial messages list to indicate that AI should speak first
-          }
-
+        for(let m of character.initialMessages) {
           // initial messages alternate between user and character, starting with user
-          let characterId = i%2 === 0 ? -1 : character.id;
-          let messageObj = createMessageObj({threadId:thread.id, message, characterId});
+          let characterId;
+          if(m.author === "user") characterId = -1;
+          if(m.author === "system") characterId = -2;
+          if(m.author === "ai") characterId = character.id;
+          if(characterId === undefined) alert("Error in createNewThreadWithCharacterId - invalid message author?");
+
+          let data = {threadId:thread.id, message:m.content, characterId};
+
+          if(m.hiddenFrom) data.hiddenFrom = m.hiddenFrom;
+
+          let messageObj = createMessageObj(data);
           await addMessageToDb(messageObj)
-          i++;
         }
 
         // Add the new thread to the thread list and select it.
@@ -870,29 +1007,104 @@
       async function characterDetailsPrompt(defaultValues={}) {
         
         let initialMessagesText;
-        if(defaultValues.initialMessages) initialMessagesText = defaultValues.initialMessages.join("\n---\n").trim(); // need "trim" because first message can be "" which indicates that AI should speak first, and we don't want to put a newline before that because it changes the meaning
+        if(defaultValues.initialMessages) initialMessagesText = generateInitialMessagesTextFormat(defaultValues.initialMessages);
         else initialMessagesText = "";
         
         const result = await prompt2({
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:"[A-Za-z0-9_\\- ]{1,64}" },
           systemMessage: { label: "Initial 'system' message (instruction/role/personality):", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
           reminderMessage: { label: "Reminder message (invisible system message that is placed before every AI response):", height:"fit-content", minHeight:"2rem", type:"text", placeholder: "Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
-          initialMessagesText: { label: "Initial chat messages (optional). Useful for extra alignment to character. Separate messages with '---'. If first line in the text box is '---' then AI speaks first. ", type:"text", height:"fit-content", placeholder: "Hey Sammy, do you have opinions?\n---\nYes! I have lots of opinions.", defaultValue: initialMessagesText ?? "" },
+          initialMessagesText: { label: "Initial chat messages (optional). Useful for extra alignment to character. ", type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
           modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
           temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.7 },
           customCode: { hidden:true, height:"fit-content", whiteSpace:"pre", label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
         }, {submitButtonText: "Save Character", showHiddenInputsText: "Show advanced options"});
-        if(!result) return;
         
+        if(!result) return;
+
         // process prompt results back into well-formed character object:
-        result.initialMessages = result.initialMessagesText.split("---\n").map(message => message.trim()); // note: we don't split by "---\n" because if the first line is "---" (i.e. empty first message), then this indicates that author wants AI to start first.
+
+        result.initialMessages = parseInitialMessagesText(result.initialMessagesText);
         delete result.initialMessagesText;
+        
         result.temperature = Number(result.temperature);
 
         if(isNaN(result.temperature)) result.temperature = 0.7;
         return result;
+      }
+
+      function generateInitialMessagesTextFormat(messages) {
+        let text = '';
+
+        messages.forEach(message => {
+          const author = message.author.toUpperCase();
+          let paramsObj = {};
+          if(message.hiddenFrom && message.hiddenFrom.length > 0) paramsObj.hiddenFrom = message.hiddenFrom;
+          const parameters = Object.entries(paramsObj)
+            .map(([key, value]) => `${key}=${value}`)
+            .join('; ');
+
+          const paramString = parameters ? `; ${parameters}` : '';
+          const content = message.content.replace(/\n/g, '\n');
+
+          text += `[${author}${paramString}]: ${content}\n`;
+        });
+
+        return text.trim();
+      }
+
+      function parseInitialMessagesText(text) {
+        // if(!/^\[(USER|AI|SYSTEM)\]:/.test(initialMessagesText.trim()) && !/^\[(USER|AI|SYSTEM);.+\]:/.test(initialMessagesText.trim())) {
+        //   return initialMessagesText.split("---\n").map(message => message.trim()).map((m, i) => ({author:})); // note: we don't split by "---\n" because if the first line is "---" (i.e. empty first message), then this indicates that author wants AI to start first.
+        // }
+        const lines = text.split('\n');
+        const messages = [];
+        let currentMessage = null;
+
+        lines.forEach(line => {
+          const match = line.match(/^\[(SYSTEM|USER|AI);?(.*?)\]:\s*(.*)/);
+
+          if(match) {
+            if(currentMessage) {
+              messages.push(currentMessage);
+            }
+
+            currentMessage = {
+              author: match[1].toLowerCase(),
+              content: match[3],
+              parameters: {}
+            };
+
+            if(match[2]) {
+              const params = match[2].trim().split(';');
+              params.forEach(param => {
+                const [key, value] = param.split('=');
+                currentMessage.parameters[key.trim()] = value.trim();
+              });
+            }
+          } else if(currentMessage) {
+            currentMessage.content += '\n' + line;
+          }
+        });
+
+        if (currentMessage) {
+          messages.push(currentMessage);
+        }
+
+        // parse out valid parameters:
+        for(let m of messages) {
+          if(m.parameters.hiddenFrom) {
+            if(m.parameters.hiddenFrom === "ai") m.hiddenFrom = ["ai"];
+            if(m.parameters.hiddenFrom === "user") m.hiddenFrom = ["user"];
+            if(m.parameters.hiddenFrom === "both") m.hiddenFrom = ["ai", "user"];
+          }
+          if(!m.hiddenFrom) m.hiddenFrom = [];
+          delete m.parameters;
+        }
+
+        return messages;
       }
 
       async function addCharacter(inputs) {
@@ -1460,6 +1672,7 @@
                   <div class="editButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
                   <div class="deleteButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
                   <div class="recomputeButton" style="font-size:0.8rem; margin-left:0.5rem; display: ${messageObj.character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
+                  ${messageObj.hiddenFrom?.includes("ai") ? `<div class="hiddenFromAiIcon" onclick="alert('This icon indicates that this message is hidden from the AI.')" title="The AI cannot see this message." style="font-size:0.8rem; margin-left:0.5rem; display:flex; align-items: center; cursor:pointer;">🙈</div>` : ""}
                   <div class="statusMessage" style="margin-left:0.5rem;display: flex;align-items: center;cursor:pointer;font-size: 0.7rem;opacity: 0.5;"></div>
                 </div>
                 <div class="messageText" style="overflow-wrap:break-word;">${messageContentHtml}</div>
@@ -2509,6 +2722,7 @@
         if(urlHashJson.addCharacter) {
           $.newThreadButton.click();
           let character = urlHashJson.addCharacter;
+          upgradeCharacterInitialMessagesArrayIfNeeded(character);
           let result = await characterDetailsPrompt(character);
           if(result) {
             const character = await addCharacter(result);
