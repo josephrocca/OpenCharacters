@@ -69,13 +69,15 @@ export async function prompt2(specs, opts={}) {
   }
   ctn.innerHTML = `
     <div class="promptModalInnerContainer" style="background:rgba(0,0,0,0.2); position:fixed; top:0; left:0; right:0; bottom:0; z-index:9999999; display:flex; justify-content:center; color:inherit; font:inherit; padding:0.5rem;">
-      <div class="sectionsContainer" style="width:600px; background:${sanitizeHtml(opts.backgroundColor)}; height: min-content; padding:1rem; border:1px solid ${opts.borderColor}; border-radius:${opts.borderRadius}; box-shadow: 0px 1px 10px 3px rgb(130 130 130 / 24%); max-height: calc(100% - 1rem); overflow:auto;">
-        ${sections}
-        ${Object.values(specs).find(s => s.hidden === true) ? `
-        <div style="text-align:center; margin-top:1rem; display:flex; justify-content:center;">
-          <button class="showHidden" onclick="this.closest('.sectionsContainer').querySelectorAll('[data-initially-hidden=yes]').forEach(el => el.style.display=''); this.remove();" style="padding: 0.25rem;">${opts.showHiddenInputsText || "Show hidden inputs"}</button>
+      <div style="width:600px; background:${sanitizeHtml(opts.backgroundColor)}; height: min-content; padding:1rem; border:1px solid ${opts.borderColor}; border-radius:${opts.borderRadius}; box-shadow: 0px 1px 10px 3px rgb(130 130 130 / 24%); max-height: calc(100% - 1rem);display: flex; flex-direction: column;">
+        <div class="sectionsContainer" style="overflow:auto;">
+          ${sections}
+          ${Object.values(specs).find(s => s.hidden === true) ? `
+          <div style="text-align:center; margin-top:1rem; display:flex; justify-content:center;">
+            <button class="showHidden" onclick="this.closest('.sectionsContainer').querySelectorAll('[data-initially-hidden=yes]').forEach(el => el.style.display=''); this.remove();" style="padding: 0.25rem;">${opts.showHiddenInputsText || "Show hidden inputs"}</button>
+          </div>
+          ` : ""}
         </div>
-        ` : ""}
         <div style="text-align:center; margin-top:1rem; display:flex; justify-content:space-between;">
           <button class="cancel" style="padding: 0.25rem;">Cancel</button>
           <button class="submit" style="padding: 0.25rem;">${opts.submitButtonText || "Submit"}</button>
