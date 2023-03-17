@@ -9,6 +9,11 @@ Some examples of what you can do with this:
  * Give your character the ability to create pictures using Stable Diffusion
  * Auto-delete/retry messages from your character that contain certain keywords
 
+
+## Examples
+
+After reading this doc to get a sense of the basics, visit this page for more complex, "real-world" examples: [custom-code-examples.md](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code-examples.md)
+
 ## The `oc` Object
 
 Within your custom code, you can access and update `oc.thread.messages`. It's an array that looks like this:
@@ -97,7 +102,6 @@ oc.thread.on("MessageAdded", async function () {
   }
 });
 ```
-
 
 ### Visual Display and User Inputs
 
