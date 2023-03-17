@@ -763,7 +763,9 @@
               const characterId = parseInt(characterEl.dataset.characterId);
               const character = (await db.characters.where("id").equals(characterId).toArray())[0];
               delete character.id;
-              let urlHashData = encodeURIComponent(JSON.stringify({addCharacter:character}));
+              let urlHashData = encodeURIComponent(JSON.stringify({addCharacter:character})).replace(/[!'()*]/g, function(c) {
+                return '%' + c.charCodeAt(0).toString(16); // since encodeURIComponent doesn't encode some characters (like parentheses) and they mess up markdown links
+              });
               const url = `${window.location.origin+window.location.pathname}#${urlHashData}`;
               await navigator.clipboard.writeText(url);
               $.topNotificationContent.innerHTML = `Copied character link to clipboard!`;
