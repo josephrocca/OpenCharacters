@@ -101,7 +101,7 @@ export async function prompt2(specs, opts={}) {
 
   setTimeout(updateFitHeights, 10);
 
-  ctn.querySelector("button.showHidden").onclick = () => {
+  ctn.querySelector("button.showHidden")?.onclick = () => {
     ctn.querySelectorAll('.sectionsContainer [data-initially-hidden=yes]').forEach(el => el.style.display='');
     ctn.querySelector("button.showHidden").remove();
     updateFitHeights();
