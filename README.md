@@ -8,10 +8,10 @@
 <p align="center"><a href="https://discord.gg/5tkWXJFqPV">Discord Server</a></p>
 
 ## Features:
-* The whole web app is a single HTML file - no server
-* All your data is stored in your browser's local storage (again, there is no server)
-* Share characters with a link - all character data is embedded within the link
-* Fully extensible with [custom code](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md)
+* The whole web app is a single HTML file - no server.
+* All your data is stored in your browser's local storage (again, there is no server).
+* Share characters with a link - all character data is embedded within the link.
+* Fully extensible with [custom code](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md). See examples [here](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code-examples.md).
   * Give your character access to the internet
   * Create your own slash commands
   * Give your character a video avatar (custom code has its own iframe & can display arbitrary content)
@@ -19,9 +19,9 @@
   * Give your character an internal thought process that runs alongside the chat
   * Give your character a voice via the browser's built-in TTS, or via an external API like ElevenLabs
   * Characters can edit their own personality and custom code - self-improving and change over time
-* Auto-summarization algorithm (for old messages) which extends effective character memory/context size massively
-* Currently only supports OpenAI APIs, but can add more (like LLaMA) later
-* Send new feature ideas or bug reports [here](https://github.com/josephrocca/OpenCharacters/issues) or on our [Discord server](https://discord.gg/5tkWXJFqPV)
+* Auto-summarization algorithm (for old messages) which extends effective character memory/context size massively.
+* Currently only supports OpenAI APIs, but can add more (like LLaMA) later.
+* Send new feature ideas or bug reports [here](https://github.com/josephrocca/OpenCharacters/issues) or on our [Discord server](https://discord.gg/5tkWXJFqPV).
 
 ## Video Demo
 
