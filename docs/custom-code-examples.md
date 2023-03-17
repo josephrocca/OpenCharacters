@@ -1,6 +1,6 @@
 # Append image based on the emotion of the message
 
-This example adds an image/GIF to each message to visually display the emotion of the character, like in **[this example character](https://tinyurl.com/3u3d984u)**:
+This example adds an image/GIF to each message to visually display the emotion of the character, like in **[this example character][append emotion images nick wilde]**:
 
 <img src="https://user-images.githubusercontent.com/1167575/225869887-03c450ec-b10a-4b81-9bbc-90a9eb928232.png" height="400">
 
@@ -86,3 +86,6 @@ console.log("questionText:", questionText);
 });
 
 ```
+
+
+[append emotion images nick wilde]: https://tinyurl.com/274w9j5b
