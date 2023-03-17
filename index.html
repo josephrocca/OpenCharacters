@@ -1553,9 +1553,14 @@
         const threadId = parseInt($.messageFeed.dataset.threadId);
         const messages = await db.messages.where("threadId").equals(threadId).toArray();
         const characterId = parseInt($.messageFeed.dataset.characterId);
+
+        let numMessagesVisibleToAi = messages.filter(m => {
+          if(m.hiddenFrom && m.hiddenFrom.includes("ai")) return false;
+          return true;
+        }).length;
         
         if(!forceReply) {
-          if(messages.length === 0 || messages[messages.length-1].characterId  === characterId) {
+          if(numMessagesVisibleToAi === 0 || messages[messages.length-1].characterId  === characterId) {
             // if no messages, or the last message was from the bot, no reply is currently needed
             return;
           }
