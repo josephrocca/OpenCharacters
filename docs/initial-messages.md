@@ -28,6 +28,8 @@ As with all messages, you can include markdown/HTML. Here's an example of an ini
 [SYSTEM, hiddenFrom=ai]: Hello there! Thanks for trying out my character. Here are some tips:
 * Make sure to edit the character's response if they break character. You'll probably only have to do this for the first few messages, at most.
 * ...
-<img src="https://https://i.imgur.com/TFA2Nmx.jpg">
+
+<img src="https://i.imgur.com/TFA2Nmx.jpg">
+
 See the latest versions of my characters at my twitter account: [@exampleusername](https://twitter.com/exampleusername)
 ```
