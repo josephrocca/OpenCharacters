@@ -378,6 +378,7 @@
             };
             author = (author === "user" ? "ai" : "user");
           }
+          if(character.initialMessages[0] === "") character.initialMessages = character.initialMessages.slice(1);
         }
       }
       
