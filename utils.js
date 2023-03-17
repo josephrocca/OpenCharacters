@@ -60,7 +60,7 @@ export async function prompt2(specs, opts={}) {
           <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
-              <textarea data-spec-key="${sanitizeHtml(key)}" data-height="fit-content" style="width:100%; ${spec.height === "fit-content" ? "" : `height:${spec.height}`}; min-height:${spec.minHeight ?? "4rem"}; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
+              <textarea data-spec-key="${sanitizeHtml(key)}" ${spec.height === "fit-content" ? `data-height="fit-content"` : ``} style="width:100%; ${spec.height === "fit-content" ? "" : `height:${sanitizeHtml(spec.height)}`}; ${spec.whiteSpace ? `white-space:${sanitizeHtml(spec.whiteSpace)}` : ""}; min-height:${spec.minHeight ?? "4rem"}; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
             </div>
           </div>
         </section>`;
@@ -74,7 +74,7 @@ export async function prompt2(specs, opts={}) {
           ${sections}
           ${Object.values(specs).find(s => s.hidden === true) ? `
           <div style="text-align:center; margin-top:1rem; display:flex; justify-content:center;">
-            <button class="showHidden" onclick="this.closest('.sectionsContainer').querySelectorAll('[data-initially-hidden=yes]').forEach(el => el.style.display=''); this.remove();" style="padding: 0.25rem;">${opts.showHiddenInputsText || "Show hidden inputs"}</button>
+            <button class="showHidden" style="padding: 0.25rem;">${opts.showHiddenInputsText || "Show hidden inputs"}</button>
           </div>
           ` : ""}
         </div>
@@ -92,12 +92,20 @@ export async function prompt2(specs, opts={}) {
   `;
   document.body.appendChild(ctn);
   
-  setTimeout(() => { // settimeout to ensure rendered
+  function updateFitHeights() { // settimeout to ensure rendered
     ctn.querySelectorAll("textarea[data-height=fit-content]").forEach(el => {
       let minHeight = el.offsetHeight; // textareas will always have min-height set, so we can use that via offsetHeight
-      el.style.height = Math.max(minHeight, (el.scrollHeight+5)) + "px";
+      el.style.height = Math.max(minHeight, (el.scrollHeight+10)) + "px";
     });
-  }, 10);
+  }
+
+  setTimeout(updateFitHeights, 10);
+
+  ctn.querySelector("button.showHidden").onclick = () => {
+    ctn.querySelectorAll('.sectionsContainer [data-initially-hidden=yes]').forEach(el => el.style.display='');
+    ctn.querySelector("button.showHidden").remove();
+    updateFitHeights();
+  };
 
   let values = await new Promise((resolve) => {
     ctn.querySelector("button.submit").onclick = () => {
