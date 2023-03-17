@@ -1,8 +1,8 @@
 # Initial Messages
 Initial messages are great for helping the AI get into character. The format of the initial messages (explained in this document) allows you to:
 
-* **Hide inital messages from the user**: For example, you might have have many messages that would be annoying for the user to see every time they start a new conversation with the character.
-* **Hide inital messages from the AI**: To, for example, provide user instructions or character creator credit/attribution at the top of the chat - stuff you want the user to see, but not the AI.
+* **Hide initial messages from the user**: In case you have many messages that would be annoying for the user to see every time they start a new conversation with the character.
+* **Hide initial messages from the AI**: To, for example, provide user instructions or character creator credit/attribution at the top of the chat - stuff you want the user to see, but not the AI.
 * **Create system messages**: These are used to guide the behavior of the AI, or provide information/context in situations where it wouldn't make sense for the AI or the user to "say" it.
 
 Initial messages should follow the following format:
