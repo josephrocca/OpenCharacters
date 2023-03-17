@@ -1,13 +1,13 @@
 # Append image based on predicted facial expression of the message
 
-This example adds an image/GIF to each message to visually display the emotion of the character, like in **[this example character][append facial expression image nick wilde]**:
+This example adds an image/GIF to each message to visually display the facial expression of the character, like in **[this example character][append facial expression image nick wilde]**:
 
 <img src="https://user-images.githubusercontent.com/1167575/225869887-03c450ec-b10a-4b81-9bbc-90a9eb928232.png" height="400">
 
 In the code below:
 
 * `oc.thread.on("MessageAdded", ...)` is used to trigger the code
-* `oc.getChatCompletion` is used to classify the messages that are added into one of the emotions that you've given
+* `oc.getChatCompletion` is used to classify the messages that are added into one of the facial expressions that you've given
 * `<!--hidden-from-ai-start-->...<!--hidden-from-ai-end-->` is used to hide the appended images from the AI, so it doesn't get confused and start trying to make up its own image URLs based on the pattern that it observes in previous messages
 
 You can replace the `<expression>: <url>` list with your own.
