@@ -60,7 +60,7 @@ export async function prompt2(specs, opts={}) {
           <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
-              <textarea data-spec-key="${sanitizeHtml(key)}" ${spec.height === "fit-content" ? `data-height="fit-content"` : ``} style="width:100%; ${spec.height === "fit-content" ? "" : `height:${sanitizeHtml(spec.height)}`}; ${spec.whiteSpace ? `white-space:${sanitizeHtml(spec.whiteSpace)}` : ""}; min-height:${spec.minHeight ?? "4rem"}; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
+              <textarea data-spec-key="${sanitizeHtml(key)}" ${spec.height === "fit-content" ? `data-height="fit-content"` : ``} style="width:100%; ${spec.height === "fit-content" ? "" : `height:${sanitizeHtml(spec.height)}`}; ${spec.whiteSpace ? `white-space:${sanitizeHtml(spec.whiteSpace)}` : ""}; min-height:${spec.minHeight ?? "4rem"}; max-height:${spec.minHeight ?? "50vh"}; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
             </div>
           </div>
         </section>`;
@@ -87,6 +87,18 @@ export async function prompt2(specs, opts={}) {
         .promptModalInnerContainer .sectionsContainer input:invalid {
           background-color: lightpink;
         }
+        .promptModalInnerContainer .sectionsContainer {
+          -ms-overflow-style: none;  /* Internet Explorer 10+ */
+          scrollbar-width: none;  /* Firefox */
+        }
+        .promptModalInnerContainer .sectionsContainer::-webkit-scrollbar { 
+          display: none;  /* Safari and Chrome */
+        }
+        .promptModalInnerContainer .sectionsContainer.scrollFade {
+          padding-bottom: 30px;
+          -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 30px), #ffffff00 100%);
+          mask-image: linear-gradient(to bottom, black calc(100% - 30px), #ffffff00 100%);
+        }
       </style>
     </div>
   `;
@@ -99,7 +111,7 @@ export async function prompt2(specs, opts={}) {
     });
   }
 
-  setTimeout(updateFitHeights, 10);
+  setTimeout(updateFitHeights, 5);
 
   if(ctn.querySelector("button.showHidden")) {
     ctn.querySelector("button.showHidden").onclick = () => {
@@ -108,6 +120,14 @@ export async function prompt2(specs, opts={}) {
       updateFitHeights();
     };
   }
+
+  // add scrollFade if sectionsContainer has scroll
+  setTimeout(() => {
+    let sectionsContainerEl = ctn.querySelector(".promptModalInnerContainer .sectionsContainer");
+    if(sectionsContainerEl.scrollHeight > sectionsContainerEl.offsetHeight) {
+      sectionsContainerEl.classList.add("scrollFade");
+    }
+  }, 5);
 
   let values = await new Promise((resolve) => {
     ctn.querySelector("button.submit").onclick = () => {
