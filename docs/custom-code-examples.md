@@ -31,13 +31,13 @@ sorry, apologetic: https://i.imgur.com/5d8qxBd.jpeg
 angry: https://i.imgur.com/51jbvuM.jpeg
 sly: https://i.imgur.com/2Tcw7DO.jpeg
 sly, hint hint nudge nudge: https://i.imgur.com/Mpt4UIt.jpeg
+relaxed confident grin: https://i.imgur.com/EGDfzaN.jpeg
 concerned: https://i.imgur.com/rYFlBDd.jpeg
-sly grin: https://i.imgur.com/EGDfzaN.jpeg
-very worried, scared, "ahhh!": https://i.imgur.com/5rp01eP.jpeg
+worried, scared: https://i.imgur.com/5rp01eP.jpeg
 concerned: https://i.imgur.com/V4Y3jUh.jpeg
 disbelief: https://i.imgur.com/D05qdJ5.jpeg
-happy, optimistic, eager: https://i.imgur.com/B6tWeLV.jpeg
-surprised, like "uhh what?!": https://i.imgur.com/Ra5Pb4c.jpeg
+happy, optimistic: https://i.imgur.com/B6tWeLV.jpeg
+very surprised, frozen, stunned: https://i.imgur.com/Ra5Pb4c.jpeg
 caught red handed: https://i.imgur.com/fvfw0Lc.jpeg
 cool, dismissive: https://i.imgur.com/Z38xuvY.jpeg
 patronising, teacherly: https://i.imgur.com/Tq1gKKw.jpeg
