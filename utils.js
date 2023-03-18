@@ -60,7 +60,7 @@ export async function prompt2(specs, opts={}) {
           <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
-              <textarea data-spec-key="${sanitizeHtml(key)}" ${spec.height === "fit-content" ? `data-height="fit-content"` : ``} style="width:100%; ${spec.height === "fit-content" ? "" : `height:${sanitizeHtml(spec.height)}`}; ${spec.whiteSpace ? `white-space:${sanitizeHtml(spec.whiteSpace)}` : ""}; min-height:${spec.minHeight ?? "4rem"}; max-height:${spec.minHeight ?? "50vh"}; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
+              <textarea data-spec-key="${sanitizeHtml(key)}" ${spec.height === "fit-content" ? `data-height="fit-content"` : ``} style="width:100%; ${spec.height === "fit-content" ? "" : `height:${sanitizeHtml(spec.height)}`}; ${spec.whiteSpace ? `white-space:${sanitizeHtml(spec.whiteSpace)}` : ""}; min-height:${spec.minHeight ?? "4rem"}; max-height:${spec.maxHeight ?? "50vh"}; border: 1px solid lightgrey; border-radius: 3px;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
             </div>
           </div>
         </section>`;
