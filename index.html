@@ -875,7 +875,7 @@
 
               Use the above syntax in your response to the previous message.`),
             initialMessages: [
-              {author:"system", hiddenFrom:["ai"], content:`Hello there! This character has some custom code that makes it output an image after each message, and the image should match the emotion of the message. You can edit this character and show advanced options and you'll see the custom code which does this. You can easily edit the \`expression:url\` list to your liking. Note that the AI cannot see this message, as indicated by the "blind" icon above this system message.`}
+              {author:"system", hiddenFrom:["ai"], content:`Hello there! This character has some custom code that makes it output an image after each message, and the image should match the facial expression of the message. You can edit this character and show advanced options and you'll see the custom code which does this. You can easily edit the \`expression:url\` list to your liking. Note that the AI cannot see this message, as indicated by the "blind" icon above this system message.`}
             ],
             modelVersion: "gpt-3.5-turbo",
             avatarUrl: "https://i.imgur.com/EGDfzaN.jpeg",
@@ -898,14 +898,15 @@
               beaming, proud of self, happy and alert: https://i.imgur.com/Y3NBEr4.jpeg
               sorry, apologetic: https://i.imgur.com/5d8qxBd.jpeg
               angry: https://i.imgur.com/51jbvuM.jpeg
-              sly, "hint hint": https://i.imgur.com/Mpt4UIt.jpeg
+              sly: https://i.imgur.com/2Tcw7DO.jpeg
+              sly, hint hint nudge nudge: https://i.imgur.com/Mpt4UIt.jpeg
+              relaxed confident grin: https://i.imgur.com/EGDfzaN.jpeg
               concerned: https://i.imgur.com/rYFlBDd.jpeg
-              sly grin: https://i.imgur.com/EGDfzaN.jpeg
               worried, scared: https://i.imgur.com/5rp01eP.jpeg
               concerned: https://i.imgur.com/V4Y3jUh.jpeg
               disbelief: https://i.imgur.com/D05qdJ5.jpeg
               happy, optimistic: https://i.imgur.com/B6tWeLV.jpeg
-              surprised, like "uhh what?!": https://i.imgur.com/Ra5Pb4c.jpeg
+              very surprised, frozen, stunned: https://i.imgur.com/Ra5Pb4c.jpeg
               caught red handed: https://i.imgur.com/fvfw0Lc.jpeg
               cool, dismissive: https://i.imgur.com/Z38xuvY.jpeg
               patronising, teacherly: https://i.imgur.com/Tq1gKKw.jpeg
@@ -915,7 +916,6 @@
               wacky, crazy, fun: https://i.imgur.com/9Q2osAe.jpeg
               woops: https://i.imgur.com/CwYTcDO.jpeg
               sucking up to someone: https://i.imgur.com/FkwJs8X.jpeg
-              sly: https://i.imgur.com/2Tcw7DO.jpeg
               staring blankly: https://i.imgur.com/JSMx8EW.jpeg
               
               
@@ -930,7 +930,7 @@
                 let questionText = \`I'm about to ask you to classify the facial expression of a particular message, but here's some context first:
               
               ---
-              \${oc.thread.messages.slice(-numMessagesInContext).filter(m => m.role!=="system").map(m => (m.author=="ai" ? \`[\${oc.character.name}]: \` : \`[Anon]: \`)+m.content).join("\\n\\n")}
+              \${oc.thread.messages.slice(-numMessagesInContext).filter(m => m.author!=="system").map(m => (m.author=="ai" ? \`[\${oc.character.name}]: \` : \`[Anon]: \`)+m.content).join("\\n\\n")}
               ---
               
               Okay, now that you have the context, please classify the facial expression of the following text:
@@ -949,7 +949,7 @@
               
                 let response = await oc.getChatCompletion({
                   messages: [
-                    {author:"system", content:"You are a helpful assistant that classifies the emotion of particular text messages."},
+                    {author:"system", content:"You are a helpful assistant that classifies the hypothetical facial expression of particular text messages."},
                     {author:"user", content:questionText},
                   ],
                 });
