@@ -2817,10 +2817,6 @@
       async function checkForHashCommand() {
         const urlHash = window.location.hash.slice(1);
         const urlHashJson = urlHash ? JSON.parse(decodeURIComponent(urlHash)) : {};
-        ignoreHashChange = true;
-        window.location.hash = "";
-        ignoreHashChange = false;
-
         if(urlHashJson.addCharacter) {
           $.newThreadButton.click();
           let character = urlHashJson.addCharacter;
@@ -2831,6 +2827,9 @@
             await createNewThreadWithCharacterId(character.id);
           }
         }
+        ignoreHashChange = true;
+        window.location.hash = "";
+        ignoreHashChange = false;
       }
       window.addEventListener('hashchange', (event) => {
         if(!ignoreHashChange) {
