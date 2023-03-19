@@ -22,6 +22,7 @@
   * Characters can [edit their own personality and custom code](https://tinyurl.com/m2m4syyv) - self-improving and change over time
 * Auto-summarization algorithm (for old messages) which extends effective character memory/context size massively.
 * Currently only supports OpenAI APIs, but can add more (like LLaMA) later.
+* Import TavernAI `.jsonl` chat/thread files.
 * Send new feature ideas or bug reports [here](https://github.com/josephrocca/OpenCharacters/issues) or on our [Discord server](https://discord.gg/5tkWXJFqPV).
 
 ## Video Demo
