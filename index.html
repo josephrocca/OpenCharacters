@@ -464,15 +464,8 @@
           summaries.rows = summaries.rows.filter(s => keepThreadCheck(s.threadId));
         }
 
-        const newBlob = new Blob([JSON.stringify(json)], {type: "application/json"});
-
-        const dataUri = URL.createObjectURL(newBlob);
-        const exportFileDefaultName = "data.json";
-        let linkElement = document.createElement("a");
-        linkElement.setAttribute("href", dataUri);
-        linkElement.setAttribute("download", exportFileDefaultName);
-        linkElement.click();
-        linkElement.remove();
+        let yyyymmdd = new Date().toISOString().split("T")[0];
+        downloadText(JSON.stringify(json), `opencharacters-export-${yyyymmdd}.json`);
       });
 
       // This renders the list of threads in the left column.
@@ -533,19 +526,7 @@
         $.chatThreads.querySelectorAll(".thread").forEach(thread => {
           thread.addEventListener("click", async function() {
             const threadId = parseInt(thread.dataset.threadId);
-            const characterId = parseInt(thread.dataset.characterId);
-            await renderMessageFeed(threadId);
-            // change background of selected thread is threadlist to indicate selection.
-            thread.classList.add("selected");
-            // remove 'selected' class from all other threads.
-            $.chatThreads.querySelectorAll(".thread").forEach(t => {
-              if(t !== thread) {
-                t.classList.remove("selected");
-              }
-            });
-            // show the chat interface.
-            document.querySelectorAll("#middleColumn > .middleColumnScreen").forEach(el => hideEl(el));
-            showEl($.chatInterface);
+            await showThread(threadId);
           });
         });
         $.chatThreads.querySelectorAll(".nameEditButton").forEach(btn => {
@@ -1075,7 +1056,6 @@
         // add initial messages
         const character = await db.characters.get(characterId);
         for(let m of character.initialMessages) {
-          // initial messages alternate between user and character, starting with user
           let characterId;
           if(m.author === "user") characterId = -1;
           if(m.author === "system") characterId = -2;
@@ -1090,15 +1070,20 @@
           await addMessageToDb(messageObj)
         }
 
-        // Add the new thread to the thread list and select it.
         await renderThreadList();
-        const threadEl = $.chatThreads.querySelector(`.thread[data-thread-id="${thread.id}"]`);
+        await showThread(thread.id);
+      }
+
+      async function showThread(threadId) {
+        
+        document.querySelectorAll("#chatThreads .thread").forEach(el => el.classList.remove("selected"));
+        const threadEl = $.chatThreads.querySelector(`.thread[data-thread-id="${threadId}"]`);
         threadEl.classList.add("selected");
         
         document.querySelectorAll("#middleColumn > .middleColumnScreen").forEach(el => hideEl(el));
         showEl($.chatInterface);
 
-        await renderMessageFeed(thread.id);
+        await renderMessageFeed(threadId);
       }
 
       async function characterDetailsPrompt(defaultValues={}) {
@@ -1215,14 +1200,14 @@
       }
 
 
-      function createMessageObj({threadId, message, characterId, hiddenFrom}) {
+      function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime}) {
         if(!hiddenFrom || !Array.isArray(hiddenFrom)) hiddenFrom = [];
         return {
           threadId,
           message,
           characterId,
           hiddenFrom,
-          creationTime: Date.now(),
+          creationTime: creationTime ?? Date.now(),
         };
       }
 
@@ -2617,125 +2602,192 @@
         }
 
         // warn about overwrite:
-        if(options.keepExistingData === "no" && !confirm("Are you sure you want to DELETE all of your existing data?")) {
+        if(options.keepExistingData === "no" && !confirm("Are you sure you want to DELETE all of your existing data? You should create an export of your data first! This cannot be undone.")) {
           $.importDataFileInput.value = "";
           return;
         }
 
         let file = $.importDataFileInput.files[0];
 
-        if(options.keepExistingData === "no") {
-          await db.delete();
-          db = await Dexie.import(file);
-        } else {
-          let json = JSON.parse(await new Blob([file]).text());
+        $.importDataFileInput.value = "";
 
-          // TODO: I should probably convert IDs to UUIDs so I don't need to do this sort of thing, but this is fine for now. Note: If you do this, you need to update the export modal because it currently uses comma-separated IDs
-          
-          // we need to re-number all ids in the imported data to be higher than the current max ids.
-
-          // get current maximum id for each table
-          let maxThreadId = (await db.threads.orderBy("id").last())?.id ?? -1;
-          let maxMessageId = (await db.messages.orderBy("id").last())?.id ?? -1;
-          let maxCharacterId = (await db.characters.orderBy("id").last())?.id ?? -1;
-          // note: summaries don't have an id (we index by hash), so we don't need to re-number their ids (but note that we do need to renumber their thread ids to match the new thread ids)
-
-          let importedCharacters = json.data.data.find(d => d.tableName === "characters").rows;
-          let importedThreads = json.data.data.find(d => d.tableName === "threads").rows;
-          let importedMessages = json.data.data.find(d => d.tableName === "messages").rows;
-          let importedSummaries = json.data.data.find(d => d.tableName === "summaries")?.rows;
-          
-          const existingCharacters = await db.characters.toArray();
-
-          // hash existing characters, and new characters, so we can map ids of new characters to ones that may already exist
-          let existingCharacterHashToId = {};
-          let newCharacterIdToHash = {};
-          for(let character of existingCharacters) {
-            let hash = await getCharacterHash(character);
-            existingCharacterHashToId[hash] = character.id;
+        // check if it's an external/non-standard format:
+        try {
+          let text = await new Blob([file]).text();
+          // parse text as jsonl format (lines are json objects):
+          let jsonl = text.trim().split("\n").map(line => JSON.parse(line));
+          // check if it's jsonl format:
+          if(!jsonl.every(obj => typeof obj === "object" && obj !== null)) {
+            throw new Error("Not JSONL format");
           }
-          for(let character of importedCharacters) {
-            let hash = await getCharacterHash(character);
-            newCharacterIdToHash[character.id] = hash;
-          }
+          // check if it's TavernAI thread format (first line is header/meta):
+          if(jsonl[0].user_name!==undefined && jsonl[0].character_name!==undefined && jsonl[0].create_date!==undefined && jsonl.slice(1).every(m => m.name!==undefined && m.is_user!==undefined && m.mes!==undefined && m.send_date!==undefined)) {
 
-          // old id -> new id maps
-          let characterIdMap = {};
-          let threadIdMap = {};
-          let messageIdMap = {};
-          let summaryIdMap = {};
-
-          let charactersThatWeAlreadyHave = [];
-
-          // re-number character ids
-          for(let character of importedCharacters) {
-            let existingCharacterId = existingCharacterHashToId[newCharacterIdToHash[character.id]];
-            if(existingCharacterId !== undefined) {
-              characterIdMap[character.id] = existingCharacterId;
-              charactersThatWeAlreadyHave.push(character);
-              continue;
+            if(options.keepExistingData === "no") {
+              if(!confirm("You're importing a TavernAI thread, but you've requested that all existing data be deleted. This is not supported when importing TavernAI threads. Existing data will NOT be deleted.")) {
+                return;
+              }
             }
-            // no existing character with this hash, so we need to create a new entry:
-            maxCharacterId++;
-            characterIdMap[character.id] = maxCharacterId;
-            character.id = maxCharacterId;
-          }
 
-          // remove all the `charactersThatWeAlreadyHave` characters from the `importedCharacters`, since we don't need to import them:
-          importedCharacters = importedCharacters.filter(c => !charactersThatWeAlreadyHave.includes(c));
-
-          // re-number thread ids
-          for(let thread of importedThreads) {
-            maxThreadId++;
-            threadIdMap[thread.id] = maxThreadId;
-            thread.id = maxThreadId;
-            // re-number character id of each thread
-            thread.characterId = characterIdMap[thread.characterId];
-          }
-
-          // re-number message ids
-          for(let message of importedMessages) {
-            maxMessageId++;
-            messageIdMap[message.id] = maxMessageId;
-            message.id = maxMessageId;
-            // re-number thread id of each message
-            message.threadId = threadIdMap[message.threadId];
-            // re-number author/character id of each message
-            if(message.characterId >= 0) { // remember, user messages have characterId = -1, and system messages have characterId = -2
-              message.characterId = characterIdMap[message.characterId];
+            // if so, ask user which character it corresponds to, and then add it as a thread
+            const characters = await db.characters.orderBy("lastMessageTime").reverse().toArray();
+            let tavernOptions = await prompt2({
+              characterId: {label: "You're importing a TavernAI thread. Choose the character for this thread. If you haven't created/imported it yet, you should click cancel and do that first.", type: "select", options:characters.map(c => ({content:`${c.name} #${c.id}`, value:c.id}))},
+            }, {submitButtonText:"Submit"});
+            if(!tavernOptions) {
+              return;
             }
-          }
-
-          if(importedSummaries) {
-            // convert old summary thread ids to new ones
-            for(let summary of importedSummaries) {
-              summary.threadId = threadIdMap[summary.threadId];
+            tavernOptions.characterId = parseInt(tavernOptions.characterId);
+            let character = await db.characters.get(tavernOptions.characterId);
+            let thread = await addThread("Unnamed Thread", character.id);
+            for(let m of jsonl.slice(1)) {
+              let characterId;
+              if(m.is_user) characterId = -1;
+              else characterId = character.id;
+              let data = {threadId:thread.id, message:m.mes, characterId, creationTime:m.send_date};
+              let messageObj = createMessageObj(data);
+              await addMessageToDb(messageObj)
             }
-            // get existing summary hashes from db
-            let existingSummaryHashes = new Set((await db.summaries.toArray()).map(s => s.hash));
-            // remove summaries we already have
-            importedSummaries = importedSummaries.filter(s => !existingSummaryHashes.has(s.hash));
+            await renderThreadList();
+            await showThread(thread.id);
+            return; // DONE
           }
-
-          json.data.data.find(d => d.tableName === "characters").rows = importedCharacters;
-          json.data.data.find(d => d.tableName === "threads").rows = importedThreads;
-          json.data.data.find(d => d.tableName === "messages").rows = importedMessages;
-          if(importedSummaries) {
-            json.data.data.find(d => d.tableName === "summaries").rows = importedSummaries;
-          }
-
-          // check which misc keys user already has, and remove them from the misc table that we're importing:
-          let existingMiscKeys = (await db.misc.toArray()).map(m => m.key);
-          let miscData = json.data.data.find(d => d.tableName === "misc");
-          miscData.rows = miscData.rows.filter(m => !existingMiscKeys.includes(m.key));
-          
-          // convert json back to blob and import
-          let blob = new Blob([JSON.stringify(json)], {type: "application/json"});
-          await db.import(blob, {acceptVersionDiff:true, acceptMissingTables:true});
-
-          // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
-          
+        } catch(e) {
+          console.log("Imported file is not an external/non-standard format.");
         }
+
+        // backup existing data just in cast this wrecks the db for some reason (used in catch block below):
+        const originalDbJsonText = await db.export({prettyJson: true}).then(blob => blob.text());
+
+        try {
+
+          if(options.keepExistingData === "no") {
+            try {
+              JSON.parse(await new Blob([file]).text());
+            } catch(e) {
+              alert("Error: Import file is not valid JSON.");
+              return;
+            }
+            await db.delete();
+            db = await Dexie.import(file);
+          } else {
+            let json = JSON.parse(await new Blob([file]).text());
+
+            // TODO: I should probably convert IDs to UUIDs so I don't need to do this sort of thing, but this is fine for now. Note: If you do this, you need to update the export modal because it currently uses comma-separated IDs
+            
+            // we need to re-number all ids in the imported data to be higher than the current max ids.
+
+            // get current maximum id for each table
+            let maxThreadId = (await db.threads.orderBy("id").last())?.id ?? -1;
+            let maxMessageId = (await db.messages.orderBy("id").last())?.id ?? -1;
+            let maxCharacterId = (await db.characters.orderBy("id").last())?.id ?? -1;
+            // note: summaries don't have an id (we index by hash), so we don't need to re-number their ids (but note that we do need to renumber their thread ids to match the new thread ids)
+
+            let importedCharacters = json.data.data.find(d => d.tableName === "characters").rows;
+            let importedThreads = json.data.data.find(d => d.tableName === "threads").rows;
+            let importedMessages = json.data.data.find(d => d.tableName === "messages").rows;
+            let importedSummaries = json.data.data.find(d => d.tableName === "summaries")?.rows;
+            
+            const existingCharacters = await db.characters.toArray();
+
+            // hash existing characters, and new characters, so we can map ids of new characters to ones that may already exist
+            let existingCharacterHashToId = {};
+            let newCharacterIdToHash = {};
+            for(let character of existingCharacters) {
+              let hash = await getCharacterHash(character);
+              existingCharacterHashToId[hash] = character.id;
+            }
+            for(let character of importedCharacters) {
+              let hash = await getCharacterHash(character);
+              newCharacterIdToHash[character.id] = hash;
+            }
+
+            // old id -> new id maps
+            let characterIdMap = {};
+            let threadIdMap = {};
+            let messageIdMap = {};
+            let summaryIdMap = {};
+
+            let charactersThatWeAlreadyHave = [];
+
+            // re-number character ids
+            for(let character of importedCharacters) {
+              let existingCharacterId = existingCharacterHashToId[newCharacterIdToHash[character.id]];
+              if(existingCharacterId !== undefined) {
+                characterIdMap[character.id] = existingCharacterId;
+                charactersThatWeAlreadyHave.push(character);
+                continue;
+              }
+              // no existing character with this hash, so we need to create a new entry:
+              maxCharacterId++;
+              characterIdMap[character.id] = maxCharacterId;
+              character.id = maxCharacterId;
+            }
+
+            // remove all the `charactersThatWeAlreadyHave` characters from the `importedCharacters`, since we don't need to import them:
+            importedCharacters = importedCharacters.filter(c => !charactersThatWeAlreadyHave.includes(c));
+
+            // re-number thread ids
+            for(let thread of importedThreads) {
+              maxThreadId++;
+              threadIdMap[thread.id] = maxThreadId;
+              thread.id = maxThreadId;
+              // re-number character id of each thread
+              thread.characterId = characterIdMap[thread.characterId];
+            }
+
+            // re-number message ids
+            for(let message of importedMessages) {
+              maxMessageId++;
+              messageIdMap[message.id] = maxMessageId;
+              message.id = maxMessageId;
+              // re-number thread id of each message
+              message.threadId = threadIdMap[message.threadId];
+              // re-number author/character id of each message
+              if(message.characterId >= 0) { // remember, user messages have characterId = -1, and system messages have characterId = -2
+                message.characterId = characterIdMap[message.characterId];
+              }
+            }
+
+            if(importedSummaries) {
+              // convert old summary thread ids to new ones
+              for(let summary of importedSummaries) {
+                summary.threadId = threadIdMap[summary.threadId];
+              }
+              // get existing summary hashes from db
+              let existingSummaryHashes = new Set((await db.summaries.toArray()).map(s => s.hash));
+              // remove summaries we already have
+              importedSummaries = importedSummaries.filter(s => !existingSummaryHashes.has(s.hash));
+            }
+
+            json.data.data.find(d => d.tableName === "characters").rows = importedCharacters;
+            json.data.data.find(d => d.tableName === "threads").rows = importedThreads;
+            json.data.data.find(d => d.tableName === "messages").rows = importedMessages;
+            if(importedSummaries) {
+              json.data.data.find(d => d.tableName === "summaries").rows = importedSummaries;
+            }
+
+            // check which misc keys user already has, and remove them from the misc table that we're importing:
+            let existingMiscKeys = (await db.misc.toArray()).map(m => m.key);
+            let miscData = json.data.data.find(d => d.tableName === "misc");
+            miscData.rows = miscData.rows.filter(m => !existingMiscKeys.includes(m.key));
+            
+            // convert json back to blob and import
+            let blob = new Blob([JSON.stringify(json)], {type: "application/json"});
+            await db.import(blob, {acceptVersionDiff:true, acceptMissingTables:true});
+
+            // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
+            
+          }
+
+        } catch(e) {
+          console.error(e);
+          let yyyymmdd = new Date().toISOString().split("T")[0];
+          downloadText(originalDbJsonText, `opencharacters-export-${yyyymmdd}.json`);
+          await delay(1000);
+          alert(`There was an error importing your data. Your data has been downloaded as a backup. Please share this error message on Github:\n\n${e.message}\n\n${e.stack}`);
+        }
+
         window.location.reload();
       });
 
