@@ -18,7 +18,7 @@
   * Create your own memory structures (embedding, retrieval, etc.)
   * Give your character an internal thought process that runs alongside the chat
   * Give your character a voice via the browser's built-in TTS, or via an external API like ElevenLabs
-  * Characters can edit their own personality and custom code - self-improving and change over time
+  * Characters can [edit their own personality and custom code](https://tinyurl.com/m2m4syyv) - self-improving and change over time
 * Auto-summarization algorithm (for old messages) which extends effective character memory/context size massively.
 * Currently only supports OpenAI APIs, but can add more (like LLaMA) later.
 * Send new feature ideas or bug reports [here](https://github.com/josephrocca/OpenCharacters/issues) or on our [Discord server](https://discord.gg/5tkWXJFqPV).
