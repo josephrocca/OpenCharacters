@@ -15,6 +15,7 @@
   * Give your character access to the internet
   * Create your own slash commands
   * Give your character a video avatar (custom code has its own iframe & can display arbitrary content)
+  * Create a "game master" [with a separate AI-powered process](https://tinyurl.com/5t3x8pdk) that tracks your abilities, inventory, etc.
   * Create your own memory structures (embedding, retrieval, etc.)
   * Give your character an internal thought process that runs alongside the chat
   * Give your character a voice via the browser's built-in TTS, or via an external API like ElevenLabs
