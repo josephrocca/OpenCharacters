@@ -5,8 +5,11 @@ But if you want to also *serve* the HTML/JavaScript files from your own machine,
 
 1. [Download this project as a zip file](https://github.com/josephrocca/OpenCharacters/archive/refs/heads/main.zip) and unzip it
 2. Install the [Web Server For Chrome](https://chrome.google.com/webstore/detail/web-server-for-chrome/ofhbbkphhbklhfoeikjpcbhemlocgigb/related?hl=en) web app/extension
-3. Activate launch the app and select the unzipped folder [as shown in the intro video](https://www.youtube.com/watch?v=AK6swHiPtew)
-4. **IMPORTANT**: Once you select the folder and switch on the server with the toggle, it'll show you a URL like `http://127.0.0.1:8887`, but you should change it to `http://localhost:8887` because otherwise (due [very strange engineering choices](https://stackoverflow.com/questions/43895390/imgur-images-returning-403) at Imgur HQ based on the "referrer" header), Imgur images won't load.
+3. Launch the app and select the unzipped folder [as shown in the intro video](https://www.youtube.com/watch?v=AK6swHiPtew)
+4. **IMPORTANT**: Once you select the folder and switch on the server with the toggle, it'll show you a URL like `http://127.0.0.1:8887`, but you should change it to `http://localhost:8887` because otherwise (due [very strange engineering choices](https://stackoverflow.com/questions/43895390/imgur-images-returning-403) at Imgur HQ based on the "referrer" header), Imgur images won't load. So just swap the `127.0.0.1` part to `localhost` and that'll fix image loading problems.
+5. Visit the URL in your browser.
+
+## Notes
 
 If you don't like the "Web Server For Chrome" app, you're free to use any sort of web server you like, of course. If you know the basics of using the command line, then there are lots of option. You can ask ChatGPT for help based on your operating system. Just ask it something like "I have a folder that I'd like to server with a static web server on [your operating system] but I'm a noob, please give me detailed instructions on how to do that without jargon".
 
