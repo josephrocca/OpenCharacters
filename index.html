@@ -1679,7 +1679,10 @@
           
           const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), statusEl:el.querySelector(".statusMessage")});
 
-          if(userDeletedMessage) return;
+          if(userDeletedMessage) {
+            botIsCurrentlyReplying = false;
+            return;
+          }
           
           // if `message` is not a string, it means the bot failed to reply, so delete the message
           if(typeof message !== "string") {
