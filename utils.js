@@ -310,3 +310,15 @@ export function dedent(str) {
   let result = indent > 0 ? str.replace(re, '') : str;
   return result.trim(); // trim because with indented multi-line strings, the first line will almost always have a newline at the beginning, assuming regular code formatting
 }
+
+
+export function downloadText(text, filename) {
+  const blob = new Blob([text], {type: "application/json"});
+  const dataUri = URL.createObjectURL(blob);
+  let linkElement = document.createElement("a");
+  linkElement.setAttribute("href", dataUri);
+  linkElement.setAttribute("download", filename);
+  linkElement.click();
+  linkElement.remove();
+  setTimeout(() => URL.revokeObjectURL(dataUri), 30*1000);
+} 
