@@ -8,7 +8,7 @@
 <p align="center"><a href="https://discord.gg/5tkWXJFqPV">Discord Server</a></p>
 
 ## Features:
-* The whole web app is a single HTML file - no server.
+* The whole web app is a single HTML file - no server (serve it [locally](https://github.com/josephrocca/OpenCharacters/blob/main/docs/local-setup.md) if you want).
 * All your data is stored in your browser's local storage (again, there is no server).
 * Share characters with a link - all character data is embedded within the link.
 * Fully extensible with [custom code](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md). See examples [here](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code-examples.md).
