@@ -1,13 +1,15 @@
 # Running OpenCharacters on your own machine
 Note that when you load up OpenCharacters via the usual URL, it *is running locally on your machine* - there is no server other than the `github.io` server that sends you the HTML/JavaScript files. Once the page has loaded, it's running completely locally on your machine, other than the requests to the OpenAI API, which are unavoidably non-local either way.
 
-But if you want to also *serve* the HTML/JavaScript files from your own machine, you can use this guide.
+But if you want to also *serve* the HTML/JavaScript files from your own machine, you can use this guide. This might be handy if you want to completely opt-in to any updates to OpenCharacters, instead of receiving updates automatically when I update this code repository.
 
 1. [Download this project as a zip file](https://github.com/josephrocca/OpenCharacters/archive/refs/heads/main.zip) and unzip it
 2. Install the [Web Server For Chrome](https://chrome.google.com/webstore/detail/web-server-for-chrome/ofhbbkphhbklhfoeikjpcbhemlocgigb/related?hl=en) web app/extension
 3. Launch the app and select the unzipped folder [as shown in the intro video](https://www.youtube.com/watch?v=AK6swHiPtew)
-4. **IMPORTANT**: Once you select the folder and switch on the server with the toggle, it'll show you a URL like `http://127.0.0.1:8887`, but you should change it to `http://localhost:8887` because otherwise (due [very strange engineering choices](https://stackoverflow.com/questions/43895390/imgur-images-returning-403) at Imgur HQ based on the "referrer" header), Imgur images won't load. So just swap the `127.0.0.1` part to `localhost` and that'll fix image loading problems.
+4. **Important**: Once you select the folder and switch on the server with the toggle, it'll show you a URL like `http://127.0.0.1:8887`, but you should change it to `http://localhost:8887` because otherwise (due [very strange engineering choices](https://stackoverflow.com/questions/43895390/imgur-images-returning-403) at Imgur HQ based on the "referrer" header), Imgur images won't load. So just swap the `127.0.0.1` part to `localhost` and that'll fix image loading problems.
 5. Visit the URL in your browser.
+
+Note that chatacter URLs look like this: `https://josephrocca.github.io/OpenCharacters/#%7B%22addCharac...` but to use them with your local version you'll need to change them to this: `http://localhost:8887/#%7B%22addCharac...`. Replace `http://localhost:8887` with whatever your webserver URL is (the `8887` number might be different). So, to be clear, just take a normal character share URL and swap `https://josephrocca.github.io/OpenCharacters/` for `http://localhost:8887`.
 
 ## Notes
 
