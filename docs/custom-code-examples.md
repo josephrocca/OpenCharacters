@@ -98,43 +98,44 @@ console.log("questionText:", questionText);
 
 # Randomly choose a character from a large, externally-hosted text file
 
-There was a question on the Discord that asked how they could compile a list of thousands of characters, and then use some custom code to randomly choose a character when a user first opens **[the character share link](https://tinyurl.com/muvsct7u)** and starts a conversation.
+There was a question on the Discord that asked how they could compile a list of thousands of characters, and then use some custom code to randomly choose a character when a user first opens **[the character share link](https://tinyurl.com/dthzwjb2)** and starts a conversation.
 
 Here's some example code for this:
 ```js
 // only choose a random character if we haven't already chosen one (as indicated by a filled-in role instruction). So if you want to re-roll a character, you can delete its instruction.
 if(!oc.character.roleInstruction) {
   // download text file:
-  let text = await fetch("https://gist.githubusercontent.com/josephrocca/3a6868255ec69534e2a7d4bd4ab3f06a/raw/e3e0b82d23c41813ef093d5f44aa2e1ee09d88ad/character-franchise-list.txt").then(r => r.text());
-  // split into lines, and then split lines into "parts" (name, and franchise)
+  let text = await fetch("https://gist.githubusercontent.com/josephrocca/93556a5a1483242b68790f58216e8ba9/raw/30a7e9d605488a4969f78fc665dde0009267870a/character-list.txt").then(r => r.text());
+  // split into lines, and then split lines into "parts" (name, franchise, image url)
   let characters = text.trim().split("\n").map(line => line.split(";").map(part => part.trim()));
   // choose a random character
   let c = characters[Math.floor(characters.length*Math.random())];
   // set name and role instruction using the two parts
   oc.character.name = c[0];
   oc.character.roleInstruction = `You are ${c[0]} from the ${c[1]} franchise.`;
+  oc.character.avatarUrl = c[2];
 }
 ```
 To create your own character list text file, you'll need to sign up for a Github account, and then click the "+" sign in the top right and click "Create gist...", then once you've created your "gist" (it's just a text file), click the "raw" button to get the direct URL to the text file. Then paste it in place of this example code, and then put that code in the "custom code" section.
 
-Here's what the URL should look like: https://gist.githubusercontent.com/josephrocca/3a6868255ec69534e2a7d4bd4ab3f06a/raw/e3e0b82d23c41813ef093d5f44aa2e1ee09d88ad/character-franchise-list.txt
+Here's what the URL should look like: https://gist.githubusercontent.com/josephrocca/93556a5a1483242b68790f58216e8ba9/raw/30a7e9d605488a4969f78fc665dde0009267870a/character-list.txt
 
 I.e. the URL should have `/raw/` in it, and it should lead to a plain text page (i.e. no "Github" header, or anything like that).
 
 As you can see, the syntax/format of the text file is:
 ```
-character name; franchise
-character name; franchise
+character name ; franchise ; avatar url
+character name ; franchise ; avatar url
 ...
 ```
 
 You can add more properties like:
 ```
-character name; franchise; personality
-character name; franchise; personality
+character name ; franchise ; avatar url ; personality
+character name ; franchise ; avatar url ; personality
 ...
 ```
-And to reference `personality`, you'd use `${c[2]}` in the code. GPT-4 should be able to help you customise it if you paste the explanation that I've written here. You can also change anything else about the character with `oc.character.propertyNameYouWantToChange` - see here: https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md
+And to reference `personality`, you'd use `${c[3]}` in the code. GPT-4 should be able to help you customise it if you paste the explanation that I've written here. You can also change anything else about the character with `oc.character.propertyNameYouWantToChange` - see here: https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md
 
 (BTW, the reason you'll want to sign up for Github is because it's one of the few places that you can create a simple text file that can be downloaded from another webpage. Normally the JS code on one page can't download some files from a different website due to a thing called "CORS". On top of this, Github is just really reputable and can be trusted to host your file forever. If you use some random pastebin type site there's a 100% chance you file will eventually either be deleted, or be redirected to some ad-filled embedded version. Github is hands-down the best place to host text files.)
 
