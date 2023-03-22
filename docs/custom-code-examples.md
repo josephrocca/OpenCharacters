@@ -96,7 +96,7 @@ console.log("questionText:", questionText);
 ```
 
 
-# Randomly choose a character from a large text file
+# Randomly choose a character from a large, externally-hosted text file
 
 There was a question on the Discord that asked how they could compile a list of thousands of characters, and then
 
