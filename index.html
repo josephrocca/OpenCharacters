@@ -176,13 +176,14 @@
         display: none;  /* Safari and Chrome */
       }
 
-      #messageFeed .message .editButton, #messageFeed .message .recomputeButton, #messageFeed .message .deleteButton {
+      #messageFeed .message .emojiButton {
         opacity:0.5;
         cursor:pointer;
       }
-      #messageFeed .message .editButton:hover, #messageFeed .message .recomputeButton:hover, #messageFeed .message .deleteButton:hover {
+      #messageFeed .message .emojiButton:hover {
         opacity:1;
       }
+
       #messageFeed .message.hiddenFromUser .showHiddenMessageButton {
         display: inline-block;
       }
@@ -368,7 +369,7 @@
       }
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(8).stores({
+      db.version(10).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -378,9 +379,12 @@
         messages: "++id,threadId,characterId,creationTime", // characterId is -1 for user, and for system it is -2.
         misc: "key,value",
         summaries: "hash,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries
-      }).upgrade(tx => {
-          return tx.table("characters").toCollection().modify(character => {
+      }).upgrade(async tx => {
+          await tx.table("characters").toCollection().modify(character => {
             upgradeCharacterInitialMessagesArrayIfNeeded(character);
+          });
+          await tx.table("messages").toCollection().modify(message => {
+            if(!message.variants) message.variants = [null]; // null is the placeholder for the currently-chosen variant (stored in `message.message`)
           });
       });
 
@@ -645,7 +649,54 @@
           el.addEventListener("click", async function() {
             await recomputeBotReply(this.closest(".message"));
           });
+
+          let variantsCtnHideTimeout = null;
+          el.addEventListener("mouseenter", function() {
+            clearTimeout(variantsCtnHideTimeout);
+            let variantsCtn = el.closest(".message").querySelector(".messageVariantsCtn");
+            showEl(variantsCtn);
+            // position variantsCtn directly above el (the recompute button)
+            variantsCtn.style.top = (el.getBoundingClientRect().top - variantsCtn.getBoundingClientRect().height - 10) + "px";
+            variantsCtn.style.left = (el.getBoundingClientRect().left - variantsCtn.getBoundingClientRect().width/2 + el.getBoundingClientRect().width/2) + "px";
+          });
+          el.addEventListener("mouseleave", async function() {
+            let variantsCtn = el.closest(".message").querySelector(".messageVariantsCtn");
+            variantsCtnHideTimeout = setTimeout(() => hideEl(variantsCtn), 500);
+          });
+
+          el.closest(".message").querySelector(".messageVariantsCtn").addEventListener("mouseenter", function() {
+            clearTimeout(variantsCtnHideTimeout);
+          });
+          el.closest(".message").querySelector(".messageVariantsCtn").addEventListener("mouseleave", function() {
+            let variantsCtn = el.closest(".message").querySelector(".messageVariantsCtn");
+            variantsCtnHideTimeout = setTimeout(() => hideEl(variantsCtn), 500);
+          });
+
+          el.closest(".message").querySelector(".prevMessageVariantButton").addEventListener("click", async function() {
+            let message = await db.messages.get(parseInt(this.closest(".message").dataset.id));
+            let currentIndex = message.variants.findIndex(v => v===null); // current message is represented with `null` in variant array
+            message.variants[currentIndex] = message.message;
+            if(currentIndex-1 < 0) currentIndex = message.variants.length;
+            message.message = message.variants[currentIndex-1];
+            message.variants[currentIndex-1] = null;
+            await db.messages.put(message);
+            updateMessageContent(this.closest(".message"), message);
+            el.closest(".message").querySelector(".currentVariantNumber").innerHTML = `${(currentIndex-1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
+          });
+          el.closest(".message").querySelector(".nextMessageVariantButton").addEventListener("click", async function() {
+            let message = await db.messages.get(parseInt(this.closest(".message").dataset.id));
+            let currentIndex = message.variants.findIndex(v => v===null); // current message is represented with `null` in variant array
+            message.variants[currentIndex] = message.message;
+            if(currentIndex+1 >= message.variants.length) currentIndex = -1;
+            message.message = message.variants[currentIndex+1];
+            message.variants[currentIndex+1] = null;
+            await db.messages.put(message);
+            updateMessageContent(this.closest(".message"), message);
+            el.closest(".message").querySelector(".currentVariantNumber").innerHTML = `${(currentIndex+1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
+          });
+
         });
+
         $.messageFeed.querySelectorAll(".deleteButton").forEach(el => el.addEventListener("click", messageDeleteButtonClickHandler));
         $.messageFeed.querySelectorAll(".showHiddenMessageButton").forEach(el => el.addEventListener("click", showHiddenMessageClickHandler));
         // <code> should not occur inside <pre> tags, so remove them (not sure why `marked` does this)
@@ -1215,6 +1266,7 @@
           characterId,
           hiddenFrom,
           creationTime: creationTime ?? Date.now(),
+          variants: [null],
         };
       }
 
@@ -1723,14 +1775,19 @@
         const character = await db.characters.get(characterId);
         const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, statusEl:messageEl.querySelector(".statusMessage")});
         if(message) {
+          messageObj.variants[messageObj.variants.findIndex(v => v===null)] = messageObj.message;
+          messageObj.variants.push(null);
           messageObj.message = message;
 
           let scrollDown = messageFeedIsNearBottom();
           updateMessageContent(messageEl, messageObj);
           if(scrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+
+          let currentVariantNumber = messageObj.variants.findIndex(v => v===null) + 1;
+          messageEl.querySelector(".currentVariantNumber").innerHTML = `${currentVariantNumber}<span style="opacity:0.5">/${messageObj.variants.length}</span>`;
           
           // update db with bot's reply
-          await db.messages.update(messageObj.id, { message });
+          await db.messages.put(messageObj);
           // update thread's lastMessageTime
           await db.threads.update(threadId, { lastMessageTime: Date.now() });
           // if this isn't at the top of the thread list, re-render the thread list
@@ -1785,6 +1842,7 @@
       function createMessageElement(messageObj) {
         let messageContentHtml = DOMPurify.sanitize(marked.parse(messageObj.message));
         let tmp = document.createElement("div");
+        let currentVariantNumber = messageObj.variants.findIndex(v => v === null) + 1;
         tmp.innerHTML = `
           <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" style="padding:0.5rem; padding-left:0;">
             <div style="text-align:center;"><button class="showHiddenMessageButton" style="cursor:pointer; font-size:0.65rem;">Show hidden message</button></div>
@@ -1794,9 +1852,14 @@
                 <div class="info" style="flex-grow:1; display:flex; font-size:80%;">
                   <div class="characterName" style="font-weight:bold;">${sanitizeHtml(messageObj.character.name)}</div>
                   <div class="time" style="font-size:0.8rem; opacity:0.5; margin-left:0.5rem; display: flex; align-items: center;">${getDateTimeString(messageObj.creationTime)}</div>
-                  <div class="editButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
-                  <div class="deleteButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
-                  <div class="recomputeButton" style="font-size:0.8rem; margin-left:0.5rem; display: ${messageObj.character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
+                  <div class="editButton emojiButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
+                  <div class="deleteButton emojiButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
+                  <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:0.5rem; display: ${messageObj.character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
+                  <div class="messageVariantsCtn" style="display:none; position:fixed;">
+                    <span class="prevMessageVariantButton emojiButton">◄</span>
+                    <span class="currentVariantNumber">${currentVariantNumber}<span style="opacity:0.5">/${messageObj.variants.length}</span></span>
+                    <span class="nextMessageVariantButton emojiButton">►</span>
+                  </div>
                   ${messageObj.hiddenFrom?.includes("ai") ? `<div class="hiddenFromAiIcon" onclick="alert('This icon indicates that this message is hidden from the AI.')" title="The AI cannot see this message." style="font-size:0.8rem; margin-left:0.5rem; display:flex; align-items: center; cursor:pointer;">🙈</div>` : ""}
                   <div class="statusMessage" style="margin-left:0.5rem;display: flex;align-items: center;cursor:pointer;font-size: 0.7rem;opacity: 0.5;"></div>
                 </div>
