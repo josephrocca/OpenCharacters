@@ -98,7 +98,7 @@ console.log("questionText:", questionText);
 
 # Randomly choose a character from a large, externally-hosted text file
 
-There was a question on the Discord that asked how they could compile a list of thousands of characters, and then
+There was a question on the Discord that asked how they could compile a list of thousands of characters, and then use some custom code to randomly choose a character when a user first opens the character share link.
 
 Here's some example code for this:
 ```js
@@ -115,7 +115,7 @@ if(!oc.character.roleInstruction) {
   oc.character.roleInstruction = `You are ${c[0]} from the ${c[1]} franchise.`;
 }
 ```
-You'll need to sign up for a Github account, and then click the "+" sign in the top right and click "Create gist...", then once you've created your "gist" (it's just a text file), click the "raw" button to get the direct URL to the text file. Then paste it in place of this example code, and then put that code in the "custom code" section.
+To create your own character list text file, you'll need to sign up for a Github account, and then click the "+" sign in the top right and click "Create gist...", then once you've created your "gist" (it's just a text file), click the "raw" button to get the direct URL to the text file. Then paste it in place of this example code, and then put that code in the "custom code" section.
 
 Here's what the URL should look like: https://gist.githubusercontent.com/josephrocca/3a6868255ec69534e2a7d4bd4ab3f06a/raw/e3e0b82d23c41813ef093d5f44aa2e1ee09d88ad/character-franchise-list.txt
 
