@@ -1157,7 +1157,7 @@
         const result = await prompt2({
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:"[A-Za-z0-9_\\- ]{1,64}" },
           systemMessage: { label: "Initial 'system' message (instruction/role/personality):", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
-          reminderMessage: { label: "Reminder message (invisible system message that is placed before every AI response):", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
+          reminderMessage: { label: "Reminder message (invisible system message that is placed before every AI response):", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
           initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md">here</a>.`, type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
           modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}, {content:"gpt-4 (only works if you have waitlist access)", value:"gpt-4"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
@@ -2079,6 +2079,8 @@
 
         let srcDoc = dedent(`
         <script type="module">
+          let ___dataInitializationIsComplete_836283628 = false;
+
           (function() {
             let userHandlers = {
               messageadded: [],
@@ -2270,12 +2272,24 @@
                     result.character[key] = oc.character[key];
                   }
                 }
+                ___dataInitializationIsComplete_836283628 = true;
                 
                 window.parent.postMessage({_id:e.data._id, success:true, result}, "${window.location.origin}");
                 dataChangedByCustomCode = false;
               }
             });
           })();
+
+          // this must come before the wait-for-initialization below, because it's what ends up triggering initialization
+          window.addEventListener("load", () => {
+            window.parent.postMessage({_id:"${pageLoadId}"}, "${window.location.origin}");
+          });
+
+          // we need to wait for the oc data to load because they may immediately reference it in their custom code
+          while(1) {
+            if(___dataInitializationIsComplete_836283628) break;
+            await new Promise(r => setTimeout(r, 2));
+          }
 
           {{customCode}}
 
@@ -2285,8 +2299,6 @@
               await window.processMessages(window.oc.thread.messages);
             });
           }
-
-          window.parent.postMessage({_id:"${pageLoadId}"}, "${window.location.origin}");
         <\/script>`); // <-- need to escape the script tag so it doesn't close the script tag that this code is within
         
         // using template+split+join so dedent works properly
