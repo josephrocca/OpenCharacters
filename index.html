@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
+    <meta name="referrer" content="no-referrer"> 
     <title>OpenCharacters - Create and share ChatGPT/AI characters</title>
   </head>
   <body>
@@ -274,7 +275,7 @@
               <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
             </div> -->
             <div style="display:flex;">
-              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;message&gt; - reply as ai&#10;/sys &lt;message&gt; - reply as system"></textarea>
+              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;message&gt; - reply as ai&#10;/sys &lt;message&gt; - reply as system&#10;/user &lt;instruction&gt; - generate a user reply"></textarea>
               <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
                 <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
                 <button id="replyWithButton" style="min-width:80px; margin-top:0.25rem;">reply with…</button>
@@ -303,8 +304,8 @@
     <script type="module">
       import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText } from "./utils.js?v=13";
       
-      window.onerror = function myErrorHandler(errorMsg, url, lineNumber) {
-        alert(`Please report this error on the Discord or Github:\n\n${errorMsg}\n\nurl: ${url} \n\nlineNumber: ${lineNumber}`);//or any message
+      window.onerror = function(errorMsg, url, lineNumber) {
+        alert(`Please report this error on the Discord or Github:\n\n${errorMsg}\n\nurl: ${url} \n\nlineNumber: ${lineNumber}`);
         return false;
       }
 
@@ -1103,7 +1104,7 @@
           systemMessage: { label: "Initial 'system' message (instruction/role/personality):", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
           reminderMessage: { label: "Reminder message (invisible system message that is placed before every AI response):", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
           initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md">here</a>.`, type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
-          modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
+          modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}, {content:"gpt-4 (only works if you have waitlist access)", value:"gpt-4"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
           temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.7 },
@@ -1252,7 +1253,7 @@
       }
 
 
-      async function getBotReply({messages, aiCharacter, userCharacter, statusEl}) {
+      async function getBotReply({messages, aiCharacter, userCharacter, threadId, statusEl}) {
 
         // TODO: not sure that this will work as expected for the "reply with..." function, since the replying bot will see the hidden-from-ai messages (do we want that?)
         messages = JSON.parse(JSON.stringify(messages)).filter(m => {
@@ -1267,8 +1268,6 @@
         statusEl.innerHTML = "";
 
         let systemName = "System"; // name for the role:system messages (needed for non-chat models like davinci-003 e.g. "System: Sammy has joined the chat")
-
-        let threadId = messages[0].threadId;
 
         let modelVersion = aiCharacter.modelVersion;
         let tokenLimit = 3300; // buffer due to token count being an estimate
@@ -1397,7 +1396,10 @@
           OPENAI_API_KEY = result.openAiApiKey;
         }
 
-        let modelType = modelVersion==="gpt-3.5-turbo" ? "chat" : "general";
+        let modelType;
+        if(modelVersion==="gpt-3.5-turbo") modelType = "chat";
+        if(modelVersion==="gpt-4") modelType = "chat";
+        if(modelVersion==="text-davinci-003") modelType = "general";
 
         let result;
 
@@ -1677,7 +1679,7 @@
             await updateInlineReminderMessage();
           });
           
-          const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), statusEl:el.querySelector(".statusMessage")});
+          const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, statusEl:el.querySelector(".statusMessage")});
 
           if(userDeletedMessage) {
             botIsCurrentlyReplying = false;
@@ -1719,7 +1721,7 @@
 
         const characterId = parseInt($.messageFeed.dataset.characterId);
         const character = await db.characters.get(characterId);
-        const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), statusEl:messageEl.querySelector(".statusMessage")});
+        const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, statusEl:messageEl.querySelector(".statusMessage")});
         if(message) {
           messageObj.message = message;
 
@@ -1848,6 +1850,11 @@
           id: -1,
           name: (await db.misc.get("userName"))?.value || "Anon",
           avatarUrl: (await db.misc.get("userAvatarUrl"))?.value || "",
+          systemMessage: "",
+          reminderMessage: "",
+          initialMessage: [],
+          customCode: "",
+          fitMessagesInContextMethod: "dropOld",
         };
       }
       async function getSystemCharacterObj() {
@@ -1879,6 +1886,16 @@
               let el = await appendMessageToFeed(messageObj);
             }
 
+          } else if(message.trim().startsWith("/user")) {
+            let instruction = "";
+            if(message.trim().length > "/user ".length) instruction = message.trim().replace(/^\/user /, "");
+            let characterToReplyWith = await getUserCharacterObj();
+            let threadCharacter = await db.characters.get(parseInt($.messageFeed.dataset.characterId));
+            characterToReplyWith.modelVersion = threadCharacter.modelVersion; // use whatever model the thread character is using
+            if(instruction) {
+              characterToReplyWith.reminderMessage = `The next message will be written by '${characterToReplyWith.name}' and WILL conform to this instruction: ${instruction}`;
+            }
+            await doBotReplyInPlaceOfUser(characterToReplyWith);
           } else {
 
             let senderCharacterId = -1;
@@ -2390,6 +2407,47 @@
 
       $.sendButton.addEventListener("click", sendButtonClickHandler);
 
+      async function doBotReplyInPlaceOfUser(characterToReplyWith) {
+        let threadCharacter = await db.characters.get(parseInt($.messageFeed.dataset.characterId));
+        let threadId = parseInt($.messageFeed.dataset.threadId);
+
+        let messageObj = createMessageObj({threadId, message:"...", characterId:-1});
+        messageObj.character = await getUserCharacterObj(); // <-- this is the 'user character', not the characterToReplyWith because the character is "typing the reply", but it's as if the user wrote it. Might change this later when I allow multiple characters per thread.
+        
+        let el = await appendMessageToFeed(messageObj);
+        el.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
+        
+        let messages = await db.messages.where("threadId").equals(threadId).toArray();
+        
+        // characterToReplyWith is replying *on behalf of the user*, so we replace *user* message ids (characterId==-1) with the id of characterToReplyWith.
+        // this is needed because of the aiCharacter/userCharacter approach in getBotReply
+        for(let message of messages) {
+          if(message.characterId === -1) {
+            message.characterId = characterToReplyWith.id;
+          }
+        }
+        
+        // the "aiCharacter" is the one that replies 
+        let message = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, statusEl:el.querySelector(".statusMessage")});
+
+        // if `message` is falsy, it means the bot failed to reply, so delete the message and end the loop
+        if(typeof message !== "string") {
+          el.remove();
+          return false;
+        } else {
+          messageObj.message = message;
+
+          let scrollDown = messageFeedIsNearBottom();
+          updateMessageContent(el, messageObj);
+          if(scrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+
+          let id = await addMessageToDb(messageObj);
+          el.dataset.id = id;
+          await triggerMessageAddedCustomCodeEvent(threadId);
+        }
+        return true;
+      }
+
       let alreadyAutoReplying = false;
       let stopAutoReplying = false;
       $.replyWithButton.addEventListener("click", async function() {
@@ -2421,7 +2479,6 @@
           let otherCharVoiceName = result.otherCharVoiceName;
 
           let characterToReplyWith = await db.characters.get(parseInt(result.characterId));
-          let threadCharacter = await db.characters.get(parseInt($.messageFeed.dataset.characterId));
           let repeat = parseInt(result.repeat);
           let threadId = parseInt($.messageFeed.dataset.threadId);
           let i = 0;
@@ -2430,39 +2487,8 @@
               break;
             }
 
-            let messageObj = createMessageObj({threadId, message:"...", characterId:-1});
-            messageObj.character = await getUserCharacterObj();
-            
-            let el = await appendMessageToFeed(messageObj);
-            el.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
-            
-            let messages = await db.messages.where("threadId").equals(threadId).toArray();
-            
-            // characterToReplyWith is replying *on behalf of the user*, so we replace *user* message ids (characterId==-1) with the id of characterToReplyWith
-            for(let message of messages) {
-              if(message.characterId === -1) {
-                message.characterId = characterToReplyWith.id;
-              }
-            }
-            
-            // the "aiCharacter" is the one that replies 
-            let message = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, statusEl:el.querySelector(".statusMessage")});
-
-            // if `message` is falsy, it means the bot failed to reply, so delete the message and end the loop
-            if(typeof message !== "string") {
-              el.remove();
-              break;
-            } else {
-              messageObj.message = message;
-
-              let scrollDown = messageFeedIsNearBottom();
-              updateMessageContent(el, messageObj);
-              if(scrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
-
-              let id = await addMessageToDb(messageObj);
-              el.dataset.id = id;
-              await triggerMessageAddedCustomCodeEvent(threadId);
-            }
+            let success = await doBotReplyInPlaceOfUser(characterToReplyWith);
+            if(!success) break;
 
             if(ttsEnabled) {
               // chrome has a bug that occurs if you try to speak text that's too long
