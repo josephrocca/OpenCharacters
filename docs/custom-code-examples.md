@@ -98,7 +98,7 @@ console.log("questionText:", questionText);
 
 # Randomly choose a character from a large, externally-hosted text file
 
-There was a question on the Discord that asked how they could compile a list of thousands of characters, and then use some custom code to randomly choose a character when a user first opens **[the character share link](https://tinyurl.com/3ffennr2)** and starts a conversation.
+There was a question on the Discord that asked how they could compile a list of thousands of characters, and then use some custom code to randomly choose a character when a user first opens **[the character share link](https://tinyurl.com/muvsct7u)** and starts a conversation.
 
 Here's some example code for this:
 ```js
