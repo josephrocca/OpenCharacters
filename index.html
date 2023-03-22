@@ -341,8 +341,10 @@
         }
       }
 
+      const isMobile = window.innerWidth < 700; // TODO: improve this heuristic. this isn't just about screen width - it's also about touch screens (no pointer hover events).
+
       // add menu open/close button for narrow screens
-      if(window.innerWidth < 700) {
+      if(isMobile) {
         hideEl($.leftColumn);
         showEl($.leftColumnToggleButton);
         $.leftColumnToggleButton.dataset.state = "closed";
@@ -650,28 +652,6 @@
             await recomputeBotReply(this.closest(".message"));
           });
 
-          let variantsCtnHideTimeout = null;
-          el.addEventListener("mouseenter", function() {
-            clearTimeout(variantsCtnHideTimeout);
-            let variantsCtn = el.closest(".message").querySelector(".messageVariantsCtn");
-            showEl(variantsCtn);
-            // position variantsCtn directly above el (the recompute button)
-            variantsCtn.style.top = (el.getBoundingClientRect().top - variantsCtn.getBoundingClientRect().height - 10) + "px";
-            variantsCtn.style.left = (el.getBoundingClientRect().left - variantsCtn.getBoundingClientRect().width/2 + el.getBoundingClientRect().width/2) + "px";
-          });
-          el.addEventListener("mouseleave", async function() {
-            let variantsCtn = el.closest(".message").querySelector(".messageVariantsCtn");
-            variantsCtnHideTimeout = setTimeout(() => hideEl(variantsCtn), 500);
-          });
-
-          el.closest(".message").querySelector(".messageVariantsCtn").addEventListener("mouseenter", function() {
-            clearTimeout(variantsCtnHideTimeout);
-          });
-          el.closest(".message").querySelector(".messageVariantsCtn").addEventListener("mouseleave", function() {
-            let variantsCtn = el.closest(".message").querySelector(".messageVariantsCtn");
-            variantsCtnHideTimeout = setTimeout(() => hideEl(variantsCtn), 500);
-          });
-
           el.closest(".message").querySelector(".prevMessageVariantButton").addEventListener("click", async function() {
             let message = await db.messages.get(parseInt(this.closest(".message").dataset.id));
             let currentIndex = message.variants.findIndex(v => v===null); // current message is represented with `null` in variant array
@@ -694,6 +674,30 @@
             updateMessageContent(this.closest(".message"), message);
             el.closest(".message").querySelector(".currentVariantNumber").innerHTML = `${(currentIndex+1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
           });
+
+          if(!isMobile) {
+            let variantsCtnHideTimeout = null;
+            el.addEventListener("mouseenter", function() {
+              clearTimeout(variantsCtnHideTimeout);
+              let variantsCtn = el.closest(".message").querySelector(".messageVariantsCtn");
+              showEl(variantsCtn);
+              // position variantsCtn directly above el (the recompute button), taking into account padding of variantsCtn
+              variantsCtn.style.top = (el.getBoundingClientRect().top - variantsCtn.getBoundingClientRect().height - 5) + "px";
+              variantsCtn.style.left = (el.getBoundingClientRect().left - variantsCtn.getBoundingClientRect().width/2 + el.getBoundingClientRect().width/2) + "px";
+            });
+            el.addEventListener("mouseleave", async function() {
+              let variantsCtn = el.closest(".message").querySelector(".messageVariantsCtn");
+              variantsCtnHideTimeout = setTimeout(() => hideEl(variantsCtn), 500);
+            });
+
+            el.closest(".message").querySelector(".messageVariantsCtn").addEventListener("mouseenter", function() {
+              clearTimeout(variantsCtnHideTimeout);
+            });
+            el.closest(".message").querySelector(".messageVariantsCtn").addEventListener("mouseleave", function() {
+              let variantsCtn = el.closest(".message").querySelector(".messageVariantsCtn");
+              variantsCtnHideTimeout = setTimeout(() => hideEl(variantsCtn), 500);
+            });
+          }
 
         });
 
@@ -1786,6 +1790,8 @@
           let currentVariantNumber = messageObj.variants.findIndex(v => v===null) + 1;
           messageEl.querySelector(".currentVariantNumber").innerHTML = `${currentVariantNumber}<span style="opacity:0.5">/${messageObj.variants.length}</span>`;
           
+          if(isMobile) showEl(messageEl.querySelector(".messageVariantsCtn"));
+
           // update db with bot's reply
           await db.messages.put(messageObj);
           // update thread's lastMessageTime
@@ -1843,6 +1849,20 @@
         let messageContentHtml = DOMPurify.sanitize(marked.parse(messageObj.message));
         let tmp = document.createElement("div");
         let currentVariantNumber = messageObj.variants.findIndex(v => v === null) + 1;
+
+        let variantCtnCss;
+        if(isMobile) {
+          // on mobile we show when there are multiple variants
+          if(messageObj.variants.length >= 2) {
+            variantCtnCss = "margin-left:0.5rem;";
+          } else {
+            variantCtnCss = "margin-left:0.5rem; display:none;";
+          }
+        } else {
+          // on desktop we show in hover:
+          variantCtnCss = "display:none; position:fixed; padding: 0.125rem;";
+        }
+
         tmp.innerHTML = `
           <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" style="padding:0.5rem; padding-left:0;">
             <div style="text-align:center;"><button class="showHiddenMessageButton" style="cursor:pointer; font-size:0.65rem;">Show hidden message</button></div>
@@ -1855,7 +1875,7 @@
                   <div class="editButton emojiButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
                   <div class="deleteButton emojiButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
                   <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:0.5rem; display: ${messageObj.character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
-                  <div class="messageVariantsCtn" style="display:none; position:fixed;">
+                  <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); ${variantCtnCss}">
                     <span class="prevMessageVariantButton emojiButton">◄</span>
                     <span class="currentVariantNumber">${currentVariantNumber}<span style="opacity:0.5">/${messageObj.variants.length}</span></span>
                     <span class="nextMessageVariantButton emojiButton">►</span>
