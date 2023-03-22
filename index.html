@@ -1146,6 +1146,10 @@
         showEl($.chatInterface);
 
         await renderMessageFeed(threadId);
+
+        if(!customCodeIframes[threadId]) {
+          await createNewCustomCodeIframeForThread(threadId); // this adds iframe as here: customCodeIframes[threadId]
+        }
       }
 
       async function characterDetailsPrompt(defaultValues={}) {
@@ -2389,9 +2393,6 @@
       });
       
       async function sendCustomCodeIframeMessage(threadId, data) {
-        if(!customCodeIframes[threadId]) {
-          await createNewCustomCodeIframeForThread(threadId); // this adds iframe as here: customCodeIframes[threadId]
-        }
         let iframe = customCodeIframes[threadId];
         let _id = Math.random().toString()+Math.random().toString();
         data._id = _id;
