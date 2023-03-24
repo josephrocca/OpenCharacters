@@ -276,7 +276,7 @@
               <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
             </div> -->
             <div style="display:flex;">
-              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;message&gt; - reply as ai&#10;/sys &lt;message&gt; - reply as system&#10;/user &lt;instruction&gt; - generate a user reply"></textarea>
+              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;message&gt; - reply as ai&#10;/sys &lt;message&gt; - reply as system&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sum - edit summary"></textarea>
               <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
                 <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
                 <button id="replyWithButton" style="min-width:80px; margin-top:0.25rem;">reply with…</button>
@@ -303,7 +303,7 @@
     <script>!function(e,t){"object"==typeof exports&&"undefined"!=typeof module?module.exports=t():"function"==typeof define&&define.amd?define(t):(e="undefined"!=typeof globalThis?globalThis:e||self).DOMPurify=t()}(this,(function(){"use strict";function e(t){return e="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},e(t)}function t(e,n){return t=Object.setPrototypeOf||function(e,t){return e.__proto__=t,e},t(e,n)}function n(){if("undefined"==typeof Reflect||!Reflect.construct)return!1;if(Reflect.construct.sham)return!1;if("function"==typeof Proxy)return!0;try{return Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],(function(){}))),!0}catch(e){return!1}}function r(e,o,a){return r=n()?Reflect.construct:function(e,n,r){var o=[null];o.push.apply(o,n);var a=new(Function.bind.apply(e,o));return r&&t(a,r.prototype),a},r.apply(null,arguments)}function o(e,t){return function(e){if(Array.isArray(e))return e}(e)||function(e,t){var n=null==e?null:"undefined"!=typeof Symbol&&e[Symbol.iterator]||e["@@iterator"];if(null==n)return;var r,o,a=[],i=!0,l=!1;try{for(n=n.call(e);!(i=(r=n.next()).done)&&(a.push(r.value),!t||a.length!==t);i=!0);}catch(e){l=!0,o=e}finally{try{i||null==n.return||n.return()}finally{if(l)throw o}}return a}(e,t)||i(e,t)||function(){throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function a(e){return function(e){if(Array.isArray(e))return l(e)}(e)||function(e){if("undefined"!=typeof Symbol&&null!=e[Symbol.iterator]||null!=e["@@iterator"])return Array.from(e)}(e)||i(e)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function i(e,t){if(e){if("string"==typeof e)return l(e,t);var n=Object.prototype.toString.call(e).slice(8,-1);return"Object"===n&&e.constructor&&(n=e.constructor.name),"Map"===n||"Set"===n?Array.from(e):"Arguments"===n||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)?l(e,t):void 0}}function l(e,t){(null==t||t>e.length)&&(t=e.length);for(var n=0,r=new Array(t);n<t;n++)r[n]=e[n];return r}var c=Object.entries,u=Object.setPrototypeOf,s=Object.isFrozen,f=Object.getPrototypeOf,m=Object.getOwnPropertyDescriptor,p=Object.freeze,d=Object.seal,h=Object.create,y="undefined"!=typeof Reflect&&Reflect,g=y.apply,b=y.construct;g||(g=function(e,t,n){return e.apply(t,n)}),p||(p=function(e){return e}),d||(d=function(e){return e}),b||(b=function(e,t){return r(e,a(t))});var v,T=R(Array.prototype.forEach),N=R(Array.prototype.pop),A=R(Array.prototype.push),E=R(String.prototype.toLowerCase),w=R(String.prototype.toString),S=R(String.prototype.match),_=R(String.prototype.replace),x=R(String.prototype.indexOf),k=R(String.prototype.trim),O=R(RegExp.prototype.test),D=(v=TypeError,function(){for(var e=arguments.length,t=new Array(e),n=0;n<e;n++)t[n]=arguments[n];return b(v,t)});function R(e){return function(t){for(var n=arguments.length,r=new Array(n>1?n-1:0),o=1;o<n;o++)r[o-1]=arguments[o];return g(e,t,r)}}function C(e,t,n){n=n||E,u&&u(e,null);for(var r=t.length;r--;){var o=t[r];if("string"==typeof o){var a=n(o);a!==o&&(s(t)||(t[r]=a),o=a)}e[o]=!0}return e}function L(e){var t,n=h(null),r=function(e,t){var n="undefined"!=typeof Symbol&&e[Symbol.iterator]||e["@@iterator"];if(!n){if(Array.isArray(e)||(n=i(e))||t&&e&&"number"==typeof e.length){n&&(e=n);var r=0,o=function(){};return{s:o,n:function(){return r>=e.length?{done:!0}:{done:!1,value:e[r++]}},e:function(e){throw e},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var a,l=!0,c=!1;return{s:function(){n=n.call(e)},n:function(){var e=n.next();return l=e.done,e},e:function(e){c=!0,a=e},f:function(){try{l||null==n.return||n.return()}finally{if(c)throw a}}}}(c(e));try{for(r.s();!(t=r.n()).done;){var a=o(t.value,2),l=a[0],u=a[1];n[l]=u}}catch(e){r.e(e)}finally{r.f()}return n}function M(e,t){for(;null!==e;){var n=m(e,t);if(n){if(n.get)return R(n.get);if("function"==typeof n.value)return R(n.value)}e=f(e)}return function(e){return console.warn("fallback value for",e),null}}var I=p(["a","abbr","acronym","address","area","article","aside","audio","b","bdi","bdo","big","blink","blockquote","body","br","button","canvas","caption","center","cite","code","col","colgroup","content","data","datalist","dd","decorator","del","details","dfn","dialog","dir","div","dl","dt","element","em","fieldset","figcaption","figure","font","footer","form","h1","h2","h3","h4","h5","h6","head","header","hgroup","hr","html","i","img","input","ins","kbd","label","legend","li","main","map","mark","marquee","menu","menuitem","meter","nav","nobr","ol","optgroup","option","output","p","picture","pre","progress","q","rp","rt","ruby","s","samp","section","select","shadow","small","source","spacer","span","strike","strong","style","sub","summary","sup","table","tbody","td","template","textarea","tfoot","th","thead","time","tr","track","tt","u","ul","var","video","wbr"]),U=p(["svg","a","altglyph","altglyphdef","altglyphitem","animatecolor","animatemotion","animatetransform","circle","clippath","defs","desc","ellipse","filter","font","g","glyph","glyphref","hkern","image","line","lineargradient","marker","mask","metadata","mpath","path","pattern","polygon","polyline","radialgradient","rect","stop","style","switch","symbol","text","textpath","title","tref","tspan","view","vkern"]),F=p(["feBlend","feColorMatrix","feComponentTransfer","feComposite","feConvolveMatrix","feDiffuseLighting","feDisplacementMap","feDistantLight","feFlood","feFuncA","feFuncB","feFuncG","feFuncR","feGaussianBlur","feImage","feMerge","feMergeNode","feMorphology","feOffset","fePointLight","feSpecularLighting","feSpotLight","feTile","feTurbulence"]),z=p(["animate","color-profile","cursor","discard","fedropshadow","font-face","font-face-format","font-face-name","font-face-src","font-face-uri","foreignobject","hatch","hatchpath","mesh","meshgradient","meshpatch","meshrow","missing-glyph","script","set","solidcolor","unknown","use"]),H=p(["math","menclose","merror","mfenced","mfrac","mglyph","mi","mlabeledtr","mmultiscripts","mn","mo","mover","mpadded","mphantom","mroot","mrow","ms","mspace","msqrt","mstyle","msub","msup","msubsup","mtable","mtd","mtext","mtr","munder","munderover"]),j=p(["maction","maligngroup","malignmark","mlongdiv","mscarries","mscarry","msgroup","mstack","msline","msrow","semantics","annotation","annotation-xml","mprescripts","none"]),P=p(["#text"]),B=p(["accept","action","align","alt","autocapitalize","autocomplete","autopictureinpicture","autoplay","background","bgcolor","border","capture","cellpadding","cellspacing","checked","cite","class","clear","color","cols","colspan","controls","controlslist","coords","crossorigin","datetime","decoding","default","dir","disabled","disablepictureinpicture","disableremoteplayback","download","draggable","enctype","enterkeyhint","face","for","headers","height","hidden","high","href","hreflang","id","inputmode","integrity","ismap","kind","label","lang","list","loading","loop","low","max","maxlength","media","method","min","minlength","multiple","muted","name","nonce","noshade","novalidate","nowrap","open","optimum","pattern","placeholder","playsinline","poster","preload","pubdate","radiogroup","readonly","rel","required","rev","reversed","role","rows","rowspan","spellcheck","scope","selected","shape","size","sizes","span","srclang","start","src","srcset","step","style","summary","tabindex","title","translate","type","usemap","valign","value","width","xmlns","slot"]),G=p(["accent-height","accumulate","additive","alignment-baseline","ascent","attributename","attributetype","azimuth","basefrequency","baseline-shift","begin","bias","by","class","clip","clippathunits","clip-path","clip-rule","color","color-interpolation","color-interpolation-filters","color-profile","color-rendering","cx","cy","d","dx","dy","diffuseconstant","direction","display","divisor","dur","edgemode","elevation","end","fill","fill-opacity","fill-rule","filter","filterunits","flood-color","flood-opacity","font-family","font-size","font-size-adjust","font-stretch","font-style","font-variant","font-weight","fx","fy","g1","g2","glyph-name","glyphref","gradientunits","gradienttransform","height","href","id","image-rendering","in","in2","k","k1","k2","k3","k4","kerning","keypoints","keysplines","keytimes","lang","lengthadjust","letter-spacing","kernelmatrix","kernelunitlength","lighting-color","local","marker-end","marker-mid","marker-start","markerheight","markerunits","markerwidth","maskcontentunits","maskunits","max","mask","media","method","mode","min","name","numoctaves","offset","operator","opacity","order","orient","orientation","origin","overflow","paint-order","path","pathlength","patterncontentunits","patterntransform","patternunits","points","preservealpha","preserveaspectratio","primitiveunits","r","rx","ry","radius","refx","refy","repeatcount","repeatdur","restart","result","rotate","scale","seed","shape-rendering","specularconstant","specularexponent","spreadmethod","startoffset","stddeviation","stitchtiles","stop-color","stop-opacity","stroke-dasharray","stroke-dashoffset","stroke-linecap","stroke-linejoin","stroke-miterlimit","stroke-opacity","stroke","stroke-width","style","surfacescale","systemlanguage","tabindex","targetx","targety","transform","transform-origin","text-anchor","text-decoration","text-rendering","textlength","type","u1","u2","unicode","values","viewbox","visibility","version","vert-adv-y","vert-origin-x","vert-origin-y","width","word-spacing","wrap","writing-mode","xchannelselector","ychannelselector","x","x1","x2","xmlns","y","y1","y2","z","zoomandpan"]),W=p(["accent","accentunder","align","bevelled","close","columnsalign","columnlines","columnspan","denomalign","depth","dir","display","displaystyle","encoding","fence","frame","height","href","id","largeop","length","linethickness","lspace","lquote","mathbackground","mathcolor","mathsize","mathvariant","maxsize","minsize","movablelimits","notation","numalign","open","rowalign","rowlines","rowspacing","rowspan","rspace","rquote","scriptlevel","scriptminsize","scriptsizemultiplier","selection","separator","separators","stretchy","subscriptshift","supscriptshift","symmetric","voffset","width","xmlns"]),q=p(["xlink:href","xml:id","xlink:title","xml:space","xmlns:xlink"]),Y=d(/\{\{[\w\W]*|[\w\W]*\}\}/gm),$=d(/<%[\w\W]*|[\w\W]*%>/gm),K=d(/\${[\w\W]*}/gm),V=d(/^data-[\-\w.\u00B7-\uFFFF]/),X=d(/^aria-[\-\w]+$/),Z=d(/^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i),J=d(/^(?:\w+script|data):/i),Q=d(/[\u0000-\u0020\u00A0\u1680\u180E\u2000-\u2029\u205F\u3000]/g),ee=d(/^html$/i),te=function(){return"undefined"==typeof window?null:window},ne=function(t,n){if("object"!==e(t)||"function"!=typeof t.createPolicy)return null;var r=null,o="data-tt-policy-suffix";n.currentScript&&n.currentScript.hasAttribute(o)&&(r=n.currentScript.getAttribute(o));var a="dompurify"+(r?"#"+r:"");try{return t.createPolicy(a,{createHTML:function(e){return e},createScriptURL:function(e){return e}})}catch(e){return console.warn("TrustedTypes policy "+a+" could not be created."),null}};var re=function t(){var n=arguments.length>0&&void 0!==arguments[0]?arguments[0]:te(),r=function(e){return t(e)};if(r.version="3.0.1",r.removed=[],!n||!n.document||9!==n.document.nodeType)return r.isSupported=!1,r;var o=n.document,i=n.document,l=n.DocumentFragment,u=n.HTMLTemplateElement,s=n.Node,f=n.Element,m=n.NodeFilter,d=n.NamedNodeMap,h=void 0===d?n.NamedNodeMap||n.MozNamedAttrMap:d,y=n.HTMLFormElement,g=n.DOMParser,b=n.trustedTypes,v=f.prototype,R=M(v,"cloneNode"),re=M(v,"nextSibling"),oe=M(v,"childNodes"),ae=M(v,"parentNode");if("function"==typeof u){var ie=i.createElement("template");ie.content&&ie.content.ownerDocument&&(i=ie.content.ownerDocument)}var le=ne(b,o),ce=le?le.createHTML(""):"",ue=i,se=ue.implementation,fe=ue.createNodeIterator,me=ue.createDocumentFragment,pe=ue.getElementsByTagName,de=o.importNode,he={};r.isSupported="function"==typeof c&&"function"==typeof ae&&se&&void 0!==se.createHTMLDocument;var ye,ge,be=Y,ve=$,Te=K,Ne=V,Ae=X,Ee=J,we=Q,Se=Z,_e=null,xe=C({},[].concat(a(I),a(U),a(F),a(H),a(P))),ke=null,Oe=C({},[].concat(a(B),a(G),a(W),a(q))),De=Object.seal(Object.create(null,{tagNameCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},attributeNameCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},allowCustomizedBuiltInElements:{writable:!0,configurable:!1,enumerable:!0,value:!1}})),Re=null,Ce=null,Le=!0,Me=!0,Ie=!1,Ue=!0,Fe=!1,ze=!1,He=!1,je=!1,Pe=!1,Be=!1,Ge=!1,We=!0,qe=!1,Ye="user-content-",$e=!0,Ke=!1,Ve={},Xe=null,Ze=C({},["annotation-xml","audio","colgroup","desc","foreignobject","head","iframe","math","mi","mn","mo","ms","mtext","noembed","noframes","noscript","plaintext","script","style","svg","template","thead","title","video","xmp"]),Je=null,Qe=C({},["audio","video","img","source","image","track"]),et=null,tt=C({},["alt","class","for","id","label","name","pattern","placeholder","role","summary","title","value","style","xmlns"]),nt="http://www.w3.org/1998/Math/MathML",rt="http://www.w3.org/2000/svg",ot="http://www.w3.org/1999/xhtml",at=ot,it=!1,lt=null,ct=C({},[nt,rt,ot],w),ut=["application/xhtml+xml","text/html"],st="text/html",ft=null,mt=i.createElement("form"),pt=function(e){return e instanceof RegExp||e instanceof Function},dt=function(t){ft&&ft===t||(t&&"object"===e(t)||(t={}),t=L(t),ye=ye=-1===ut.indexOf(t.PARSER_MEDIA_TYPE)?st:t.PARSER_MEDIA_TYPE,ge="application/xhtml+xml"===ye?w:E,_e="ALLOWED_TAGS"in t?C({},t.ALLOWED_TAGS,ge):xe,ke="ALLOWED_ATTR"in t?C({},t.ALLOWED_ATTR,ge):Oe,lt="ALLOWED_NAMESPACES"in t?C({},t.ALLOWED_NAMESPACES,w):ct,et="ADD_URI_SAFE_ATTR"in t?C(L(tt),t.ADD_URI_SAFE_ATTR,ge):tt,Je="ADD_DATA_URI_TAGS"in t?C(L(Qe),t.ADD_DATA_URI_TAGS,ge):Qe,Xe="FORBID_CONTENTS"in t?C({},t.FORBID_CONTENTS,ge):Ze,Re="FORBID_TAGS"in t?C({},t.FORBID_TAGS,ge):{},Ce="FORBID_ATTR"in t?C({},t.FORBID_ATTR,ge):{},Ve="USE_PROFILES"in t&&t.USE_PROFILES,Le=!1!==t.ALLOW_ARIA_ATTR,Me=!1!==t.ALLOW_DATA_ATTR,Ie=t.ALLOW_UNKNOWN_PROTOCOLS||!1,Ue=!1!==t.ALLOW_SELF_CLOSE_IN_ATTR,Fe=t.SAFE_FOR_TEMPLATES||!1,ze=t.WHOLE_DOCUMENT||!1,Pe=t.RETURN_DOM||!1,Be=t.RETURN_DOM_FRAGMENT||!1,Ge=t.RETURN_TRUSTED_TYPE||!1,je=t.FORCE_BODY||!1,We=!1!==t.SANITIZE_DOM,qe=t.SANITIZE_NAMED_PROPS||!1,$e=!1!==t.KEEP_CONTENT,Ke=t.IN_PLACE||!1,Se=t.ALLOWED_URI_REGEXP||Se,at=t.NAMESPACE||ot,De=t.CUSTOM_ELEMENT_HANDLING||{},t.CUSTOM_ELEMENT_HANDLING&&pt(t.CUSTOM_ELEMENT_HANDLING.tagNameCheck)&&(De.tagNameCheck=t.CUSTOM_ELEMENT_HANDLING.tagNameCheck),t.CUSTOM_ELEMENT_HANDLING&&pt(t.CUSTOM_ELEMENT_HANDLING.attributeNameCheck)&&(De.attributeNameCheck=t.CUSTOM_ELEMENT_HANDLING.attributeNameCheck),t.CUSTOM_ELEMENT_HANDLING&&"boolean"==typeof t.CUSTOM_ELEMENT_HANDLING.allowCustomizedBuiltInElements&&(De.allowCustomizedBuiltInElements=t.CUSTOM_ELEMENT_HANDLING.allowCustomizedBuiltInElements),Fe&&(Me=!1),Be&&(Pe=!0),Ve&&(_e=C({},a(P)),ke=[],!0===Ve.html&&(C(_e,I),C(ke,B)),!0===Ve.svg&&(C(_e,U),C(ke,G),C(ke,q)),!0===Ve.svgFilters&&(C(_e,F),C(ke,G),C(ke,q)),!0===Ve.mathMl&&(C(_e,H),C(ke,W),C(ke,q))),t.ADD_TAGS&&(_e===xe&&(_e=L(_e)),C(_e,t.ADD_TAGS,ge)),t.ADD_ATTR&&(ke===Oe&&(ke=L(ke)),C(ke,t.ADD_ATTR,ge)),t.ADD_URI_SAFE_ATTR&&C(et,t.ADD_URI_SAFE_ATTR,ge),t.FORBID_CONTENTS&&(Xe===Ze&&(Xe=L(Xe)),C(Xe,t.FORBID_CONTENTS,ge)),$e&&(_e["#text"]=!0),ze&&C(_e,["html","head","body"]),_e.table&&(C(_e,["tbody"]),delete Re.tbody),p&&p(t),ft=t)},ht=C({},["mi","mo","mn","ms","mtext"]),yt=C({},["foreignobject","desc","title","annotation-xml"]),gt=C({},["title","style","font","a","script"]),bt=C({},U);C(bt,F),C(bt,z);var vt=C({},H);C(vt,j);var Tt=function(e){var t=ae(e);t&&t.tagName||(t={namespaceURI:at,tagName:"template"});var n=E(e.tagName),r=E(t.tagName);return!!lt[e.namespaceURI]&&(e.namespaceURI===rt?t.namespaceURI===ot?"svg"===n:t.namespaceURI===nt?"svg"===n&&("annotation-xml"===r||ht[r]):Boolean(bt[n]):e.namespaceURI===nt?t.namespaceURI===ot?"math"===n:t.namespaceURI===rt?"math"===n&&yt[r]:Boolean(vt[n]):e.namespaceURI===ot?!(t.namespaceURI===rt&&!yt[r])&&(!(t.namespaceURI===nt&&!ht[r])&&(!vt[n]&&(gt[n]||!bt[n]))):!("application/xhtml+xml"!==ye||!lt[e.namespaceURI]))},Nt=function(e){A(r.removed,{element:e});try{e.parentNode.removeChild(e)}catch(t){e.remove()}},At=function(e,t){try{A(r.removed,{attribute:t.getAttributeNode(e),from:t})}catch(e){A(r.removed,{attribute:null,from:t})}if(t.removeAttribute(e),"is"===e&&!ke[e])if(Pe||Be)try{Nt(t)}catch(e){}else try{t.setAttribute(e,"")}catch(e){}},Et=function(e){var t,n;if(je)e="<remove></remove>"+e;else{var r=S(e,/^[\r\n\t ]+/);n=r&&r[0]}"application/xhtml+xml"===ye&&at===ot&&(e='<html xmlns="http://www.w3.org/1999/xhtml"><head></head><body>'+e+"</body></html>");var o=le?le.createHTML(e):e;if(at===ot)try{t=(new g).parseFromString(o,ye)}catch(e){}if(!t||!t.documentElement){t=se.createDocument(at,"template",null);try{t.documentElement.innerHTML=it?ce:o}catch(e){}}var a=t.body||t.documentElement;return e&&n&&a.insertBefore(i.createTextNode(n),a.childNodes[0]||null),at===ot?pe.call(t,ze?"html":"body")[0]:ze?t.documentElement:a},wt=function(e){return fe.call(e.ownerDocument||e,e,m.SHOW_ELEMENT|m.SHOW_COMMENT|m.SHOW_TEXT,null,!1)},St=function(e){return e instanceof y&&("string"!=typeof e.nodeName||"string"!=typeof e.textContent||"function"!=typeof e.removeChild||!(e.attributes instanceof h)||"function"!=typeof e.removeAttribute||"function"!=typeof e.setAttribute||"string"!=typeof e.namespaceURI||"function"!=typeof e.insertBefore||"function"!=typeof e.hasChildNodes)},_t=function(t){return"object"===e(s)?t instanceof s:t&&"object"===e(t)&&"number"==typeof t.nodeType&&"string"==typeof t.nodeName},xt=function(e,t,n){he[e]&&T(he[e],(function(e){e.call(r,t,n,ft)}))},kt=function(e){var t;if(xt("beforeSanitizeElements",e,null),St(e))return Nt(e),!0;var n=ge(e.nodeName);if(xt("uponSanitizeElement",e,{tagName:n,allowedTags:_e}),e.hasChildNodes()&&!_t(e.firstElementChild)&&(!_t(e.content)||!_t(e.content.firstElementChild))&&O(/<[/\w]/g,e.innerHTML)&&O(/<[/\w]/g,e.textContent))return Nt(e),!0;if(!_e[n]||Re[n]){if(!Re[n]&&Dt(n)){if(De.tagNameCheck instanceof RegExp&&O(De.tagNameCheck,n))return!1;if(De.tagNameCheck instanceof Function&&De.tagNameCheck(n))return!1}if($e&&!Xe[n]){var o=ae(e)||e.parentNode,a=oe(e)||e.childNodes;if(a&&o)for(var i=a.length-1;i>=0;--i)o.insertBefore(R(a[i],!0),re(e))}return Nt(e),!0}return e instanceof f&&!Tt(e)?(Nt(e),!0):"noscript"!==n&&"noembed"!==n||!O(/<\/no(script|embed)/i,e.innerHTML)?(Fe&&3===e.nodeType&&(t=e.textContent,t=_(t,be," "),t=_(t,ve," "),t=_(t,Te," "),e.textContent!==t&&(A(r.removed,{element:e.cloneNode()}),e.textContent=t)),xt("afterSanitizeElements",e,null),!1):(Nt(e),!0)},Ot=function(e,t,n){if(We&&("id"===t||"name"===t)&&(n in i||n in mt))return!1;if(Me&&!Ce[t]&&O(Ne,t));else if(Le&&O(Ae,t));else if(!ke[t]||Ce[t]){if(!(Dt(e)&&(De.tagNameCheck instanceof RegExp&&O(De.tagNameCheck,e)||De.tagNameCheck instanceof Function&&De.tagNameCheck(e))&&(De.attributeNameCheck instanceof RegExp&&O(De.attributeNameCheck,t)||De.attributeNameCheck instanceof Function&&De.attributeNameCheck(t))||"is"===t&&De.allowCustomizedBuiltInElements&&(De.tagNameCheck instanceof RegExp&&O(De.tagNameCheck,n)||De.tagNameCheck instanceof Function&&De.tagNameCheck(n))))return!1}else if(et[t]);else if(O(Se,_(n,we,"")));else if("src"!==t&&"xlink:href"!==t&&"href"!==t||"script"===e||0!==x(n,"data:")||!Je[e]){if(Ie&&!O(Ee,_(n,we,"")));else if(n)return!1}else;return!0},Dt=function(e){return e.indexOf("-")>0},Rt=function(t){var n,o,a,i;xt("beforeSanitizeAttributes",t,null);var l=t.attributes;if(l){var c={attrName:"",attrValue:"",keepAttr:!0,allowedAttributes:ke};for(i=l.length;i--;){var u=n=l[i],s=u.name,f=u.namespaceURI;if(o="value"===s?n.value:k(n.value),a=ge(s),c.attrName=a,c.attrValue=o,c.keepAttr=!0,c.forceKeepAttr=void 0,xt("uponSanitizeAttribute",t,c),o=c.attrValue,!c.forceKeepAttr&&(At(s,t),c.keepAttr))if(Ue||!O(/\/>/i,o)){Fe&&(o=_(o,be," "),o=_(o,ve," "),o=_(o,Te," "));var m=ge(t.nodeName);if(Ot(m,a,o)){if(!qe||"id"!==a&&"name"!==a||(At(s,t),o=Ye+o),le&&"object"===e(b)&&"function"==typeof b.getAttributeType)if(f);else switch(b.getAttributeType(m,a)){case"TrustedHTML":o=le.createHTML(o);break;case"TrustedScriptURL":o=le.createScriptURL(o)}try{f?t.setAttributeNS(f,s,o):t.setAttribute(s,o),N(r.removed)}catch(e){}}}else At(s,t)}xt("afterSanitizeAttributes",t,null)}},Ct=function e(t){var n,r=wt(t);for(xt("beforeSanitizeShadowDOM",t,null);n=r.nextNode();)xt("uponSanitizeShadowNode",n,null),kt(n)||(n.content instanceof l&&e(n.content),Rt(n));xt("afterSanitizeShadowDOM",t,null)};return r.sanitize=function(e){var t,n,a,i,c=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{};if((it=!e)&&(e="\x3c!--\x3e"),"string"!=typeof e&&!_t(e)){if("function"!=typeof e.toString)throw D("toString is not a function");if("string"!=typeof(e=e.toString()))throw D("dirty is not a string, aborting")}if(!r.isSupported)return e;if(He||dt(c),r.removed=[],"string"==typeof e&&(Ke=!1),Ke){if(e.nodeName){var u=ge(e.nodeName);if(!_e[u]||Re[u])throw D("root node is forbidden and cannot be sanitized in-place")}}else if(e instanceof s)1===(n=(t=Et("\x3c!----\x3e")).ownerDocument.importNode(e,!0)).nodeType&&"BODY"===n.nodeName||"HTML"===n.nodeName?t=n:t.appendChild(n);else{if(!Pe&&!Fe&&!ze&&-1===e.indexOf("<"))return le&&Ge?le.createHTML(e):e;if(!(t=Et(e)))return Pe?null:Ge?ce:""}t&&je&&Nt(t.firstChild);for(var f=wt(Ke?e:t);a=f.nextNode();)kt(a)||(a.content instanceof l&&Ct(a.content),Rt(a));if(Ke)return e;if(Pe){if(Be)for(i=me.call(t.ownerDocument);t.firstChild;)i.appendChild(t.firstChild);else i=t;return(ke.shadowroot||ke.shadowrootmod)&&(i=de.call(o,i,!0)),i}var m=ze?t.outerHTML:t.innerHTML;return ze&&_e["!doctype"]&&t.ownerDocument&&t.ownerDocument.doctype&&t.ownerDocument.doctype.name&&O(ee,t.ownerDocument.doctype.name)&&(m="<!DOCTYPE "+t.ownerDocument.doctype.name+">\n"+m),Fe&&(m=_(m,be," "),m=_(m,ve," "),m=_(m,Te," ")),le&&Ge?le.createHTML(m):m},r.setConfig=function(e){dt(e),He=!0},r.clearConfig=function(){ft=null,He=!1},r.isValidAttribute=function(e,t,n){ft||dt({});var r=ge(e),o=ge(t);return Ot(r,o,n)},r.addHook=function(e,t){"function"==typeof t&&(he[e]=he[e]||[],A(he[e],t))},r.removeHook=function(e){if(he[e])return N(he[e])},r.removeHooks=function(e){he[e]&&(he[e]=[])},r.removeAllHooks=function(){he={}},r}();return re}));</script>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText } from "./utils.js?v=14";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText } from "./utils.js?v=15";
       
       window.onerror = function(errorMsg, url, lineNumber) {
         alert(`Please report this error on the Discord or Github:\n\n${errorMsg}\n\nurl: ${url} \n\nlineNumber: ${lineNumber}`);
@@ -319,25 +319,25 @@
         borderColor: "var(--border-color)",
       };
 
-      let logsWindow = createFloatingWindow({header:"Logs"});
-      logsWindow.hide();
-      function log(html) {
+      let summariesWindow = createFloatingWindow({header:"Summaries"});
+      summariesWindow.hide();
+      function addToSummaryLog(html) {
         let ctn = document.createElement("div");
         ctn.innerHTML = html;
         ctn.style.cssText = "font-size:0.8rem; padding:0.5rem; solid var(--border-color); font-family:monospace;";
-        let initialScrollTop = logsWindow.bodyEl.scrollTop;
-        logsWindow.bodyEl.appendChild(ctn);
+        let initialScrollTop = summariesWindow.bodyEl.scrollTop;
+        summariesWindow.bodyEl.appendChild(ctn);
 
         setTimeout(function() {
           // wait for render and then scroll to bottom if it was near bottom previously
-          if(Math.abs(initialScrollTop - logsWindow.bodyEl.scrollTop) < 10) {
-            logsWindow.bodyEl.scrollTop = logsWindow.bodyEl.scrollHeight;
+          if(Math.abs(initialScrollTop - summariesWindow.bodyEl.scrollTop) < 10) {
+            summariesWindow.bodyEl.scrollTop = summariesWindow.bodyEl.scrollHeight;
           }
         }, 10);
         
         // delete earlier children if there are too many
-        while(logsWindow.bodyEl.children.length > 500) {
-          logsWindow.bodyEl.removeChild(logsWindow.bodyEl.children[0]);
+        while(summariesWindow.bodyEl.children.length > 500) {
+          summariesWindow.bodyEl.removeChild(summariesWindow.bodyEl.children[0]);
         }
       }
 
@@ -380,7 +380,7 @@
         threads: "++id,name,characterId,creationTime,lastMessageTime",
         messages: "++id,threadId,characterId,creationTime", // characterId is -1 for user, and for system it is -2.
         misc: "key,value",
-        summaries: "hash,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries
+        summaries: "hash,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries. we also need it for grabbing summaries for the edit interface.
       }).upgrade(async tx => {
           await tx.table("characters").toCollection().modify(character => {
             upgradeCharacterInitialMessagesArrayIfNeeded(character);
@@ -705,7 +705,7 @@
         $.messageFeed.querySelectorAll(".showHiddenMessageButton").forEach(el => el.addEventListener("click", showHiddenMessageClickHandler));
         // <code> should not occur inside <pre> tags, so remove them (not sure why `marked` does this)
         $.messageFeed.querySelectorAll(".messageText").forEach(el => el.querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML));
-        $.messageFeed.querySelectorAll(".statusMessage").forEach(el => el.addEventListener("click", () => showEl(logsWindow.ctn)));
+        $.messageFeed.querySelectorAll(".statusMessage").forEach(el => el.addEventListener("click", () => summariesWindow.show()));
         
         // let tmp = document.createElement("div");
         // tmp.innerHTML = `<div class="endOfFeedStuff" style="text-align: center;">
@@ -727,6 +727,47 @@
         doBotReplyIfNeeded(); // we shouldn't `await` this because thread is already rendered.
       }
 
+      // function createInlineSummaryEditor(summaryText) {
+      //   let tmp = document.createElement("div");
+      //   if(summaryText.length > 50) summaryText = summaryText.slice(0, 30) + "…";
+      //   tmp.innerHTML = `
+      //     <div class="inlineSummaryEditor" style="margin-bottom: 0.25rem;">
+      //       <div style="opacity: 0.5;font-size: 0.7rem;text-align: center;"><b>Summary so far:</b> <span>${summaryText}</span> <span class="inlineSummaryEditButton" style="cursor: pointer;">✏️</span></div>
+      //     </div>
+      //   `;
+      //   let el = tmp.firstElementChild;
+      //   el.querySelector(".inlineSummaryEditButton").addEventListener("click", async function() {
+      //     let threadSummariesArr = await db.summaries.where('threadId').equals(threadId).toArray();
+      //     let latestSummary = threadSummariesArr.sort((a,b) => b.id-a.id)[0];
+      //     let result = await prompt2({
+      //       summaryText: {label: "Summary of preceding messages:", height:"fit-content", type: "text", defaultValue: reminderMessage, placeholder: "Write your summary here."}
+      //     });
+      //     if(result) {
+      //       await db.summaries.update(characterId, {reminderMessage:result.reminderMessage});
+      //       await updateInlineSummaryEditor();
+      //     }
+      //   });
+      //   return el;
+      // }
+
+      // async function updateInlineSummaryEditor() {
+      //   // remove existing inline reminder messages
+      //   $.messageFeed.querySelectorAll(".inlineSummaryEditor").forEach(el => el.remove());
+      //   // place reminder element before the most recent bot message
+      //   let threadId = parseInt($.messageFeed.dataset.threadId);
+      //   let threadSummariesArr = await db.summaries.where('threadId').equals(threadId).toArray();
+      //   let messagesArr = await db.messages.where('threadId').equals(threadId).toArray();
+      //   let undeletedMessageIds = messagesArr.map(m => m.id);
+      //   let latestSummaryObj = threadSummariesArr.sort((a,b) => b.id-a.id)[0];
+
+      //   if(!latestSummaryObj) {
+      //     return;
+      //   }
+      //   let latestMessage = botMessages.at(-1);
+      //   let el = createInlineSummaryEditor(latestSummaryObj);
+      //   lastBotMessageEl.before(el);
+      // }
+
       function createInlineReminderMessage(reminderMessage) {
         let tmp = document.createElement("div");
         if(reminderMessage.length > 50) reminderMessage = reminderMessage.slice(0, 30) + "…";
@@ -740,7 +781,7 @@
           let characterId = parseInt($.messageFeed.dataset.characterId);
           let reminderMessage = await db.characters.get(characterId).then(c => c.reminderMessage);
           let result = await prompt2({
-            reminderMessage: {label: "Reminder message:", height:"fit-content", type: "text", defaultValue: reminderMessage, placeholder: "Enter a reminder message here. A reminder message is a 'system' message that helps remind/command/instruct the AI on how to respond."}
+            reminderMessage: {label: "Reminder message:", height:"fit-content", type: "text", defaultValue: reminderMessage, focus:true, placeholder: "Enter a reminder message here. A reminder message is a 'system' message that helps remind/command/instruct the AI on how to respond."}
           });
           if(result) {
             await db.characters.update(characterId, {reminderMessage:result.reminderMessage});
@@ -751,8 +792,6 @@
       }
 
       async function updateInlineReminderMessage() {
-        // remove existing inline reminder messages
-        $.messageFeed.querySelectorAll(".inlineReminderMessage").forEach(el => el.remove());
         // place reminder element before the most recent bot message
         let characterId = parseInt($.messageFeed.dataset.characterId);
         let reminderMessage = await db.characters.get(characterId).then(c => c.reminderMessage || "");
@@ -760,6 +799,9 @@
         if(!reminderMessage.trim() || botMessages.length === 0) {
           return;
         }
+        // remove existing inline reminder messages (important to do this after the async db call above to be sure that if updateInlineReminderMessage is for some reason called twice very close together, we won't get too inline reminders)
+        $.messageFeed.querySelectorAll(".inlineReminderMessage").forEach(el => el.remove());
+
         let lastBotMessageEl = botMessages.at(-1);
         let el = createInlineReminderMessage(reminderMessage);
         lastBotMessageEl.before(el);
@@ -1147,7 +1189,10 @@
 
         await renderMessageFeed(threadId);
 
-        if(!customCodeIframes[threadId]) {
+        let thread = await db.threads.get(threadId);
+        let characterObj = await db.characters.get(thread.characterId);
+
+        if(!customCodeIframes[threadId] && characterObj.customCode) {
           await createNewCustomCodeIframeForThread(threadId); // this adds iframe as here: customCodeIframes[threadId]
         }
       }
@@ -1171,6 +1216,10 @@
         }, {submitButtonText: "Save Character", showHiddenInputsText: "Show advanced options"});
         
         if(!result) return;
+        
+        result.name = result.name.trim();
+
+        if(result.name === "") result.name = "_";
 
         // process prompt results back into well-formed character object:
 
@@ -1313,9 +1362,148 @@
       }
 
 
-      async function getBotReply({messages, aiCharacter, userCharacter, threadId, statusEl}) {
+      const modelNameToMaxTokenLimit = {
+        "gpt-3.5-turbo": 4096,
+        "text-davinci-003": 4096,
+        "gpt-4": 8192,
+      };
 
-        // TODO: not sure that this will work as expected for the "reply with..." function, since the replying bot will see the hidden-from-ai messages (do we want that?)
+
+      async function compressSummary(summary, tokenLimit, model, statusEl) {
+        let i = 0;
+        while(countTokens(summary) > tokenLimit) {
+          if(statusEl) statusEl.innerHTML = `compressing summary (${i})`;
+          let messages = [
+            {role: "system", content: "You are a text compression assistant. You respond only with summary that the user requests - nothing more, nothing less."},
+            {role: "user", content: `Please compress this text to 75% of its original size:\n\n---\n\n${summary}\n\n---\n\nTry to remove unimportant details and make the wording more *concise* to save space. DON'T MAKE IT TOO SHORT. Retain all important details.\n\nPlease reply with the *slightly* shortened text - nothing else. Keep *almost all* of the information.`},
+          ];
+          let newSummary = await getChatCompletion({messages, model, temperature:0.7});
+          if(!newSummary) {
+            if(statusEl) statusEl.innerHTML = `error, retrying...`;
+            await delay(3000);
+          } else {
+            summary = newSummary;
+            console.log(`compressed summary (${countTokens(summary)} tokens): ${summary}`);
+          }
+          i++;
+        }
+        return summary;
+      }
+
+
+      async function computeAndSaveThreadSummaryIfNeeded({threadId, statusEl}) {
+        // here's the overall idea: "consume" old messages (remove them from the start of the messages array) until you get to `messageTokensToConsumePerSummary` tokens, and then summarize them (use an existing summary if we already have it - it's kinda treated like the first message), and then keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
+
+        const model = "gpt-3.5-turbo"; // TODO: maybe make this depend on character's modelName
+
+        let thread = await db.threads.get(threadId);
+        let aiCharacter = await db.characters.get(thread.characterId);
+        let userCharacter = await getUserCharacterObj();
+
+        let originalMessages = await db.messages.where({threadId}).toArray();
+        let remainingMessages = prepareMessagesForBot(originalMessages, aiCharacter, userCharacter);
+
+        const tokenLimitForSummaryAndMessages = getTokenLimitForSummaryAndMessages(aiCharacter);
+        const maxTokenCountOfSummary = Math.round(tokenLimitForSummaryAndMessages/3); // <-- probably don't want summary to be any longer than the first third of our token budget
+
+        const messageTokensToConsumePerSummary = Math.round(modelNameToMaxTokenLimit[model]*0.3); // don't make this too much bigger - if messageTokensToConsumePerSummary is 1000, and we're adding messages to batch and are currently at 900, and the next message happens to be 1000 tokens, then we'll end up 900 over. So we set it low-ish to account for that (this is fine, it just means more "incremental" summarization steps - but could fix by breaking up large messages - TODO?)
+
+        if(maxTokenCountOfSummary + messageTokensToConsumePerSummary > modelNameToMaxTokenLimit[model]-500) { // -500 due to token estimation and to make room for summarization prompt
+          throw new Error("The specified values of `maxTokenCountOfSummary` and `messageTokensToConsumePerSummary` are such that the summarization process could go over this model's token limit.");
+        }
+
+        // get total tokens in all messages
+        let initialTokenCount = countTokensInMessages(remainingMessages);
+        let currentTokenCount = initialTokenCount;
+        let prevSummary;
+        let prevInstructionHash;
+        let i = 0;
+        // while the total token count is too high, grab batches of old messages, and summarize them
+        while(currentTokenCount > tokenLimitForSummaryAndMessages) {
+          if(statusEl) statusEl.innerHTML = `summarizing (${i})`;
+          
+          // grab old messages until we have at least `messageTokensToConsumePerSummary` tokens worth of text
+          let messageBatchTokenCount = 0;
+          let messageBatchArr = [];
+          while(messageBatchTokenCount < messageTokensToConsumePerSummary) {
+            let m = remainingMessages.shift();
+            messageBatchArr.push(m);
+            messageBatchTokenCount += countTokensInMessages([m]);
+          }
+
+          let messageBatchSummarizationInstruction;
+          if(i > 0) { // if i>0, then we have prevSummary 
+            let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
+            messageBatchSummarizationInstruction = `Here's what has recently happened:\n\n---\n${messageBatchText}\n---\n\nHere's a summary of what happened previously:\n\n---\n${prevSummary}\n---\n\nPlease reply with a new version of this summary that ALSO includes what has recently happened. Include ALL the KEY details. DO NOT MISS ANY IMPORTANT DETAILS. You MUST include all the details that were in the previous summary in your response. Your response should start with "${prevSummary.split(" ").slice(0, 5).join(" ")}" and it should compress all the important details into a new summary.`;
+          } else {
+            let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
+            messageBatchSummarizationInstruction = `Please summarize the content of these messages:\n\n------\n`+messageBatchText+`\n------\n\nRespond with the summary only - nothing else. Include all relevant details. Be concise, but DO NOT leave out any important details.`;
+          }
+
+          // Note: Hash corresponds to only the inputs (i.e. instruction).
+          // User can edit summaries and that doesn't mess with out hashing stuff (if they edited a non-latest summary, then summaries would need to be recomputed, which would be fine, but they can only edit latest one anyway).
+          
+          let hash = await sha256Text(messageBatchSummarizationInstruction);
+          // check if we have a summary for this text yet
+          let summaryObj = await db.summaries.get(hash);
+          let summary = summaryObj?.summary;
+          if(!summary) {
+            // Create summary:
+            while(1) {
+              summary = await getChatCompletion({
+                messages: [
+                  {role: "system", content: "You are a text summarization assistant. You respond only with summary that the user requests - nothing more, nothing less."},
+                  {role: "user", content: messageBatchSummarizationInstruction},
+                ],
+                model,
+                temperature: 0.7
+              });
+              if(summary) break;
+              if(statusEl) statusEl.innerHTML = `error, retrying...`;
+              await delay(3000);
+            }
+            console.log("summary:", summary);
+            addToSummaryLog(`<b>computed summary:</b> ${summary}`);
+            await db.summaries.put({hash, summary, threadId});
+          } else {
+            // There's already an existing summary that matches this instruction hash.
+          }
+
+          // Compress summary if needed.
+          // Note this is *outside* of the above `if` block because user will be able to adjust maxTokenCountOfSummary, and we want to re-compute/compress summaries if they change that value.
+          // (this also helps with backwards-compat since maxTokenCountOfSummary previously didn't exist, we so we may need to compress some old summaries)
+          if(countTokens(summary) > maxTokenCountOfSummary) {
+            addToSummaryLog(`<b>summary to compress:</b> ${summary}`);
+            summary = await compressSummary(summary, maxTokenCountOfSummary, model, statusEl);
+            await db.summaries.put({hash, summary, threadId});
+            addToSummaryLog(`<b>compressed summary:</b> ${summary}`);
+          }
+          
+          // add button to latest message to allow them to edit summary
+          summaryObj = await db.summaries.get(hash);
+
+          // get size difference between summary and original messages
+          let summaryTokenChange = countTokens(prevSummary || "") - countTokens(summary);
+          let messageArrTokenChange = -messageBatchTokenCount; // since all these messages were "removed" (squashed into the summary)
+          let overallTokenChange = summaryTokenChange + messageArrTokenChange;
+          currentTokenCount += overallTokenChange; // hopefully overallTokenChange is negative but we can't assume that for sure, since it's not technically impossible for the LLM to return a summary that's longer than message batch
+          prevSummary = summary;
+          prevInstructionHash = hash;
+          i++;
+        }
+        // NOTE: prevSummary can be undefined - i.e. no summaries were needed to get messages under the tokenLimitForSummaryAndMessages limit
+        return {summary:prevSummary, instructionHash:prevInstructionHash, remainingMessages}; // remainingMessages = unsummarized messages (the ones that follow the summary)
+      }
+
+      
+
+      const systemName = "System"; // name for the role:system messages (needed for non-chat models like davinci-003 e.g. "System: Sammy has joined the chat")
+
+
+
+      function prepareMessagesForBot(messages, aiCharacter, userCharacter) {
+
+        // TODO: not sure that this will work as expected for the "reply with..." function, since the in-place-of-user bot will see the hidden-from-ai messages (like the user would - do we want that?)
         messages = JSON.parse(JSON.stringify(messages)).filter(m => {
           if(m.hiddenFrom && m.hiddenFrom.includes("ai")) return false;
           return true;
@@ -1325,17 +1513,7 @@
           m.message = m.message.replace(/<!--hidden-from-ai-start-->.+?<!--hidden-from-ai-end-->/gs, "");
         }
 
-        statusEl.innerHTML = "";
-
-        let systemName = "System"; // name for the role:system messages (needed for non-chat models like davinci-003 e.g. "System: Sammy has joined the chat")
-
-        let modelVersion = aiCharacter.modelVersion;
-        let tokenLimit = 3300; // buffer due to token count being an estimate
-
-        tokenLimit -= countTokens(aiCharacter.systemMessage); // allow for system message tokens
-        tokenLimit -= countTokens(aiCharacter.reminderMessage||""); // allow for reminder message tokens
-
-        let fullMessagesArr = messages.map(m => {
+        messages = messages.map(m => {
           let role;
           if(m.characterId === userCharacter.id) role = "user";
           else if(m.characterId === aiCharacter.id) role = "assistant";
@@ -1349,84 +1527,57 @@
           return { role, content: m.message+"", name };
         });
 
+        return messages;
+      }
+
+      function getTokenLimitForSummaryAndMessages(character) {
+        let tokenLimit = modelNameToMaxTokenLimit[character.modelVersion];
+        // TODO: let user set aiCharacter.tokenLimit (via oc.character.tokenLimit) here to override this if it's smaller than the model's max token limit
+        tokenLimit -= Math.round(tokenLimit*0.1); // buffer due to token count being an estimate
+        tokenLimit -= countTokens(character.systemMessage); // allow for system message tokens
+        tokenLimit -= countTokens(character.reminderMessage||""); // allow for reminder message tokens
+        tokenLimit -= Math.round(tokenLimit*0.2); // allow for bot response
+        return tokenLimit;
+      }
+
+      // Note: the reason this doesn't just take threadId as a param is because we use it for recomputeBotReply() which doesn't necessarily use all messages in a thread, and we also use it for "reply with..." which switches characters
+      async function getBotReply({messages, threadId, aiCharacter, userCharacter, statusEl}) {
+
+        let fullMessagesArr = prepareMessagesForBot(messages, aiCharacter, userCharacter);
+
+        statusEl.innerHTML = "";
+
+        let modelVersion = aiCharacter.modelVersion;
+
+        let tokenLimitForSummaryAndMessages = getTokenLimitForSummaryAndMessages(aiCharacter);
+
         console.log("getBotReply() - fullMessagesArr:", fullMessagesArr);
 
         let messagesArr = [];
         let numTokensInContext = countTokensInMessages(fullMessagesArr);
-        let minTokenAllowanceForBotResponse = 1000;
-
-        if(numTokensInContext > tokenLimit-minTokenAllowanceForBotResponse) {
+        
+        if(numTokensInContext > tokenLimitForSummaryAndMessages) {
           let fitMessagesInContextMethod = aiCharacter.fitMessagesInContextMethod ?? "summarizeOld";
+
           if(fitMessagesInContextMethod === "dropOld") {
             // push messages into messagesArrToSend until total content reaches token limit
             numTokensInContext = 0;
             for(let i = fullMessagesArr.length-1; i >= 0; i--) {
-              if(numTokensInContext + fullMessagesArr[i].content.length > tokenLimit-minTokenAllowanceForBotResponse) break;
+              if(numTokensInContext + fullMessagesArr[i].content.length > tokenLimitForSummaryAndMessages) break;
               messagesArr.unshift(fullMessagesArr[i]);
               numTokensInContext += countTokensInMessages([fullMessagesArr[i]]);
             }
           } else if(fitMessagesInContextMethod === "summarizeOld") {
-            // here's the overall idea: "consume" old messages (remove them from the messages array) until you get to `tokensPerSummary` tokens, and then summarize them (use an existing summary if we already have it), and then add this summary to the messages array in place of the original messages. Then we repeat - so the process basically treats the summaries as just regular messages. Keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
-            let tokensPerSummary = 1000;
-            // get total tokens in all messages
-            let initialTokenCount = countTokensInMessages(fullMessagesArr);
-            let currentTokenCount = initialTokenCount;
-            let messagesAndSummariesArr = fullMessagesArr.slice(0);
-            let i = 0;
-            // while the total token count is too high, grab batches of old messages, and summarize them
-            while(currentTokenCount > tokenLimit-minTokenAllowanceForBotResponse) {
-              statusEl.innerHTML = `summarizing (${i})`;
-              // grab old messages until we have at least `tokensPerSummary` tokens worth of text
-              let messageBatchTokenCount = 0;
-              let messageBatchArr = [];
-              while(messageBatchTokenCount < tokensPerSummary) {
-                let m = messagesAndSummariesArr.shift();
-                messageBatchArr.push(m);
-                messageBatchTokenCount += countTokensInMessages([m]);
-              }
-              // note that messageBatchArr will include earlier summaries, so we are running "summaries of (summaries+messages)" - this is actually good/okay because it means that summaries are done within the context of the full history, not just a lone batch of messages with no context
-              let messageBatchSummarizationInstruction;
-              if(i > 0) { // if i>0, then first message in batch is always the previous summary, and the rest are regular messages
-                let prevSummary = messageBatchArr.shift().content;
-                let messages = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
-                messageBatchSummarizationInstruction = `Here's what has recently happened:\n\n---\n${messages}\n---\n\nHere's a summary of what happened previously:\n\n---\n${prevSummary}\n---\n\nPlease reply with a new version of this summary that ALSO includes what has recently happened. Include ALL the KEY details. DO NOT MISS ANY IMPORTANT DETAILS. You MUST include all the details that were in the previous summary in your response. Your response should start with "${prevSummary.split(" ").slice(0, 5).join(" ")}" and it should compress all the important details into a summary.`;
-              } else {
-                let messages = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
-                messageBatchSummarizationInstruction = `Please summarize the content of these messages:\n\n------\n`+messages+`\n------\n\nRespond with the summary only - nothing else. Include all relevant details. Be concise, but DO NOT leave out any important details.`;
-              }
-              
-              let hash = await sha256Text(messageBatchSummarizationInstruction);
-              // check if we have a summary for this text yet
-              let summary = (await db.summaries.get(hash))?.summary;
-              if(!summary) {
-                let messages = [
-                  {role: "system", content: "You are a text summarization assistant. You respond only with summary that the user requests - nothing more, nothing less."},
-                  {role: "user", content: messageBatchSummarizationInstruction},
-                ];
-                while(1) {
-                  summary = await getChatCompletion({messages, model:"gpt-3.5-turbo", temperature:0.7});
-                  if(summary) break;
-                  statusEl.innerHTML = `error, retrying...`;
-                  await delay(3000);
-                }
-                console.log("summary:", summary);
-                log(`<b>computed summary:</b> ${summary}`);
-                await db.summaries.put({hash, summary, threadId});
-              } else {
-                log(`<b>found existing summary:</b> ${summary}`);
-              }
-              messagesAndSummariesArr.unshift({
-                role: "system",
-                content: summary,
-              });
-              // get size difference between summary and original messages
-              let summaryTokenCount = countTokens(summary);
-              let tokenReduction = messageBatchTokenCount - summaryTokenCount;
-              currentTokenCount -= tokenReduction;
-              i++;
-            }
-            messagesArr = messagesAndSummariesArr;
-            numTokensInContext = countTokensInMessages(messagesAndSummariesArr);
+            
+            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, statusEl});
+            if(summary === undefined) throw new Error("There should be a summary, since numTokensInContext > tokenLimitForSummaryAndMessages");
+
+            messagesArr = remainingMessages;
+            messagesArr.unshift({
+              role: "system",
+              content: "Here's a summary of what happened previously:\n\n"+summary,
+            });
+
           } else {
             throw new Error("Invalid fitIntoContextMethod");
           }
@@ -1436,12 +1587,14 @@
 
         statusEl.innerHTML = "";
 
-        let maxTokensInResponse = tokenLimit - numTokensInContext;
-
         messagesArr.unshift({"role": "system", "content": aiCharacter.systemMessage});
 
         if(aiCharacter.reminderMessage) {
           messagesArr.push({"role": "system", "content": aiCharacter.reminderMessage});
+        }
+
+        for(let m of messagesArr) {
+          delete m.id; // id is added by prepareMessagesForBot() because it's needed for some functions (e.g. summarization), but we don't want to send it to the API
         }
 
         console.log("getBotReply() - messagesArr:", messagesArr);
@@ -1449,12 +1602,13 @@
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
         if(!OPENAI_API_KEY) {
           let result = await prompt2({
-            openAiApiKey: { label: "Please create a new OpenAI API secret key and paste it here. Go to <a style='color:blue' href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a> to do that. You can change or delete this later by clicking the 'settings' button.", type:"textLine", placeholder:"sk-..." },
+            openAiApiKey: { label: "Please create a new OpenAI API secret key and paste it here. Go to <a style='color:blue' href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a> to do that. You can change or delete this later by clicking the 'settings' button.", type:"textLine", placeholder:"sk-...", focus:true },
           });
           if(!result) return;
           await db.misc.put({ key: "openAiApiKey", value: result.openAiApiKey });
           OPENAI_API_KEY = result.openAiApiKey;
         }
+
 
         let modelType;
         if(modelVersion==="gpt-3.5-turbo") modelType = "chat";
@@ -1469,7 +1623,7 @@
             model: modelVersion,
             messages: messagesArr,
             temperature: aiCharacter.temperature ?? 0.7,
-            max_tokens: maxTokensInResponse,
+            // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted systemMessage and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
           };
           if(aiCharacter.topP) data.top_p = aiCharacter.topP;
           if(aiCharacter.frequencyPenalty) data.frequency_penalty = aiCharacter.frequencyPenalty;
@@ -1481,8 +1635,8 @@
             headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
-          if(!json || json.error) {
-            console.error(json.error);
+          if(!json || json?.error) {
+            console.error(json?.error);
             alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
 
@@ -1495,7 +1649,7 @@
           let data = {
             model: modelVersion,
             prompt,
-            max_tokens: maxTokensInResponse,
+            // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted systemMessage and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
             temperature: aiCharacter.temperature ?? 0.7,
             stop: [`\n[${userCharacter.name}]:`, `\n[SYSTEM]:`],
           };
@@ -1509,8 +1663,8 @@
             headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
-          if(!json || json.error) {
-            console.error(json.error);
+          if(!json || json?.error) {
+            console.error(json?.error);
             alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
           result = json?.choices[0].text.trim();
@@ -1523,12 +1677,17 @@
 
       async function getChatCompletion({messages, model, temperature, stopSequences, topP, frequencyPenalty, presencePenalty}) {
 
-        let tokenLimit = 3500; // buffer due to token count being an estimate
+        // let tokenLimit = modelNameToMaxTokenLimit[model];
+        // tokenLimit -= tokenLimit*0.15; // buffer due to token count being an estimate
+        // let numTokensInContext = countTokensInMessages(messages);
 
-        let numTokensInContext = countTokensInMessages(messages);
-        let maxTokensInResponse = tokenLimit - numTokensInContext;
+        messages = JSON.parse(JSON.stringify(messages));
 
-        if(maxTokensInResponse <= 0) return alert("This prompt is too long:\n\n"+prompt.slice(0, 200)+"...");
+        messages = messages.filter(m => !m.hiddenFrom || !m.hiddenFrom.includes("ai"));
+
+        for(let m of messages) {
+          m.content = m.content.replace(/<!--hidden-from-ai-start-->.+?<!--hidden-from-ai-end-->/gs, "");
+        }
 
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
 
@@ -1542,7 +1701,6 @@
             model,
             messages,
             temperature: temperature ?? 0.7,
-            max_tokens: maxTokensInResponse,
           };
           if(stopSequences) data.stop = stopSequences;
           if(topP) data.top_p = topP;
@@ -1555,8 +1713,8 @@
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getChatCompletion: "+e.stack));
           
-          if(!json || json.error) {
-            console.error(json.error);
+          if(!json || json?.error) {
+            console.error(json?.error);
             alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
 
@@ -1577,7 +1735,6 @@
           let data = {
             model,
             prompt: messagesFinal.map(m => `[${m.name}]: ${m.content}`).join("\n\n") + `\n\n[${aiName}]: `,
-            max_tokens: maxTokensInResponse,
             temperature: temperature ?? 0.7,
             stop: [`\n\n[${userName}]:`, `\n\n[${systemName}]:`],
           };
@@ -1592,8 +1749,8 @@
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
           
-          if(!json || json.error) {
-            console.error(json.error);
+          if(!json || json?.error) {
+            console.error(json?.error);
             alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
 
@@ -1606,11 +1763,9 @@
 
       async function getCompletion({prompt, model, temperature, stopSequences, topP, frequencyPenalty, presencePenalty}) {
 
-        let tokenLimit = 3500; // buffer of ~500 tokens due to token count being an estimate
-
-        let maxTokensInResponse = tokenLimit - countTokens(prompt);
-
-        if(maxTokensInResponse <= 0) return alert("This prompt is too long:\n\n"+prompt.slice(0, 200)+"...");
+        // let tokenLimit = modelNameToMaxTokenLimit[model];
+        // tokenLimit -= tokenLimit*0.15; // buffer due to token count being an estimate
+        // let numTokensInContext = countTokensInMessages(messages);
 
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
 
@@ -1623,7 +1778,6 @@
           let data = {
             model,
             prompt,
-            max_tokens: maxTokensInResponse,
             temperature: temperature ?? 0.7,
           };
           if(stopSequences) data.stop = stopSequences;
@@ -1636,8 +1790,8 @@
             headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getCompletion: "+e.stack));
-          if(!json || json.error) {
-            console.error(json.error);
+          if(!json || json?.error) {
+            console.error(json?.error);
             alert("For some reason a prompt completion request didn't work. You can try verifying your API key by clicking the 'settings' button. Here's the error: \n" + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
 
@@ -1660,7 +1814,6 @@
               },
             ],
             temperature: temperature ?? 0.7,
-            max_tokens: maxTokensInResponse,
           };
           if(stopSequences) data.stop = stopSequences;
           if(topP) data.top_p = topP;
@@ -1673,8 +1826,8 @@
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getChatCompletion: "+e.stack));
           
-          if(!json || json.error) {
-            console.error(json.error);
+          if(!json || json?.error) {
+            console.error(json?.error);
             alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
 
@@ -1764,6 +1917,7 @@
 
         } catch(e) {
           console.error(e);
+          alert(e.stack);
           botIsCurrentlyReplying = false;
         }
         botIsCurrentlyReplying = false;
@@ -1836,7 +1990,7 @@
         messageEl.querySelector(".deleteButton").addEventListener("click", messageDeleteButtonClickHandler);
         messageEl.querySelector(".showHiddenMessageButton").addEventListener("click", showHiddenMessageClickHandler);
         messageEl.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
-        messageEl.querySelector(".statusMessage").addEventListener("click", () => logsWindow.show());
+        messageEl.querySelector(".statusMessage").addEventListener("click", () => summariesWindow.show());
         
         await updateInlineReminderMessage();
 
@@ -1858,9 +2012,9 @@
         if(isMobile) {
           // on mobile we show when there are multiple variants
           if(messageObj.variants.length >= 2) {
-            variantCtnCss = "margin-left:0.5rem;";
+            variantCtnCss = "margin-left:1rem;";
           } else {
-            variantCtnCss = "margin-left:0.5rem; display:none;";
+            variantCtnCss = "margin-left:1rem; display:none;";
           }
         } else {
           // on desktop we show in hover:
@@ -1876,16 +2030,16 @@
                 <div class="info" style="flex-grow:1; display:flex; font-size:80%;">
                   <div class="characterName" style="font-weight:bold;">${sanitizeHtml(messageObj.character.name)}</div>
                   <div class="time" style="font-size:0.8rem; opacity:0.5; margin-left:0.5rem; display: flex; align-items: center;">${getDateTimeString(messageObj.creationTime)}</div>
-                  <div class="editButton emojiButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
-                  <div class="deleteButton emojiButton" style="font-size:0.8rem; margin-left:0.5rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
-                  <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:0.5rem; display: ${messageObj.character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
+                  <div class="editButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
+                  <div class="deleteButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
+                  <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: ${messageObj.character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
                   <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); ${variantCtnCss}">
                     <span class="prevMessageVariantButton emojiButton">◄</span>
                     <span class="currentVariantNumber">${currentVariantNumber}<span style="opacity:0.5">/${messageObj.variants.length}</span></span>
                     <span class="nextMessageVariantButton emojiButton">►</span>
                   </div>
                   ${messageObj.hiddenFrom?.includes("ai") ? `<div class="hiddenFromAiIcon" onclick="alert('This icon indicates that this message is hidden from the AI.')" title="The AI cannot see this message." style="font-size:0.8rem; margin-left:0.5rem; display:flex; align-items: center; cursor:pointer;">🙈</div>` : ""}
-                  <div class="statusMessage" style="margin-left:0.5rem;display: flex;align-items: center;cursor:pointer;font-size: 0.7rem;opacity: 0.5;"></div>
+                  <div class="statusMessage" style="margin-left:1rem;display: flex;align-items: center;cursor:pointer;font-size: 0.7rem;opacity: 0.5;"></div>
                 </div>
                 <div class="messageText" style="overflow-wrap:break-word;">${messageContentHtml}</div>
               </div>
@@ -1903,7 +2057,7 @@
         const messageId = parseInt(this.closest(".message").dataset.id);
         const originalMessage = await db.messages.get(messageId);
         const result = await prompt2({
-          message: {label: "Message:", type: "text", height:"fit-content", defaultValue: originalMessage.message},
+          message: {label: "Message:", type: "text", height:"fit-content", defaultValue: originalMessage.message, focus:true},
           hiddenFrom: {label: "Hidden from:", type: "select", options:[{value:"user"}, {value:"ai"}, {content:"both", value:"user,ai"}, {content:"neither", value:""}], defaultValue: originalMessage.hiddenFrom.join(",")},
         });
         if(!result) return;
@@ -1983,6 +2137,20 @@
               characterToReplyWith.reminderMessage = `The next message will be written by '${characterToReplyWith.name}' and WILL conform to this instruction: ${instruction}`;
             }
             await doBotReplyInPlaceOfUser(characterToReplyWith);
+          } else if(message.trim() === "/sum") {
+            // first ensure summary is up to date:
+            $.messageInput.value = "Loading latest summary...";
+            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId});
+            $.messageInput.value = "";
+            if(summary === undefined) {
+              return alert("No summary available for this thread yet. Wait until the thread gets longer.");
+            }
+            // now let them edit it:
+            let result = await prompt2({summary: {label: "Summary:", type: "text", height:"fit-content", defaultValue: summary, focus:true}});
+            if(result) {
+              await db.summaries.update(instructionHash, {summary:result.summary});
+              addToSummaryLog(`<b>edited summary:</b> ${result.summary}`);
+            }
           } else {
 
             let senderCharacterId = -1;
