@@ -2038,7 +2038,7 @@
                     <span class="currentVariantNumber">${currentVariantNumber}<span style="opacity:0.5">/${messageObj.variants.length}</span></span>
                     <span class="nextMessageVariantButton emojiButton">►</span>
                   </div>
-                  ${messageObj.hiddenFrom?.includes("ai") ? `<div class="hiddenFromAiIcon" onclick="alert('This icon indicates that this message is hidden from the AI.')" title="The AI cannot see this message." style="font-size:0.8rem; margin-left:0.5rem; display:flex; align-items: center; cursor:pointer;">🙈</div>` : ""}
+                  ${messageObj.hiddenFrom?.includes("ai") ? `<div class="hiddenFromAiIcon" onclick="alert('This icon indicates that this message is hidden from the AI.')" title="The AI cannot see this message." style="font-size:0.8rem; margin-left:1rem; display:flex; align-items: center; cursor:pointer;">🙈</div>` : ""}
                   <div class="statusMessage" style="margin-left:1rem;display: flex;align-items: center;cursor:pointer;font-size: 0.7rem;opacity: 0.5;"></div>
                 </div>
                 <div class="messageText" style="overflow-wrap:break-word;">${messageContentHtml}</div>
