@@ -1391,9 +1391,10 @@
       }
 
 
-      async function computeAndSaveThreadSummaryIfNeeded({threadId, statusEl}) {
+      async function computeAndSaveThreadSummaryIfNeeded({threadId, statusEl, upToMessageId}) {
         // here's the overall idea: "consume" old messages (remove them from the start of the messages array) until you get to `messageTokensToConsumePerSummary` tokens, and then summarize them (use an existing summary if we already have it - it's kinda treated like the first message), and then keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
-
+        // note: upToMessageId is inclusive. it's needed for things like recomputeBotReply, where it may be that not all messages in the thread are visible to the bot.
+        
         const model = "gpt-3.5-turbo"; // TODO: maybe make this depend on character's modelName
 
         let thread = await db.threads.get(threadId);
@@ -1401,6 +1402,9 @@
         let userCharacter = await getUserCharacterObj();
 
         let originalMessages = await db.messages.where({threadId}).toArray();
+        if(upToMessageId === undefined) upToMessageId = originalMessages.at(-1).id;
+        originalMessages = originalMessages.slice(0, originalMessages.findIndex(m => m.id === upToMessageId)+1);
+
         let remainingMessages = prepareMessagesForBot(originalMessages, aiCharacter, userCharacter);
 
         const tokenLimitForSummaryAndMessages = getTokenLimitForSummaryAndMessages(aiCharacter);
@@ -1524,7 +1528,7 @@
           else if(m.characterId === aiCharacter.id) name = aiCharacter.name.replaceAll(" ", "_");
           else if(m.characterId === -2) name = systemName;
 
-          return { role, content: m.message+"", name };
+          return { role, content: m.message+"", name, id: m.id }; // id is used for summary upToMessageId stuff
         });
 
         return messages;
@@ -1569,7 +1573,9 @@
             }
           } else if(fitMessagesInContextMethod === "summarizeOld") {
             
-            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, statusEl});
+            // note: we need upToMessageId because this could be a call from recomputeBotReply() which doesn't necessarily use all messages in a thread
+            // upToMessageId is inclusive.
+            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId: fullMessagesArr.at(-1).id, statusEl});
             if(summary === undefined) throw new Error("There should be a summary, since numTokensInContext > tokenLimitForSummaryAndMessages");
 
             messagesArr = remainingMessages;
@@ -1643,8 +1649,11 @@
           result = json.choices[0].message.content;
 
         } else {
-          let promptIntro = `You are ${aiCharacter.name}. You're talking to '${userCharacter.name}'. Some messages are "System" messages which do not originate from either party. \n\n`+messagesArr[0].content + "\n\nThe chat begins now:\n\n\n\n";
-          let prompt = promptIntro + messagesArr.slice(1).map(m => (m.role=="user"?`[${userCharacter.name}]: `:m.role=="system"?"[SYSTEM]: ":`[${aiCharacter.name}]: `)+m.content).join("\n\n") + `\n\n${aiCharacter.name}: `;
+          let promptIntro = `You are ${aiCharacter.name}. You're talking to '${userCharacter.name}'. Some messages are "System" messages which do not originate from either party.\n\n` + messagesArr[0].content + "\n\nThe chat begins now:\n\n\n\n";
+          let prompt = promptIntro + messagesArr.slice(1).map(m => (m.role=="user"?`[${userCharacter.name}]: `:m.role=="system"?"[SYSTEM]: ":`[${aiCharacter.name}]: `)+m.content).join("\n\n") + `\n\n[${aiCharacter.name}]:`;
+          
+          // davinci *requires* max_tokens else it defaults to 16 (unlike turbo which defaults to infinity)
+          let max_tokens = Math.round((modelNameToMaxTokenLimit[modelVersion] - countTokens(prompt)) * 0.85); // *0.85 because countTokens is an estimate
           
           let data = {
             model: modelVersion,
@@ -1652,6 +1661,7 @@
             // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted systemMessage and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
             temperature: aiCharacter.temperature ?? 0.7,
             stop: [`\n[${userCharacter.name}]:`, `\n[SYSTEM]:`],
+            max_tokens, 
           };
           if(aiCharacter.topP) data.top_p = aiCharacter.topP;
           if(aiCharacter.frequencyPenalty) data.frequency_penalty = aiCharacter.frequencyPenalty;
@@ -1931,11 +1941,11 @@
         const threadId = parseInt($.messageFeed.dataset.threadId);
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
         // remove this message and all following messages from the array
-        messages = messages.slice(0, messages.findIndex(m => m.id === messageObj.id));
+        let contextMessages = messages.slice(0, messages.findIndex(m => m.id === messageObj.id));
 
         const characterId = parseInt($.messageFeed.dataset.characterId);
         const character = await db.characters.get(characterId);
-        const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, statusEl:messageEl.querySelector(".statusMessage")});
+        const message = await getBotReply({messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, statusEl:messageEl.querySelector(".statusMessage")});
         if(message) {
           messageObj.variants[messageObj.variants.findIndex(v => v===null)] = messageObj.message;
           messageObj.variants.push(null);
