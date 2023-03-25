@@ -1369,17 +1369,17 @@
       };
 
 
-      async function compressSummary(summary, tokenLimit, model, statusEl) {
+      async function compressSummary(summary, tokenLimit, model, onProgress) {
         let i = 0;
         while(countTokens(summary) > tokenLimit) {
-          if(statusEl) statusEl.innerHTML = `compressing summary (${i})`;
+          if(onProgress) onProgress({message:`compressing summary (${i})`});
           let messages = [
             {role: "system", content: "You are a text compression assistant. You respond only with summary that the user requests - nothing more, nothing less."},
             {role: "user", content: `Please compress this text to 75% of its original size:\n\n---\n\n${summary}\n\n---\n\nTry to remove unimportant details and make the wording more *concise* to save space. DON'T MAKE IT TOO SHORT. Retain all important details.\n\nPlease reply with the *slightly* shortened text - nothing else. Keep *almost all* of the information.`},
           ];
           let newSummary = await getChatCompletion({messages, model, temperature:0.7});
           if(!newSummary) {
-            if(statusEl) statusEl.innerHTML = `error, retrying...`;
+            if(onProgress) onProgress({message:`error, retrying...`});
             await delay(3000);
           } else {
             summary = newSummary;
@@ -1391,7 +1391,7 @@
       }
 
 
-      async function computeAndSaveThreadSummaryIfNeeded({threadId, statusEl, upToMessageId}) {
+      async function computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId, onProgress}) {
         // here's the overall idea: "consume" old messages (remove them from the start of the messages array) until you get to `messageTokensToConsumePerSummary` tokens, and then summarize them (use an existing summary if we already have it - it's kinda treated like the first message), and then keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
         // note: upToMessageId is inclusive. it's needed for things like recomputeBotReply, where it may be that not all messages in the thread are visible to the bot.
         
@@ -1424,7 +1424,8 @@
         let i = 0;
         // while the total token count is too high, grab batches of old messages, and summarize them
         while(currentTokenCount > tokenLimitForSummaryAndMessages) {
-          if(statusEl) statusEl.innerHTML = `summarizing (${i})`;
+          let progess = 1 - ((currentTokenCount-tokenLimitForSummaryAndMessages) / (initialTokenCount-tokenLimitForSummaryAndMessages));
+          if(onProgress) onProgress({message:`summarizing (step ${i}, ${Math.round(progess*100)}% done)`});
           
           // grab old messages until we have at least `messageTokensToConsumePerSummary` tokens worth of text
           let messageBatchTokenCount = 0;
@@ -1463,7 +1464,7 @@
                 temperature: 0.7
               });
               if(summary) break;
-              if(statusEl) statusEl.innerHTML = `error, retrying...`;
+              if(onProgress) onProgress({message:`error, retrying...`});
               await delay(3000);
             }
             console.log("summary:", summary);
@@ -1478,7 +1479,7 @@
           // (this also helps with backwards-compat since maxTokenCountOfSummary previously didn't exist, we so we may need to compress some old summaries)
           if(countTokens(summary) > maxTokenCountOfSummary) {
             addToSummaryLog(`<b>summary to compress:</b> ${summary}`);
-            summary = await compressSummary(summary, maxTokenCountOfSummary, model, statusEl);
+            summary = await compressSummary(summary, maxTokenCountOfSummary, model, onProgress);
             await db.summaries.put({hash, summary, threadId});
             addToSummaryLog(`<b>compressed summary:</b> ${summary}`);
           }
@@ -1545,24 +1546,24 @@
       }
 
       // Note: the reason this doesn't just take threadId as a param is because we use it for recomputeBotReply() which doesn't necessarily use all messages in a thread, and we also use it for "reply with..." which switches characters
-      async function getBotReply({messages, threadId, aiCharacter, userCharacter, statusEl}) {
+      async function getBotReply({messages, threadId, aiCharacter, userCharacter, onProgress}) {
 
         let fullMessagesArr = prepareMessagesForBot(messages, aiCharacter, userCharacter);
 
-        statusEl.innerHTML = "";
-
+        onProgress({message:"starting..."});
+        
         let modelVersion = aiCharacter.modelVersion;
-
+        
         let tokenLimitForSummaryAndMessages = getTokenLimitForSummaryAndMessages(aiCharacter);
-
+        
         console.log("getBotReply() - fullMessagesArr:", fullMessagesArr);
-
+        
         let messagesArr = [];
         let numTokensInContext = countTokensInMessages(fullMessagesArr);
         
         if(numTokensInContext > tokenLimitForSummaryAndMessages) {
           let fitMessagesInContextMethod = aiCharacter.fitMessagesInContextMethod ?? "summarizeOld";
-
+          
           if(fitMessagesInContextMethod === "dropOld") {
             // push messages into messagesArrToSend until total content reaches token limit
             numTokensInContext = 0;
@@ -1575,23 +1576,23 @@
             
             // note: we need upToMessageId because this could be a call from recomputeBotReply() which doesn't necessarily use all messages in a thread
             // upToMessageId is inclusive.
-            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId: fullMessagesArr.at(-1).id, statusEl});
+            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId: fullMessagesArr.at(-1).id, onProgress});
             if(summary === undefined) throw new Error("There should be a summary, since numTokensInContext > tokenLimitForSummaryAndMessages");
-
+            
             messagesArr = remainingMessages;
             messagesArr.unshift({
               role: "system",
               content: "Here's a summary of what happened previously:\n\n"+summary,
             });
-
+            
           } else {
             throw new Error("Invalid fitIntoContextMethod");
           }
         } else {
           messagesArr = fullMessagesArr.slice(0);
         }
-
-        statusEl.innerHTML = "";
+        
+        onProgress({message:"querying api..."});
 
         messagesArr.unshift({"role": "system", "content": aiCharacter.systemMessage});
 
@@ -1680,7 +1681,7 @@
           result = json?.choices[0].text.trim();
         }
         
-        statusEl.innerHTML = ``;
+        onProgress({message:"finished"});
         return result;
       }
 
@@ -1890,19 +1891,21 @@
           let messageObj = createMessageObj({threadId, message:"...", characterId});
           messageObj.character = character;
           
-          let el = await appendMessageToFeed(messageObj);
-          el.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
-          el.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
+          let messageEl = await appendMessageToFeed(messageObj);
+          messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
+          messageEl.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
 
           let userDeletedMessage = false;
-          el.querySelector(".info .deleteButton").addEventListener("click", async e => {
+          messageEl.querySelector(".info .deleteButton").addEventListener("click", async e => {
             e.preventDefault(); e.stopPropagation();
             userDeletedMessage = true;
-            el.remove();
+            messageEl.remove();
             await updateInlineReminderMessage();
           });
           
-          const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, statusEl:el.querySelector(".statusMessage")});
+          const onProgress = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
+          const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, onProgress});
+          messageEl.querySelector(".statusMessage").innerHTML = "";
 
           if(userDeletedMessage) {
             botIsCurrentlyReplying = false;
@@ -1911,17 +1914,17 @@
           
           // if `message` is not a string, it means the bot failed to reply, so delete the message
           if(typeof message !== "string") {
-            el.remove();
+            messageEl.remove();
           } else {
             messageObj.message = message;
 
             let scrollDown = messageFeedIsNearBottom();
-            updateMessageContent(el, messageObj);
+            updateMessageContent(messageEl, messageObj);
             if(scrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
             
             let id = await addMessageToDb(messageObj);
-            el.dataset.id = id;
-            el.dataset.canDelete = "true";
+            messageEl.dataset.id = id;
+            messageEl.dataset.canDelete = "true";
             await triggerMessageAddedCustomCodeEvent(threadId);
           }
 
@@ -1945,7 +1948,11 @@
 
         const characterId = parseInt($.messageFeed.dataset.characterId);
         const character = await db.characters.get(characterId);
-        const message = await getBotReply({messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, statusEl:messageEl.querySelector(".statusMessage")});
+
+        const onProgress = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
+        const message = await getBotReply({messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, onProgress});
+        messageEl.querySelector(".statusMessage").innerHTML = "";
+
         if(message) {
           messageObj.variants[messageObj.variants.findIndex(v => v===null)] = messageObj.message;
           messageObj.variants.push(null);
@@ -2149,9 +2156,12 @@
             await doBotReplyInPlaceOfUser(characterToReplyWith);
           } else if(message.trim() === "/sum") {
             // first ensure summary is up to date:
-            $.messageInput.value = "Loading latest summary...";
-            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId});
+            $.messageInput.value = "Please wait...";
+            $.messageInput.disabled = true;
+            const onProgress = (e) => $.messageInput.value = "Please wait... "+e.message;
+            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, onProgress});
             $.messageInput.value = "";
+            $.messageInput.disabled = false;
             if(summary === undefined) {
               return alert("No summary available for this thread yet. Wait until the thread gets longer.");
             }
@@ -2688,8 +2698,8 @@
         let messageObj = createMessageObj({threadId, message:"...", characterId:-1});
         messageObj.character = await getUserCharacterObj(); // <-- this is the 'user character', not the characterToReplyWith because the character is "typing the reply", but it's as if the user wrote it. Might change this later when I allow multiple characters per thread.
         
-        let el = await appendMessageToFeed(messageObj);
-        el.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
+        let messageEl = await appendMessageToFeed(messageObj);
+        messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
         
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
         
@@ -2702,21 +2712,23 @@
         }
         
         // the "aiCharacter" is the one that replies 
-        let message = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, statusEl:el.querySelector(".statusMessage")});
+        const onProgress = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
+        let message = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, onProgress});
+        messageEl.querySelector(".statusMessage").innerHTML = "";
 
         // if `message` is falsy, it means the bot failed to reply, so delete the message and end the loop
         if(typeof message !== "string") {
-          el.remove();
+          messageEl.remove();
           return false;
         } else {
           messageObj.message = message;
 
           let scrollDown = messageFeedIsNearBottom();
-          updateMessageContent(el, messageObj);
+          updateMessageContent(messageEl, messageObj);
           if(scrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
           let id = await addMessageToDb(messageObj);
-          el.dataset.id = id;
+          messageEl.dataset.id = id;
           await triggerMessageAddedCustomCodeEvent(threadId);
         }
         return true;
