@@ -24,7 +24,7 @@ If you want to use the command line, I'd recommend Deno because it allows you to
 # Then open a terminal in the unzipped folder (ask ChatGPT to help if you need - you'll need to tell it your operating system)
 # Then run this:
 deno run --allow-net=0.0.0.0:4507 --allow-read=. https://deno.land/std@0.180.0/http/file_server.ts
-# It'll give you a URL.
+# Now open http://localhost:4507 in your browser.
 ```
 * The `--allow-net=0.0.0.0:4507` part means "give this script access to the internet, but *only* to `0.0.0.0:4507` (i.e. `localhost:4507`) so it can serve the files there"
-* The `--allow-read=.` means "give this script the ability to read files on my filesystem, but *only* to `.` - i.e. the files in the current directory"
+* The `--allow-read=.` means "give this script the ability to read files on my filesystem, but *only* `.` - i.e. only the files in the current folder/directory"
