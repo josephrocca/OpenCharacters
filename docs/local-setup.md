@@ -9,7 +9,7 @@ But if you want to also *serve* the HTML/JavaScript files from your own machine,
 4. **Important**: Once you select the folder and switch on the server with the toggle, it'll show you a URL like `http://127.0.0.1:8887`, but you should change it to `http://localhost:8887` because otherwise (due [very strange engineering choices](https://stackoverflow.com/questions/43895390/imgur-images-returning-403) at Imgur HQ based on the "referrer" header), Imgur images won't load. So just swap the `127.0.0.1` part to `localhost` and that'll fix image loading problems.
 5. Visit the URL in your browser.
 
-Note that chatacter URLs look like this: `https://josephrocca.github.io/OpenCharacters/#%7B%22addCharac...` but to use them with your local version you'll need to change them to this: `http://localhost:8887/#%7B%22addCharac...`. Replace `http://localhost:8887` with whatever your webserver URL is (the `8887` number might be different). So, to be clear, just take a normal character share URL and swap `https://josephrocca.github.io/OpenCharacters/` for `http://localhost:8887`.
+Note that chatacter URLs look like this: `https://josephrocca.github.io/OpenCharacters/#%7B%22addCharac...` but to use them with your local version you'll need to change them to this: `http://localhost:8887/#%7B%22addCharac...`. Replace `http://localhost:8887` with whatever your webserver URL is (the `8887` number might be different). So, to be clear, just take a normal character share URL and swap `https://josephrocca.github.io/OpenCharacters/` for `http://localhost:8887/`.
 
 ## Notes
 
