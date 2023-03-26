@@ -25,7 +25,7 @@ It also has two lines.
 ```
 As with all messages, you can include markdown/HTML. Here's an example of an initial message the provides instructions to the user, and has an image embedded:
 ```
-[SYSTEM, hiddenFrom=ai]: Hello there! Thanks for trying out my character. Here are some tips:
+[SYSTEM; hiddenFrom=ai]: Hello there! Thanks for trying out my character. Here are some tips:
 * Make sure to edit the character's response if they break character. You'll probably only have to do this for the first few messages, at most.
 * ...
 
