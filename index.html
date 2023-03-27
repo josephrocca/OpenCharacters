@@ -1271,6 +1271,8 @@
       }
 
       async function addMessageToDb(messageObj) {
+        
+        messageObj = JSON.parse(JSON.stringify(messageObj));
         delete messageObj.character; // just in case I'm sloppy somewhere
 
         let id = await db.messages.add(messageObj);
