@@ -2025,7 +2025,6 @@
       }
 
       function createMessageElement(messageObj) {
-        let messageContentHtml = DOMPurify.sanitize(marked.parse(messageObj.message));
         let tmp = document.createElement("div");
         let currentVariantNumber = messageObj.variants.findIndex(v => v === null) + 1;
 
@@ -2062,13 +2061,13 @@
                   ${messageObj.hiddenFrom?.includes("ai") ? `<div class="hiddenFromAiIcon" onclick="alert('This icon indicates that this message is hidden from the AI.')" title="The AI cannot see this message." style="font-size:0.8rem; margin-left:1rem; display:flex; align-items: center; cursor:pointer;">🙈</div>` : ""}
                   <div class="statusMessage" style="margin-left:1rem;display: flex;align-items: center;cursor:pointer;font-size: 0.7rem;opacity: 0.5;"></div>
                 </div>
-                <div class="messageText" style="overflow-wrap:break-word;">${messageContentHtml}</div>
+                <div class="messageText" style="overflow-wrap:break-word;"></div>
               </div>
             </div>
           </div>
         `;
         let el = tmp.firstElementChild;
-        el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+        updateMessageContent(el, messageObj); // this adds the actual message with rendered markdown, adds code block copy comments, etc.
         return el;
       }
 
@@ -2850,6 +2849,27 @@
 
         el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(messageObj.message));
         el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+
+        // add 'copy' button to code blocks
+        el.querySelectorAll('.messageText pre').forEach(pre => {
+          const wrapper = document.createElement('div');
+          const button = document.createElement('button');
+          button.innerText = 'copy';
+          button.style.cssText = 'font-size:80%; position:absolute; top:0.25rem; right:0.25rem;';
+          wrapper.style.position = 'relative';
+          pre.parentNode.insertBefore(wrapper, pre);
+          wrapper.appendChild(pre);
+          wrapper.appendChild(button);
+
+          button.addEventListener('click', async () => {
+            let text = pre.innerText.trim(); // trim removes trailing newlines from bash commands which is a very good idea
+            await navigator.clipboard.writeText(text);
+            button.innerText = 'copied!';
+            setTimeout(() => {
+              button.innerText = 'copy';
+            }, 2000);
+          });
+        });
       }
 
       $.newThreadButton.addEventListener("click", async function() {
