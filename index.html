@@ -2546,14 +2546,16 @@
           let character = await db.characters.get(thread.characterId);
           
           if(e.data.data.type === "getChatCompletion") {
-            if(!e.data.data.options.messages || !e.data.data.options.messages[0].content || !e.data.data.options.messages[0].author) {
+            let options = e.data.data?.options;
+            let messages = options?.messages;
+
+            if(!messages || !messages[0].content || !messages[0].author) {
               let result = "Invalid parameter: The first input to oc.getChatCompletion should be an options object, and 'options.messages' must be an array of objects with 'content' and 'author' properties.";
               customCodeIframes[e.data.threadId].contentWindow.postMessage({_id:e.data._id, success:false, result}, "*");
               return;
             }
 
             // transform and clean the options data:
-            let options = e.data.data.options;
             options.messages.forEach(m => {
               m.content = m.content+"";
               m.role = m.author==="user"?"user" : m.author==="ai"?"assistant" : m.author==="system"?"system" : "system";
