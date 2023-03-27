@@ -2528,7 +2528,7 @@
       window.addEventListener("message", function(e) {
         let threadId = e.data.threadId;
         let types = ["showWindow", "hideWindow"];
-        if(types.includes(e.data.data?.type) && customCodeFloatingWindows[threadId] && customCodeIframes[threadId].contentWindow === e.source) {
+        if(types.includes(e.data?.type) && customCodeFloatingWindows[threadId] && customCodeIframes[threadId].contentWindow === e.source) {
           let w = customCodeFloatingWindows[threadId];
           if(e.data.type === "showWindow") w.show();
           if(e.data.type === "hideWindow") w.hide();
