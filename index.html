@@ -305,8 +305,8 @@
     <script type="module">
       import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText } from "./utils.js?v=15";
       
-      window.onerror = function(errorMsg, url, lineNumber) {
-        alert(`Please report this error on the Discord or Github:\n\n${errorMsg}\n\nurl: ${url} \n\nlineNumber: ${lineNumber}`);
+      window.onerror = function(errorMsg, url, lineNumber, columnNumber, errorObj) {
+        alert(`Please report this error on the Discord or Github:\n\n${errorMsg}\n\nstack: ${errorObj?.stack}\n\nline: ${lineNumber}`);
         return false;
       }
 
@@ -491,7 +491,7 @@
 
         let characters = await db.characters.toArray();
         for(let thread of threads) {
-          thread.character = characters.find(c => c.id === thread.characterId);
+          thread.character = characters.find(c => c.id === thread.characterId) || {}; // added the `|| {}` so it still attempts to render the thread even if there's a bug - this shouldn't happen, but did happen for a user and this might help me debug
         }
         if(opts.filterWithQuery) {
           let q = opts.filterWithQuery.toLowerCase();
@@ -1148,7 +1148,7 @@
         
         const result = await prompt2({
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:"[A-Za-z0-9_\\- ]{1,64}" },
-          systemMessage: { label: "Initial 'system' message (instruction/role/personality):", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
+          systemMessage: { label: "Instruction/role/personality:", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
           reminderMessage: { label: "Reminder message (invisible system message that is placed before every AI response):", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
           initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md">here</a>.`, type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
           modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}, {content:"gpt-4 (only works if you have waitlist access)", value:"gpt-4"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
@@ -1381,9 +1381,14 @@
           let messageBatchTokenCount = 0;
           let messageBatchArr = [];
           while(messageBatchTokenCount < messageTokensToConsumePerSummary) {
-            let m = remainingMessages.shift();
+            let m = remainingMessages[0];
+            let tokens = countTokensInMessages([m]);
+            if(messageBatchTokenCount > 0 && messageBatchTokenCount+tokens >= messageTokensToConsumePerSummary) {
+              break; // don't add this message to the batch, because it would put us over the limit
+            }
             messageBatchArr.push(m);
-            messageBatchTokenCount += countTokensInMessages([m]);
+            messageBatchTokenCount += tokens;
+            remainingMessages.shift();
           }
 
           let messageBatchSummarizationInstruction;
@@ -1593,7 +1598,7 @@
           }).then(r => r.json()).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
           if(!json || json?.error) {
             console.error(json?.error);
-            alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+            alert(`Error: getBotReply:\n` + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
 
           result = json.choices[0].message.content;
@@ -1625,7 +1630,7 @@
           }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
           if(!json || json?.error) {
             console.error(json?.error);
-            alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+            alert(`Error: getBotReply:\n` + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
           result = json?.choices[0].text.trim();
         }
@@ -1675,7 +1680,7 @@
           
           if(!json || json?.error) {
             console.error(json?.error);
-            alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+            alert(`Error: getChatCompletion:\n` + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
 
           result = json.choices[0].message.content;
@@ -1711,7 +1716,7 @@
           
           if(!json || json?.error) {
             console.error(json?.error);
-            alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+            alert(`Error: getChatCompletion:\n` + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
 
           result = json?.choices[0].text.trim();
@@ -1788,7 +1793,7 @@
           
           if(!json || json?.error) {
             console.error(json?.error);
-            alert("For some reason that didn't work. You can try verifying your API key by clicking the 'settings' button. " + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+            alert(`Error: getCompletion:\n` + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
           }
 
           result = json.choices[0].message.content;
