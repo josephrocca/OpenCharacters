@@ -1271,7 +1271,7 @@
       }
 
       async function addMessageToDb(messageObj) {
-        
+
         messageObj = JSON.parse(JSON.stringify(messageObj));
         delete messageObj.character; // just in case I'm sloppy somewhere
 
@@ -1311,6 +1311,11 @@
         "gpt-3.5-turbo": 4096,
         "text-davinci-003": 4096,
         "gpt-4": 8192,
+      };
+      const modelNameToModelType = {
+        "gpt-3.5-turbo": "chat",
+        "gpt-4": "chat",
+        "text-davinci-003": "general",
       };
 
 
@@ -1564,10 +1569,7 @@
         }
 
 
-        let modelType;
-        if(modelVersion==="gpt-3.5-turbo") modelType = "chat";
-        if(modelVersion==="gpt-4") modelType = "chat";
-        if(modelVersion==="text-davinci-003") modelType = "general";
+        let modelType = modelNameToModelType[modelVersion];
 
         let result;
 
@@ -1649,7 +1651,7 @@
 
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
 
-        let modelType = model==="gpt-3.5-turbo" ? "chat" : "general";
+        let modelType = modelNameToModelType[model];
 
         let result;
 
