@@ -135,22 +135,45 @@ export async function prompt2(specs, opts={}) {
     }
   }, 5);
 
-  let values = await new Promise((resolve) => {
-    ctn.querySelector("button.submit").onclick = () => {
-      let values = {};
-      for(let el of [...ctn.querySelectorAll("[data-spec-key]")]) {
-        if(el.tagName === "INPUT") {
-          if(el.type == "file") {
-            values[el.dataset.specKey] = el.files;
-          } else {
-            values[el.dataset.specKey] = el.value;
-          }
-        } else if(el.tagName === "TEXTAREA") {
-          values[el.dataset.specKey] = el.value;
-        } else if(el.tagName === "SELECT") {
+  // a spec can have a `show` function which determines whether it's shown based on the values of the other inputs
+  function updateInputVisibilies() {
+    const values = getAllValues();
+    for(const el of [...ctn.querySelectorAll("[data-spec-key]")]) {
+      const showFn = specs[el.dataset.specKey].show;
+      if(!showFn) continue;
+      if(showFn(values)) {
+        el.closest('section').style.display = "";
+      } else {
+        el.closest('section').style.display = "none";
+      }
+    }
+  }
+  updateInputVisibilies();
+  for(const el of [...ctn.querySelectorAll("[data-spec-key]")]) {
+    el.addEventListener("input", updateInputVisibilies);
+  }
+
+  function getAllValues() {
+    let values = {};
+    for(let el of [...ctn.querySelectorAll("[data-spec-key]")]) {
+      if(el.tagName === "INPUT") {
+        if(el.type == "file") {
+          values[el.dataset.specKey] = el.files;
+        } else {
           values[el.dataset.specKey] = el.value;
         }
+      } else if(el.tagName === "TEXTAREA") {
+        values[el.dataset.specKey] = el.value;
+      } else if(el.tagName === "SELECT") {
+        values[el.dataset.specKey] = el.value;
       }
+    }
+    return values;
+  }
+
+  let values = await new Promise((resolve) => {
+    ctn.querySelector("button.submit").onclick = () => {
+      let values = getAllValues();
       resolve(values);
     }
     ctn.querySelector("button.cancel").onclick = () => {
