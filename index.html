@@ -1397,7 +1397,7 @@
             if(messageBatchTokenCount > 0 && messageBatchTokenCount+tokens >= messageTokensToConsumePerSummary) {
               break; // don't add this message to the batch, because it would put us over the limit
             }
-            
+
             messageBatchArr.push(m);
             messageBatchTokenCount += tokens;
             remainingMessages.shift();
@@ -1512,6 +1512,10 @@
         return tokenLimit;
       }
 
+      const openAiErrorTypeToReadableError = {
+        "insufficient_quota": "Looks like you've used up all your OpenAI credits. You can buy more here: https://platform.openai.com/account",
+      };
+
       // Note: the reason this doesn't just take threadId as a param is because we use it for recomputeBotReply() which doesn't necessarily use all messages in a thread, and we also use it for "reply with..." which switches characters
       async function getBotReply({messages, threadId, aiCharacter, userCharacter, onProgress}) {
 
@@ -1608,9 +1612,10 @@
             headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
-          if(!json || json?.error) {
-            console.error(json?.error);
-            alert(`Error: getBotReply:\n` + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+          
+          if(json?.error) {
+            console.error(json.error);
+            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
           }
 
           result = json?.choices?.[0].message.content;
@@ -1640,10 +1645,12 @@
             headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
-          if(!json || json?.error) {
-            console.error(json?.error);
-            alert(`Error: getBotReply:\n` + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+          
+          if(json?.error) {
+            console.error(json.error);
+            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
           }
+          
           result = json?.choices?.[0].text.trim();
         }
         
@@ -1690,9 +1697,9 @@
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getChatCompletion: "+e.stack));
           
-          if(!json || json?.error) {
-            console.error(json?.error);
-            alert(`Error: getChatCompletion:\n` + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+          if(json?.error) {
+            console.error(json.error);
+            alert(`Error during getChatCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
           }
 
           result = json?.choices?.[0].message.content;
@@ -1726,9 +1733,9 @@
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
           
-          if(!json || json?.error) {
-            console.error(json?.error);
-            alert(`Error: getChatCompletion:\n` + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+          if(json?.error) {
+            console.error(json.error);
+            alert(`Error during getChatCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
           }
 
           result = json?.choices?.[0].text.trim();
@@ -1767,9 +1774,10 @@
             headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getCompletion: "+e.stack));
-          if(!json || json?.error) {
-            console.error(json?.error);
-            alert("For some reason a prompt completion request didn't work. You can try verifying your API key by clicking the 'settings' button. Here's the error: \n" + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+          
+          if(json?.error) {
+            console.error(json.error);
+            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
           }
 
           result = json?.choices[0].text.trim();
@@ -1803,9 +1811,9 @@
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getChatCompletion: "+e.stack));
           
-          if(!json || json?.error) {
-            console.error(json?.error);
-            alert(`Error: getCompletion:\n` + (json?.error ? JSON.stringify(json.error, null, 2) : ""));
+          if(json?.error) {
+            console.error(json.error);
+            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
           }
 
           result = json.choices[0].message.content;
