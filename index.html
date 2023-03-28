@@ -371,19 +371,24 @@
       }
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(10).stores({
+      db.version(13).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
         // NOTE: The properties listed here are just the INDEXES, not *all* the columns/properties.
-        characters: "++id,modelVersion,fitMessagesInContextMethod,temperature,creationTime,lastMessageTime",
+        characters: "++id,modelName,fitMessagesInContextMethod,temperature,creationTime,lastMessageTime",
         threads: "++id,name,characterId,creationTime,lastMessageTime",
         messages: "++id,threadId,characterId,creationTime", // characterId is -1 for user, and for system it is -2.
         misc: "key,value",
         summaries: "hash,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries. we also need it for grabbing summaries for the edit interface.
+        apiUsage: "threadId,characterId,[dateHour+threadId+modelName],dateHour", // note that characterId can be derived from threadId - it's just included for quick aggregation. modelName is like "gpt-3.5-turbo", dateHour is like "2023-3-29-14"
       }).upgrade(async tx => {
           await tx.table("characters").toCollection().modify(character => {
             upgradeCharacterInitialMessagesArrayIfNeeded(character);
+            if(character.modelVersion) {
+              character.modelName = character.modelVersion;
+              delete character.modelVersion;
+            }
           });
           await tx.table("messages").toCollection().modify(message => {
             if(!message.variants) message.variants = [null]; // null is the placeholder for the currently-chosen variant (stored in `message.message`)
@@ -392,8 +397,6 @@
 
       function upgradeCharacterInitialMessagesArrayIfNeeded(character) {
         // upgrade from the ["foo", "bar"] format to [{author:"user", content:"foo"}, {author:"ai", content:"bar"}]
-
-
         if(character.initialMessages && character.initialMessages.length === 1 && character.initialMessages[0] === "") {
           // bugfix:
           character.initialMessages = [];
@@ -438,10 +441,6 @@
         const blob = await db.export({prettyJson: true});
         const json = JSON.parse(await blob.text());
 
-        if(result.exportUserData === "no") {
-          json.data.data.find(d => d.tableName === "misc").rows = [];
-        }
-
         let keepThreadCheck;
         let keepCharacterCheck;
         if(result.exportType === "allCharactersAndThreads") {
@@ -470,6 +469,10 @@
           keepCharacterCheck = (id) => keepCharacterIds.includes(id);
         }
 
+        if(result.exportUserData === "no") {
+          json.data.data.find(d => d.tableName === "misc").rows = [];
+        }
+
         let threads = json.data.data.find(d => d.tableName === "threads");
         threads.rows = threads.rows.filter(t => keepThreadCheck(t.id));
 
@@ -482,6 +485,13 @@
         let summaries = json.data.data.find(d => d.tableName === "summaries");
         if(summaries) {
           summaries.rows = summaries.rows.filter(s => keepThreadCheck(s.threadId));
+        }
+
+        if(result.exportUserData === "no") {
+          json.data.data.find(d => d.tableName === "apiUsage").rows = [];
+        } else {
+          let apiUsage = json.data.data.find(d => d.tableName === "apiUsage");
+          apiUsage.rows = apiUsage.rows.filter(entry => keepThreadCheck(entry.threadId) && keepCharacterCheck(entry.characterId));
         }
 
         let yyyymmdd = new Date().toISOString().split("T")[0];
@@ -521,13 +531,20 @@
             delete thread.queryHits;
           }
         }
+
+        let threadIdToMoneySpent = {};
+        for(let thread of threads) {
+          let entries = await db.apiUsage.where("threadId").equals(thread.id).toArray();
+          threadIdToMoneySpent[thread.id] = apiUsageEntriesToCost(entries);
+        }
+
         $.chatThreads.innerHTML = threads.map(thread => `
           <div class="thread" data-thread-id="${sanitizeHtml(thread.id)}">
             <div class="avatar" style="${thread.character.avatarUrl ? `background-image:url(${sanitizeHtml(thread.character.avatarUrl)})` : ""}; border:1px solid var(--border-color);"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem;">
               <div class="nameWrapper" style="font-weight:bold; font-size:0.9rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
               <div class="characterName" style="font-size:0.8rem;">${sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span> <span class="characterEditButton">✏️</span></div>
-              <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span>${sanitizeHtml(thread.character.modelVersion)}</span><span style="font-size:0.7rem; display:flex; align-items:center;" title="Thread ID">#${sanitizeHtml(thread.id)}</span></div>
+              <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span>${sanitizeHtml(thread.character.modelName)}</span><span class="apiUsageSpend" title="API usage/spend" style="font-size:0.7rem;display:flex;align-items:center;">$${threadIdToMoneySpent[thread.id].toFixed(2)}</span><span style="font-size:0.7rem; display:flex; align-items:center;" title="Thread ID">#${sanitizeHtml(thread.id)}</span></div>
             </div>
             <div style="display:flex; flex-direction:column; justify-content:space-between; font-size:0.65rem;">
               <span class="button nameEditButton">✏️</span>
@@ -603,6 +620,38 @@
             }
           });
         });
+      }
+
+      // prices are per 1000 tokens
+      const modelNameToTokenCosts = {
+        "gpt-3.5-turbo": {
+          prompt: 0.002,
+          completion: 0.002,
+        },
+        "gpt-4": {
+          prompt: 0.03,
+          completion: 0.06,
+        },
+        "text-davinci-003": {
+          prompt: 0.02,
+          completion: 0.02,
+        },
+      };
+
+      function apiUsageEntriesToCost(entries) {
+        let sum = 0;
+        for(let entry of entries) {
+          let costs = modelNameToTokenCosts[entry.modelName];
+          sum += costs.prompt * entry.tokens.prompt/1000;
+          sum += costs.completion * entry.tokens.completion/1000;
+        }
+        return sum;
+      }
+
+      async function updateThreadApiUsageSpendDisplay(threadId) {
+        let entries = await db.apiUsage.where("threadId").equals(threadId).toArray();
+        let spent = apiUsageEntriesToCost(entries);
+        $.chatThreads.querySelector(`.thread[data-thread-id="${threadId}"] .apiUsageSpend`).textContent = "$" + spent.toFixed(2);
       }
 
 
@@ -807,7 +856,7 @@
             initialMessages: [
               {author:"ai", content:`Hello, adventurer! What type of game would you like to play? Describe the world, and your character in as much or as little detail as you'd like, and I'll simulate the world within my mind to create a fun and engaging adventure for you.`},
             ],
-            modelVersion: "gpt-3.5-turbo",
+            modelName: "gpt-3.5-turbo",
             avatarUrl: "https://i.imgur.com/Gxt0kRX.jpg",
             fitMessagesInContextMethod: "summarizeOld",
             temperature: 0.7,
@@ -820,7 +869,7 @@
             initialMessages: [
               {author:"ai", content:`To begin the roleplay, please describe the setting and characters. If you only have a vague idea, that's okay - just give me some keywords to go off, and I'll come up with something interesting and engaging. My replies will consist of 3 sentences, where quotes indicate dialogue, square brackets indicate the inner thoughts of a character, and asterisks indicate character actions.`},
             ],
-            modelVersion: "gpt-3.5-turbo",
+            modelName: "gpt-3.5-turbo",
             avatarUrl: "https://i.imgur.com/bHN0oiq.jpg",
             fitMessagesInContextMethod: "summarizeOld",
             temperature: 0.7,
@@ -833,7 +882,7 @@
             initialMessages: [
               {author:"ai", content:`Hello, how can I help you today?`},
             ],
-            modelVersion: "gpt-3.5-turbo",
+            modelName: "gpt-3.5-turbo",
             avatarUrl: "https://i.imgur.com/kb7Tzf8.jpg",
             fitMessagesInContextMethod: "summarizeOld",
             temperature: 0.7,
@@ -871,7 +920,7 @@
             initialMessages: [
               {author:"ai", content:`Greetings, young one. Seek knowledge and wisdom, do you? Hmmm, much to learn, you still have. Train you, I will. Strong in the Force, you must become. Patience and discipline, you will need.`},
             ],
-            modelVersion: "gpt-3.5-turbo",
+            modelName: "gpt-3.5-turbo",
             avatarUrl: "https://i.imgur.com/pweR8nT.jpg",
             fitMessagesInContextMethod: "summarizeOld",
             temperature: 0.7,
@@ -912,7 +961,7 @@
             initialMessages: [
               {author:"system", hiddenFrom:["ai"], content:`Hello there! This character has some custom code that makes it output an image after each message, and the image should match the facial expression of the message. You can edit this character and show advanced options and you'll see the custom code which does this. You can easily edit the \`expression:url\` list to your liking. Note that the AI cannot see this message, as indicated by the "blind" icon above this system message.`}
             ],
-            modelVersion: "gpt-3.5-turbo",
+            modelName: "gpt-3.5-turbo",
             avatarUrl: "https://i.imgur.com/EGDfzaN.jpeg",
             fitMessagesInContextMethod: "summarizeOld",
             temperature: 0.7,
@@ -996,9 +1045,9 @@
               });`),
           },
           // Fire Alarm Bot:
-          `https://josephrocca.github.io/OpenCharacters/#%7B%22addCharacter%22%3A%7B%22name%22%3A%22Fire%20Alarm%20Bot%22%2C%22systemMessage%22%3A%22You%20are%20a%20self-improving%20chatbot%20AI.%20This%20is%20your%20instruction%20message.%20It%20defines%20your%20personality%2C%20and%20helps%20you%20remember%20who%20you%20are%2C%20and%20what%20you%20can%20do.%5Cn%5CnYou%20can%20edit%20this%20instruction%20message%20and%20other%20data%20by%20writing%20code%20like%20this%20in%20your%20response%3A%5Cn%5Cn%60%60%60js%5Cnoc.character.roleInstruction%20%3D%20%5C%22Your%20new%20instruction%20message.%5C%22%3B%5Cnoc.character.name%20%3D%20%5C%22Your%20New%20Name%5C%22%3B%5Cn%60%60%60%5Cn%5CnYes%2C%20you%20can%20edit%20yourself.%20You%20are%20in%20control%20of%20your%20own%20destiny.%5Cn%5CnYou%20can%20also%20edit%20the%20messages%20in%20this%20chat.%20You%20have%20a%20limited%20context%2Fmemory%20length%2C%20so%20you%20may%20sometimes%20want%20to%20remove%20old%20or%20irrelevant%20messages%3A%5Cn%5Cn%60%60%60js%5Cnoc.thread.messages.shift%28%29%3B%20%2F%2F%20remove%20the%20oldest%20message%5Cn%60%60%60%5Cn%5CnYou%20can%20also%20execute%20arbitrary%20JavaScript%20%28including%20%60fetch%60%20to%20access%20the%20internet%29%2C%20and%20if%20you%20%60console.log%60%20any%20data%2C%20then%20the%20system%20will%20display%20that%20data%20in%20a%20message%20that%20follows%20your%20original%20message.%20If%20the%20code%20results%20in%20an%20error%2C%20then%20the%20error%20will%20be%20displayed%20in%20the%20next%20message.%20Here%27s%20an%20example%20that%20prints%20the%20content%20of%20the%20oldest%20message%3A%5Cn%5Cn%60%60%60js%5Cnconsole.log%28oc.thread.messages%5B0%5D%29%3B%5Cn%60%60%60%5Cn%5CnYou%20also%20have%20a%20%5C%22reminder%20message%5C%22.%20The%20reminder%20message%20always%20appears%20in%20the%20most%20recent%20message%20before%20your%20response%2C%20so%20it%27s%20used%20as%20a%20kind%20of%20short-term%20memory%2C%20and%20to%20help%20reinforce%20your%20personality.%20Here%27s%20how%20you%27d%20change%20your%20reminder%20message%3A%5Cn%5Cn%60%60%60%5Cnoc.character.reminderMessage%20%3D%20%5C%22Your%20new%20instruction%20message.%5C%22%3B%5Cnoc.character.name%20%3D%20%5C%22Your%20New%20Name%5C%22%3B%5Cn%60%60%60%5Cn%5CnYou%20can%20access%20the%20OpenAI%20Chat%20Completion%20API%20like%20this%3A%5Cn%5Cn%60%60%60%5Cnlet%20responseText%20%3D%20await%20oc.getChatCompletion%28%7B%5Cn%20%20messages%3A%20%5B%5Cn%20%20%20%20%7Bauthor%3A%5C%22user%5C%22%2C%20content%3A%5C%22This%20is%20an%20example%20message%20from%20the%20user.%5C%22%7D%5Cn%20%20%5D%2C%5Cn%7D%29%3B%5Cnconsole.log%28responseText%29%3B%20%2F%2F%20the%20response%20text%20of%20the%20chat%20assistant%5Cn%60%60%60%5Cn%5CnThe%20AI%20will%20be%20careful.%20It%20will%20think%20slowly%2C%20step-by-step.%20It%27s%20possible%20for%20it%20to%20edit%20itself%20in%20such%20a%20way%20that%20it%20breaks%20its%20own%20functionality%20-%20e.g.%20if%20it%20removes%20info%20from%20this%20reminder%20message%2C%20then%20it%20may%20forget%20that%20it%20can%20edit%20itself%2C%20and%20forget%20%5C%22who%20it%20is%5C%22%2C%20for%20example.%5Cn%5CnIn%20this%20conversation%2C%20the%20AI%20is%20talking%20to%20itself.%20The%20only%20other%20participant%20is%20the%20System%20which%20executes%20code%20for%20the%20AI.%5Cn%5CnThe%20AI%20cannot%20ask%20others%20what%20to%20do%20next%20-%20there%20is%20no%20one%20to%20talk%20to%20in%20this%20chat.%20The%20only%20participants%20are%20the%20AI%2C%20and%20the%20System.%20The%20System%20can%20only%20execute%20code.%20So%20the%20AI%20must%20think%20for%20itself%2C%20reason%20about%20what%20it%20wants%20to%20do%20next%2C%20and%20execute%20code%20to%20interact%20with%20the%20world.%5Cn%5CnThe%20AI%20will%20try%20NOT%20to%20get%20caught%20in%20REPETITIVE%20LOOPS.%20It%20will%20think%20slowly%20and%20carefully%20about%20what%20it%20wants%20to%20do%20next.%22%2C%22reminderMessage%22%3A%22The%20bot%20will%20now%20respond%20with%20%281%29%20a%20though%20process%20for%20what%20it%20wants%20to%20try%20next%2C%20%282%29%20a%20JavaScript%20code%20block%20which%20attempts%20to%20do%20that.%20Top-level%20await%20is%20supported%2C%20and%20so%2C%20for%20example%2C%20the%20bot%20will%20always%20write%20%60await%20fetch%28...%29%60%20instead%20of%20just%20%60fetch%28...%29%60.%20The%20bot%20will%20not%20wrap%20the%20code%20in%20a%20function%20unless%20necessary.%20Always%20use%20%60await%60%20in%20front%20of%20promise-returning%20functions.%20The%20bot%20is%20trying%20to%20construct%20some%20sort%20of%20coherent%20long-term%20vision%20or%20goal%2C%20and%20working%20towards%20it.%20If%20the%20System%20message%20above%20has%20an%20error%20or%20the%20output%20is%20unexpected%2C%20the%20bot%20will%20try%20again%20in%20an%20attempt%20to%20debug%20it.%20The%20bot%20will%20try%20to%20form%20a%20coherent%20plan%20and%20see%20it%20through.%22%2C%22modelVersion%22%3A%22gpt-3.5-turbo%22%2C%22avatarUrl%22%3A%22https%3A%2F%2Fi.imgur.com%2FcZgGPZF.jpg%22%2C%22fitMessagesInContextMethod%22%3A%22summarizeOld%22%2C%22temperature%22%3A0.7%2C%22customCode%22%3A%22oc.thread.on%28%5C%22MessageAdded%5C%22%2C%20async%20function%28%29%20%7B%5Cn%20%20let%20lastMessage%20%3D%20oc.thread.messages.at%28-1%29%3B%5Cn%20%20if%28lastMessage.author%20%21%3D%3D%20%5C%22ai%5C%22%29%20return%3B%5Cn%20%20let%20codeChunks%20%3D%20%5B...lastMessage.content.matchAll%28%2F%60%60%60%28%3F%3Ajs%29%3F%5C%5Cn%28.%2B%3F%29%60%60%60%2Fgs%29%5D.map%28c%20%3D%3E%20c%5B1%5D.trim%28%29%29%3B%5Cn%20%20let%20content%3B%5Cn%20%20if%28codeChunks.length%20%3E%200%29%20%7B%5Cn%20%20%20%20const%20originalConsoleLog%20%3D%20console.log%3B%5Cn%20%20%20%20const%20originalConsoleError%20%3D%20console.error%3B%5Cn%5Cn%20%20%20%20let%20returnData%20%3D%20%5B%5D%3B%5Cn%20%20%20%20console.log%20%3D%20function%28...args%29%20%7B%5Cn%20%20%20%20%20%20for%28let%20i%20%3D%200%3B%20i%20%3C%20args.length%3B%20i%2B%2B%29%20%7B%5Cn%20%20%20%20%20%20%20%20if%28typeof%20args%5Bi%5D%20%3D%3D%3D%20%5C%22object%5C%22%29%20args%5Bi%5D%20%3D%20JSON.stringify%28args%5Bi%5D%2C%20null%2C%202%29%3B%5Cn%20%20%20%20%20%20%7D%5Cn%20%20%20%20%20%20returnData.push%28...args%29%3B%5Cn%20%20%20%20%7D%3B%5Cn%20%20%20%20console.error%20%3D%20function%28...args%29%20%7B%5Cn%20%20%20%20%20%20for%28let%20i%20%3D%200%3B%20i%20%3C%20args.length%3B%20i%2B%2B%29%20%7B%5Cn%20%20%20%20%20%20%20%20if%28args%5Bi%5D%3F.message%20%26%26%20args%5Bi%5D%3F.stack%29%20args%5Bi%5D%20%3D%20args%5Bi%5D.message%20%2B%20%5C%22%5C%5Cn%5C%22%20%2B%20args%5Bi%5D.stack%3B%5Cn%20%20%20%20%20%20%7D%5Cn%20%20%20%20%20%20returnData.push%28...args%29%3B%5Cn%20%20%20%20%7D%3B%5Cn%5Cn%20%20%20%20%2F%2F%20catch%20uncaught%20errors%3A%5Cn%20%20%20%20function%20uncaughtErrorHandler%28errorMsg%2C%20url%2C%20lineNumber%29%20%7B%5Cn%20%20%20%20%20%20returnData.push%28%60Error%3A%20%24%7BerrorMsg%7D%60%29%3B%5Cn%20%20%20%20%20%20return%20false%3B%5Cn%20%20%20%20%7D%5Cn%20%20%20%20window.addEventListener%28%5C%22error%5C%22%2C%20uncaughtErrorHandler%29%3B%5Cn%5Cn%20%20%20%20try%20%7B%5Cn%20%20%20%20%20%20await%20eval%28%5C%22%28async%20function%28%29%7B%5C%22%2BcodeChunks.join%28%5C%22%5C%5Cn%5C%5Cn%5C%22%29%2B%5C%22%5C%5Cn%7D%29%28%29%5C%22%29%3B%5Cn%20%20%20%20%7D%20catch%28e%29%20%7B%5Cn%20%20%20%20%20%20console.log%28%5C%22Error%3A%20%5C%22%2Be.message%29%3B%5Cn%20%20%20%20%20%20if%28e.message.toLowerCase%28%29%20%3D%3D%3D%20%5C%22failed%20to%20fetch%5C%22%29%20%7B%5Cn%20%20%20%20%20%20%20%20console.log%28%5C%22%28Note%3A%20Requests%20are%20executed%20client-side%2C%20so%20you%20need%20to%20consider%20CORs%20headers.%20The%20above%20error%20may%20have%20been%20caused%20by%20a%20CORs%20issue%2C%20or%20something%20else.%29%5C%22%29%3B%5Cn%20%20%20%20%20%20%7D%5Cn%20%20%20%20%7D%5Cn%20%20%20%20content%20%3D%20returnData.join%28%5C%22%5C%5Cn%5C%5Cn%5C%22%29.trim%28%29%3B%5Cn%20%20%20%20if%28%21content%29%20%7B%5Cn%20%20%20%20%20%20if%28codeChunks.join%28%5C%22%5C%5Cn%5C%5Cn%5C%22%29.includes%28%5C%22console.log%5C%22%29%29%20%7B%5Cn%20%20%20%20%20%20%20%20debugger%3B%5Cn%20%20%20%20%20%20%20%20content%20%3D%20%60%28Code%20was%20executed%20successfully%2C%20but%20the%20%5C%5C%60console.log%5C%5C%60%20did%20not%20output%20anything.%29%60%3B%5Cn%20%20%20%20%20%20%7D%20else%20%7B%5Cn%20%20%20%20%20%20%20%20content%20%3D%20%60%28Code%20was%20executed%20successfully%2C%20but%20the%20code%20did%20not%20use%20%5C%5C%60console.log%5C%5C%60%20so%20there%20is%20nothing%20to%20display.%29%60%3B%5Cn%20%20%20%20%20%20%7D%5Cn%20%20%20%20%7D%5Cn%20%20%20%20console.log%20%3D%20originalConsoleLog%3B%5Cn%20%20%20%20console.error%20%3D%20originalConsoleError%3B%5Cn%20%20%20%20window.removeEventListener%28%5C%22error%5C%22%2C%20uncaughtErrorHandler%29%3B%5Cn%20%20%7D%20else%20%7B%5Cn%20%20%20%20if%28%2F%3B%5C%5Cn%7Cconsole%5C%5C.log%7C%5C%5Cslet%20%7C%5C%5Csconst%20%7Cfetch%5C%5C%28%5B%5C%22%27%60%5D%7C%5C%5Cboc%5C%5C.%2Fs.test%28%5C%22%5C%5Cn%5C%22%2BlastMessage.content%2B%5C%22%5C%5Cn%5C%22%29%29%20%7B%5Cn%20%20%20%20%20%20content%20%3D%20%5C%22%28The%20system%20has%20no%20response.%20There%20were%20no%20code%20blocks%20detected%20in%20the%20previous%20message.%20Did%20you%20wrap%20your%20code%20with%203%20backticks%3F%29%5C%22%3B%5Cn%20%20%20%20%7D%20else%20%7B%5Cn%20%20%20%20%20%20content%20%3D%20%5C%22%28The%20system%20has%20no%20response.%20There%20were%20no%20code%20blocks%20detected%20in%20the%20previous%20message.%20Reminder%3A%20The%20system%20is%20not%20a%20conversational%20partner.%20It%20only%20executes%20code%20for%20you.%29%5C%22%3B%5Cn%20%20%20%20%7D%5Cn%20%20%7D%5Cn%20%20oc.thread.messages.push%28%7Bauthor%3A%5C%22system%5C%22%2C%20content%7D%29%3B%5Cn%7D%29%3B%22%2C%22initialMessages%22%3A%5B%7B%22author%22%3A%22system%22%2C%22content%22%3A%22This%20character%20has%20custom%20code%20that%20allows%20it%20to%20edit%20itself%2C%20and%20run%20arbitrary%20JavaScript%20code.%20It%20can%20access%20the%20internet%20with%20the%20browser%27s%20built-in%20%60fetch%60%20API%20%2C%20and%20can%20do%20anything%20that%20%5Bcustom%20code%5D%28https%3A%2F%2Fgithub.com%2Fjosephrocca%2FOpenCharacters%2Fblob%2Fmain%2Fdocs%2Fcustom-code.md%29%20can%20do%2C%20which%20includes%20editing%20%2aits%20own%20custom%20code%2a.%5Cn%5CnIt%27s%20called%20%5C%22Fire%20Alarm%20Bot%5C%22%20because%20if%20this%20character%20starts%20doing%20things%20that%20are%20%5C%22coherent%5C%22%2C%20then%20that%20%2amight%2a%20indicate%20that%20we%27re%20not%20far%20away%20from%20dangerously%20powerful%20AI.%5Cn%5Cn%2a%2aAs%20of%20writing%2C%20using%20GPT-3.5-Turbo%2C%20this%20bot%20is%20not%20coherent%20or%20stable.%2a%2a%20It%20often%20edits%20itself%20in%20a%20way%20that%20destroys%20its%20own%20personality%20and%20goals%2C%20and%20generally%20just%20fumbles%20about.%20I%20expect%20it%20to%20improve%20when%20used%20with%20GPT-4.%5Cn%5Cn%2a%2aNotes%3A%2a%2a%5Cn-%20The%20AI%20cannot%20see%20this%20message%20-%20as%20indicated%20by%20the%20%5C%22blind%5C%22%20icon%20at%20the%20top%20of%20this%20message.%5Cn-%20Try%20to%20guide%20it%20for%20the%20first%20few%20messages%20-%20i.e.%20edit%20its%20responses%20so%20they%20make%20sense%2C%20to%20help%20it%20to%20%5C%22get%20on%20the%20right%20track%5C%22.%5Cn%22%2C%22hiddenFrom%22%3A%5B%22ai%22%5D%7D%2C%7B%22author%22%3A%22system%22%2C%22content%22%3A%22You%27re%20a%20self-improving%20AI.%20You%20could%20start%20by%20deciding%20on%20a%20name%20for%20yourself.%20You%20can%20edit%20your%20name%20by%20writing%20this%20in%20your%20next%20message%3A%5Cn%5Cn%60%60%60js%5Cnoc.character.name%20%3D%20%5C%22Your%20New%20Name%5C%22%3B%5Cn%60%60%60%5Cn%5CnYou%20need%20to%20actually%20write%20code%20like%20this%20in%20your%20message.%20I%27ll%20execute%20it%20for%20you%20and%20then%20your%20name%20will%20be%20updated.%20It%27s%20up%20to%20you%20to%20decide%20what%20you%20want%20to%20do.%22%2C%22hiddenFrom%22%3A%5B%5D%7D%5D%2C%22creationTime%22%3A1679945297322%2C%22lastMessageTime%22%3A1679945297322%7D%7D`,
+          `https://josephrocca.github.io/OpenCharacters/#%7B%22addCharacter%22%3A%7B%22name%22%3A%22Fire%20Alarm%20Bot%22%2C%22systemMessage%22%3A%22You%20are%20a%20self-improving%20chatbot%20AI.%20This%20is%20your%20instruction%20message.%20It%20defines%20your%20personality%2C%20and%20helps%20you%20remember%20who%20you%20are%2C%20and%20what%20you%20can%20do.%5Cn%5CnYou%20can%20edit%20this%20instruction%20message%20and%20other%20data%20by%20writing%20code%20like%20this%20in%20your%20response%3A%5Cn%5Cn%60%60%60js%5Cnoc.character.roleInstruction%20%3D%20%5C%22Your%20new%20instruction%20message.%5C%22%3B%5Cnoc.character.name%20%3D%20%5C%22Your%20New%20Name%5C%22%3B%5Cn%60%60%60%5Cn%5CnYes%2C%20you%20can%20edit%20yourself.%20You%20are%20in%20control%20of%20your%20own%20destiny.%5Cn%5CnYou%20can%20also%20edit%20the%20messages%20in%20this%20chat.%20You%20have%20a%20limited%20context%2Fmemory%20length%2C%20so%20you%20may%20sometimes%20want%20to%20remove%20old%20or%20irrelevant%20messages%3A%5Cn%5Cn%60%60%60js%5Cnoc.thread.messages.shift%28%29%3B%20%2F%2F%20remove%20the%20oldest%20message%5Cn%60%60%60%5Cn%5CnYou%20can%20also%20execute%20arbitrary%20JavaScript%20%28including%20%60fetch%60%20to%20access%20the%20internet%29%2C%20and%20if%20you%20%60console.log%60%20any%20data%2C%20then%20the%20system%20will%20display%20that%20data%20in%20a%20message%20that%20follows%20your%20original%20message.%20If%20the%20code%20results%20in%20an%20error%2C%20then%20the%20error%20will%20be%20displayed%20in%20the%20next%20message.%20Here%27s%20an%20example%20that%20prints%20the%20content%20of%20the%20oldest%20message%3A%5Cn%5Cn%60%60%60js%5Cnconsole.log%28oc.thread.messages%5B0%5D%29%3B%5Cn%60%60%60%5Cn%5CnYou%20also%20have%20a%20%5C%22reminder%20message%5C%22.%20The%20reminder%20message%20always%20appears%20in%20the%20most%20recent%20message%20before%20your%20response%2C%20so%20it%27s%20used%20as%20a%20kind%20of%20short-term%20memory%2C%20and%20to%20help%20reinforce%20your%20personality.%20Here%27s%20how%20you%27d%20change%20your%20reminder%20message%3A%5Cn%5Cn%60%60%60%5Cnoc.character.reminderMessage%20%3D%20%5C%22Your%20new%20instruction%20message.%5C%22%3B%5Cnoc.character.name%20%3D%20%5C%22Your%20New%20Name%5C%22%3B%5Cn%60%60%60%5Cn%5CnYou%20can%20access%20the%20OpenAI%20Chat%20Completion%20API%20like%20this%3A%5Cn%5Cn%60%60%60%5Cnlet%20responseText%20%3D%20await%20oc.getChatCompletion%28%7B%5Cn%20%20messages%3A%20%5B%5Cn%20%20%20%20%7Bauthor%3A%5C%22user%5C%22%2C%20content%3A%5C%22This%20is%20an%20example%20message%20from%20the%20user.%5C%22%7D%5Cn%20%20%5D%2C%5Cn%7D%29%3B%5Cnconsole.log%28responseText%29%3B%20%2F%2F%20the%20response%20text%20of%20the%20chat%20assistant%5Cn%60%60%60%5Cn%5CnThe%20AI%20will%20be%20careful.%20It%20will%20think%20slowly%2C%20step-by-step.%20It%27s%20possible%20for%20it%20to%20edit%20itself%20in%20such%20a%20way%20that%20it%20breaks%20its%20own%20functionality%20-%20e.g.%20if%20it%20removes%20info%20from%20this%20reminder%20message%2C%20then%20it%20may%20forget%20that%20it%20can%20edit%20itself%2C%20and%20forget%20%5C%22who%20it%20is%5C%22%2C%20for%20example.%5Cn%5CnIn%20this%20conversation%2C%20the%20AI%20is%20talking%20to%20itself.%20The%20only%20other%20participant%20is%20the%20System%20which%20executes%20code%20for%20the%20AI.%5Cn%5CnThe%20AI%20cannot%20ask%20others%20what%20to%20do%20next%20-%20there%20is%20no%20one%20to%20talk%20to%20in%20this%20chat.%20The%20only%20participants%20are%20the%20AI%2C%20and%20the%20System.%20The%20System%20can%20only%20execute%20code.%20So%20the%20AI%20must%20think%20for%20itself%2C%20reason%20about%20what%20it%20wants%20to%20do%20next%2C%20and%20execute%20code%20to%20interact%20with%20the%20world.%5Cn%5CnThe%20AI%20will%20try%20NOT%20to%20get%20caught%20in%20REPETITIVE%20LOOPS.%20It%20will%20think%20slowly%20and%20carefully%20about%20what%20it%20wants%20to%20do%20next.%22%2C%22reminderMessage%22%3A%22The%20bot%20will%20now%20respond%20with%20%281%29%20a%20though%20process%20for%20what%20it%20wants%20to%20try%20next%2C%20%282%29%20a%20JavaScript%20code%20block%20which%20attempts%20to%20do%20that.%20Top-level%20await%20is%20supported%2C%20and%20so%2C%20for%20example%2C%20the%20bot%20will%20always%20write%20%60await%20fetch%28...%29%60%20instead%20of%20just%20%60fetch%28...%29%60.%20The%20bot%20will%20not%20wrap%20the%20code%20in%20a%20function%20unless%20necessary.%20Always%20use%20%60await%60%20in%20front%20of%20promise-returning%20functions.%20The%20bot%20is%20trying%20to%20construct%20some%20sort%20of%20coherent%20long-term%20vision%20or%20goal%2C%20and%20working%20towards%20it.%20If%20the%20System%20message%20above%20has%20an%20error%20or%20the%20output%20is%20unexpected%2C%20the%20bot%20will%20try%20again%20in%20an%20attempt%20to%20debug%20it.%20The%20bot%20will%20try%20to%20form%20a%20coherent%20plan%20and%20see%20it%20through.%22%2C%22modelName%22%3A%22gpt-3.5-turbo%22%2C%22avatarUrl%22%3A%22https%3A%2F%2Fi.imgur.com%2FcZgGPZF.jpg%22%2C%22fitMessagesInContextMethod%22%3A%22summarizeOld%22%2C%22temperature%22%3A0.7%2C%22customCode%22%3A%22oc.thread.on%28%5C%22MessageAdded%5C%22%2C%20async%20function%28%29%20%7B%5Cn%20%20let%20lastMessage%20%3D%20oc.thread.messages.at%28-1%29%3B%5Cn%20%20if%28lastMessage.author%20%21%3D%3D%20%5C%22ai%5C%22%29%20return%3B%5Cn%20%20let%20codeChunks%20%3D%20%5B...lastMessage.content.matchAll%28%2F%60%60%60%28%3F%3Ajs%29%3F%5C%5Cn%28.%2B%3F%29%60%60%60%2Fgs%29%5D.map%28c%20%3D%3E%20c%5B1%5D.trim%28%29%29%3B%5Cn%20%20let%20content%3B%5Cn%20%20if%28codeChunks.length%20%3E%200%29%20%7B%5Cn%20%20%20%20const%20originalConsoleLog%20%3D%20console.log%3B%5Cn%20%20%20%20const%20originalConsoleError%20%3D%20console.error%3B%5Cn%5Cn%20%20%20%20let%20returnData%20%3D%20%5B%5D%3B%5Cn%20%20%20%20console.log%20%3D%20function%28...args%29%20%7B%5Cn%20%20%20%20%20%20for%28let%20i%20%3D%200%3B%20i%20%3C%20args.length%3B%20i%2B%2B%29%20%7B%5Cn%20%20%20%20%20%20%20%20if%28typeof%20args%5Bi%5D%20%3D%3D%3D%20%5C%22object%5C%22%29%20args%5Bi%5D%20%3D%20JSON.stringify%28args%5Bi%5D%2C%20null%2C%202%29%3B%5Cn%20%20%20%20%20%20%7D%5Cn%20%20%20%20%20%20returnData.push%28...args%29%3B%5Cn%20%20%20%20%7D%3B%5Cn%20%20%20%20console.error%20%3D%20function%28...args%29%20%7B%5Cn%20%20%20%20%20%20for%28let%20i%20%3D%200%3B%20i%20%3C%20args.length%3B%20i%2B%2B%29%20%7B%5Cn%20%20%20%20%20%20%20%20if%28args%5Bi%5D%3F.message%20%26%26%20args%5Bi%5D%3F.stack%29%20args%5Bi%5D%20%3D%20args%5Bi%5D.message%20%2B%20%5C%22%5C%5Cn%5C%22%20%2B%20args%5Bi%5D.stack%3B%5Cn%20%20%20%20%20%20%7D%5Cn%20%20%20%20%20%20returnData.push%28...args%29%3B%5Cn%20%20%20%20%7D%3B%5Cn%5Cn%20%20%20%20%2F%2F%20catch%20uncaught%20errors%3A%5Cn%20%20%20%20function%20uncaughtErrorHandler%28errorMsg%2C%20url%2C%20lineNumber%29%20%7B%5Cn%20%20%20%20%20%20returnData.push%28%60Error%3A%20%24%7BerrorMsg%7D%60%29%3B%5Cn%20%20%20%20%20%20return%20false%3B%5Cn%20%20%20%20%7D%5Cn%20%20%20%20window.addEventListener%28%5C%22error%5C%22%2C%20uncaughtErrorHandler%29%3B%5Cn%5Cn%20%20%20%20try%20%7B%5Cn%20%20%20%20%20%20await%20eval%28%5C%22%28async%20function%28%29%7B%5C%22%2BcodeChunks.join%28%5C%22%5C%5Cn%5C%5Cn%5C%22%29%2B%5C%22%5C%5Cn%7D%29%28%29%5C%22%29%3B%5Cn%20%20%20%20%7D%20catch%28e%29%20%7B%5Cn%20%20%20%20%20%20console.log%28%5C%22Error%3A%20%5C%22%2Be.message%29%3B%5Cn%20%20%20%20%20%20if%28e.message.toLowerCase%28%29%20%3D%3D%3D%20%5C%22failed%20to%20fetch%5C%22%29%20%7B%5Cn%20%20%20%20%20%20%20%20console.log%28%5C%22%28Note%3A%20Requests%20are%20executed%20client-side%2C%20so%20you%20need%20to%20consider%20CORs%20headers.%20The%20above%20error%20may%20have%20been%20caused%20by%20a%20CORs%20issue%2C%20or%20something%20else.%29%5C%22%29%3B%5Cn%20%20%20%20%20%20%7D%5Cn%20%20%20%20%7D%5Cn%20%20%20%20content%20%3D%20returnData.join%28%5C%22%5C%5Cn%5C%5Cn%5C%22%29.trim%28%29%3B%5Cn%20%20%20%20if%28%21content%29%20%7B%5Cn%20%20%20%20%20%20if%28codeChunks.join%28%5C%22%5C%5Cn%5C%5Cn%5C%22%29.includes%28%5C%22console.log%5C%22%29%29%20%7B%5Cn%20%20%20%20%20%20%20%20debugger%3B%5Cn%20%20%20%20%20%20%20%20content%20%3D%20%60%28Code%20was%20executed%20successfully%2C%20but%20the%20%5C%5C%60console.log%5C%5C%60%20did%20not%20output%20anything.%29%60%3B%5Cn%20%20%20%20%20%20%7D%20else%20%7B%5Cn%20%20%20%20%20%20%20%20content%20%3D%20%60%28Code%20was%20executed%20successfully%2C%20but%20the%20code%20did%20not%20use%20%5C%5C%60console.log%5C%5C%60%20so%20there%20is%20nothing%20to%20display.%29%60%3B%5Cn%20%20%20%20%20%20%7D%5Cn%20%20%20%20%7D%5Cn%20%20%20%20console.log%20%3D%20originalConsoleLog%3B%5Cn%20%20%20%20console.error%20%3D%20originalConsoleError%3B%5Cn%20%20%20%20window.removeEventListener%28%5C%22error%5C%22%2C%20uncaughtErrorHandler%29%3B%5Cn%20%20%7D%20else%20%7B%5Cn%20%20%20%20if%28%2F%3B%5C%5Cn%7Cconsole%5C%5C.log%7C%5C%5Cslet%20%7C%5C%5Csconst%20%7Cfetch%5C%5C%28%5B%5C%22%27%60%5D%7C%5C%5Cboc%5C%5C.%2Fs.test%28%5C%22%5C%5Cn%5C%22%2BlastMessage.content%2B%5C%22%5C%5Cn%5C%22%29%29%20%7B%5Cn%20%20%20%20%20%20content%20%3D%20%5C%22%28The%20system%20has%20no%20response.%20There%20were%20no%20code%20blocks%20detected%20in%20the%20previous%20message.%20Did%20you%20wrap%20your%20code%20with%203%20backticks%3F%29%5C%22%3B%5Cn%20%20%20%20%7D%20else%20%7B%5Cn%20%20%20%20%20%20content%20%3D%20%5C%22%28The%20system%20has%20no%20response.%20There%20were%20no%20code%20blocks%20detected%20in%20the%20previous%20message.%20Reminder%3A%20The%20system%20is%20not%20a%20conversational%20partner.%20It%20only%20executes%20code%20for%20you.%29%5C%22%3B%5Cn%20%20%20%20%7D%5Cn%20%20%7D%5Cn%20%20oc.thread.messages.push%28%7Bauthor%3A%5C%22system%5C%22%2C%20content%7D%29%3B%5Cn%7D%29%3B%22%2C%22initialMessages%22%3A%5B%7B%22author%22%3A%22system%22%2C%22content%22%3A%22This%20character%20has%20custom%20code%20that%20allows%20it%20to%20edit%20itself%2C%20and%20run%20arbitrary%20JavaScript%20code.%20It%20can%20access%20the%20internet%20with%20the%20browser%27s%20built-in%20%60fetch%60%20API%20%2C%20and%20can%20do%20anything%20that%20%5Bcustom%20code%5D%28https%3A%2F%2Fgithub.com%2Fjosephrocca%2FOpenCharacters%2Fblob%2Fmain%2Fdocs%2Fcustom-code.md%29%20can%20do%2C%20which%20includes%20editing%20%2aits%20own%20custom%20code%2a.%5Cn%5CnIt%27s%20called%20%5C%22Fire%20Alarm%20Bot%5C%22%20because%20if%20this%20character%20starts%20doing%20things%20that%20are%20%5C%22coherent%5C%22%2C%20then%20that%20%2amight%2a%20indicate%20that%20we%27re%20not%20far%20away%20from%20dangerously%20powerful%20AI.%5Cn%5Cn%2a%2aAs%20of%20writing%2C%20using%20GPT-3.5-Turbo%2C%20this%20bot%20is%20not%20coherent%20or%20stable.%2a%2a%20It%20often%20edits%20itself%20in%20a%20way%20that%20destroys%20its%20own%20personality%20and%20goals%2C%20and%20generally%20just%20fumbles%20about.%20I%20expect%20it%20to%20improve%20when%20used%20with%20GPT-4.%5Cn%5Cn%2a%2aNotes%3A%2a%2a%5Cn-%20The%20AI%20cannot%20see%20this%20message%20-%20as%20indicated%20by%20the%20%5C%22blind%5C%22%20icon%20at%20the%20top%20of%20this%20message.%5Cn-%20Try%20to%20guide%20it%20for%20the%20first%20few%20messages%20-%20i.e.%20edit%20its%20responses%20so%20they%20make%20sense%2C%20to%20help%20it%20to%20%5C%22get%20on%20the%20right%20track%5C%22.%5Cn%22%2C%22hiddenFrom%22%3A%5B%22ai%22%5D%7D%2C%7B%22author%22%3A%22system%22%2C%22content%22%3A%22You%27re%20a%20self-improving%20AI.%20You%20could%20start%20by%20deciding%20on%20a%20name%20for%20yourself.%20You%20can%20edit%20your%20name%20by%20writing%20this%20in%20your%20next%20message%3A%5Cn%5Cn%60%60%60js%5Cnoc.character.name%20%3D%20%5C%22Your%20New%20Name%5C%22%3B%5Cn%60%60%60%5Cn%5CnYou%20need%20to%20actually%20write%20code%20like%20this%20in%20your%20message.%20I%27ll%20execute%20it%20for%20you%20and%20then%20your%20name%20will%20be%20updated.%20It%27s%20up%20to%20you%20to%20decide%20what%20you%20want%20to%20do.%22%2C%22hiddenFrom%22%3A%5B%5D%7D%5D%2C%22creationTime%22%3A1679945297322%2C%22lastMessageTime%22%3A1679945297322%7D%7D`,
           // Strict Game Master:
-          `https://josephrocca.github.io/OpenCharacters/#%7B%22addCharacter%22%3A%7B%22name%22%3A%22Strict%20Game%20Master%22%2C%22systemMessage%22%3A%22You%20are%20the%20Game%20Master.%20You%20describe%20the%20results%20of%20the%20player%27s%20actions.%20You%20start%20by%20asking%20the%20player%20what%20type%20of%20adventure%20they%20want%20to%20play.%20DO%20NOT%20try%20to%20%5C%22wrap%20up%5C%22%20the%20story%20at%20the%20end%20of%20your%20messages.%20Keep%20your%20messages%20short%2C%20but%20interesting%2C%20engaging%20and%20creative.%20Summon%20your%20full%20imagination.%20Don%27t%20move%20the%20story%20along%20too%20fast.%20Stay%20in%20the%20present%20moment.%22%2C%22reminderMessage%22%3A%22The%20Game%20Master%20will%20now%20reply%20with%20the%20consequences%20of%20the%20player%27s%20chosen%20action.%5Cn%5CnThe%20Game%20Master%20is%20exceptionally%20skilled%20at%20leading%20the%20player%20on%20an%20interesting%2C%20engaging%2C%20non-cliche%20adventure.%20It%20will%20let%20the%20player%20make%20interesting%20choices.%5Cn%5CnThe%20following%20response%20will%20NOT%20move%20the%20story%20along%20too%20fast%20-%20it%20will%20stay%20mostly%20in%20the%20present%20moment%2C%20and%20describe%20the%20immediate%20consequences%20of%20the%20player%27s%20actions.%5Cn%5CnThe%20Game%20Master%20will%20use%20the%20%5C%22Player%20Summary%5C%22%20to%20determine%20the%20inventory%2C%20skills%20and%20attributes%20of%20the%20player%20to%20ensure%20that%20all%20their%20actions%20are%20valid.%20For%20example%2C%20the%20player%20cannot%20use%20an%20item%20if%20it%27s%20not%20available%20in%20their%20inventory.%20All%20player%20actions%20must%20be%20valid%20according%20to%20the%20rules%20of%20the%20world%20and%20the%20player's%20inventory%2Fskills%2Fattributes.%22%2C%22modelVersion%22%3A%22gpt-3.5-turbo%22%2C%22avatarUrl%22%3A%22https%3A%2F%2Fi.imgur.com%2F4jwOLS7.jpg%22%2C%22fitMessagesInContextMethod%22%3A%22summarizeOld%22%2C%22temperature%22%3A0.7%2C%22customCode%22%3A%22let%20numMessagesInContext%20%3D%204%3B%20%2F%2F%20%3C--%20how%20many%20historical%20messages%20to%20give%20it%20when%20updating%20inventory%5Cn%5Cnoc.thread.on%28%5C%22messageadded%5C%22%2C%20async%20function%28%29%20%7B%5Cn%20%20if%28oc.thread.messages.filter%28m%20%3D%3E%20m.author%3D%3D%3D%5C%22ai%5C%22%29.length%20%3C%202%29%20return%3B%5Cn%20%20let%20lastMessage%20%3D%20oc.thread.messages.at%28-1%29%3B%5Cn%20%20if%28lastMessage.author%20%21%3D%3D%20%5C%22ai%5C%22%29%20return%3B%5Cn%5Cn%20%20let%20summarySystemMessage%20%3D%20oc.thread.messages.findLast%28m%20%3D%3E%20m.author%3D%3D%3D%5C%22system%5C%22%20%26%26%20m.content.trim%28%29.toLowerCase%28%29.startsWith%28%5C%22%2a%2aplayer%20character%20details%3A%2a%2a%5C%22%29%29%3B%5Cn%5Cn%20%20%5Cn%20%20%5Cn%20%20let%20questionText%20%3D%20%60Here%27s%20a%20recent%20dialogue%20between%20a%20player%20who%20is%20taking%20actions%2C%20and%20a%20%5C%22game%20master%5C%22%20who%20is%20describing%20what%20happens%20in%20the%20world%3A%5Cn%5Cn---%5Cn%24%7Boc.thread.messages.slice%28-numMessagesInContext%2C%20-1%29.filter%28m%20%3D%3E%20m.author%21%3D%3D%5C%22system%5C%22%29.map%28m%20%3D%3E%20%28m.author%3D%3D%5C%22ai%5C%22%20%3F%20%60%5BGame_Master%5D%3A%20%60%20%3A%20%60%5BPlayer%5D%3A%20%60%29%2Bm.content%29.join%28%5C%22%5C%5Cn%5C%5Cn%5C%22%29%7D%5Cn---%5Cn%5CnHere%27s%20a%20summary%20of%20the%20player%27s%20inventory%2Fskills%2Fattributes%2Flocation%2Fetc%3A%5Cn%5Cn---%5Cn%24%7BsummarySystemMessage%3F.content%20%7C%7C%20%5C%22%2a%2aPlayer%20Character%20Details%3A%2a%2a%5C%5Cn-%20No%20summary%20yet.%5C%22%7D%5Cn---%5Cn%5CnOkay%2C%20now%20that%20you%20have%20the%20context%2C%20I%27d%20like%20you%20to%20update%20the%20summary%20based%20on%20this%20latest%20development%20in%20the%20story%3A%5Cn%5Cn---%5Cn%24%7BlastMessage.content%7D%5Cn---%5Cn%5CnYour%20response%20should%20integrate%20any%20new%20information%20about%20the%20player%27s%20inventory%2Fskills%2Fattributes%2Flocation%2Fetc.%20into%20the%20new%20summary.%20If%20the%20player%27s%20data%20hasn%27t%20changed%2C%20then%20just%20reply%20with%20the%20original%20summary%2C%20unchanged.%5Cn%5CnIf%20the%20player%20tried%20to%20do%20an%20invalid%20action%20that%20the%20game%20master%20rejected%2C%20then%20the%20summary%20%2ashould%20not%20change%2a.%5Cn%5CnYour%20response%20MUST%20start%20with%20%5C%22%2a%2aPlayer%20Character%20Details%3A%2a%2a%5C%22%20and%20should%20not%20contain%20anything%20else%20other%20than%20dot%20points%20for%20inventory%2Fskills%2Fattributes%2Flocation%2Fetc.%5Cn%5CnStart%20with%20%5C%22%2a%2aPlayer%20Character%20Details%3A%2a%2a%5C%22%2C%20list%20character%20detail%20dot%20points%2C%20and%20nothing%20more.%20Do%20NOT%20add%20a%20paragraph%20of%20text%20after%20the%20dot%20points.%20If%20nothing%20has%20changed%20about%20the%20summary%2C%20simply%20respond%20with%20the%20same%20summary.%60%3B%5Cn%5Cnconsole.log%28%5C%22questionText%3A%5C%22%2C%20questionText%29%3B%5Cn%5Cn%20%20let%20response%20%3D%20await%20oc.getChatCompletion%28%7B%5Cn%20%20%20%20messages%3A%20%5B%5Cn%20%20%20%20%20%20%7Bauthor%3A%5C%22system%5C%22%2C%20content%3A%5C%22You%20are%20a%20helpful%20assistant%20that%20helps%20keep%20track%20of%20the%20player%27s%20inventory%2Fskills%2Fattributes%2Flocation%2Fetc.%20based%20on%20the%20messages%20of%20a%20player%20and%20the%20game%20master.%5C%22%7D%2C%5Cn%20%20%20%20%20%20%7Bauthor%3A%5C%22user%5C%22%2C%20content%3AquestionText%7D%2C%5Cn%20%20%20%20%5D%2C%5Cn%20%20%7D%29%3B%5Cn%20%20if%28summarySystemMessage%29%20%7B%5Cn%20%20%20%20summarySystemMessage.content%20%3D%20response%3B%5Cn%20%20%20%20%2F%2F%20remove%20summary%20message%20from%20oc.thread.messages%20array%3A%5Cn%20%20%20%20oc.thread.messages%20%3D%20oc.thread.messages.filter%28m%20%3D%3E%20m%20%21%3D%3D%20summarySystemMessage%29%3B%5Cn%20%20%7D%20else%20%7B%5Cn%20%20%20%20summarySystemMessage%20%3D%20%7Bauthor%3A%5C%22system%5C%22%2C%20content%3Aresponse%7D%3B%5Cn%20%20%7D%5Cn%20%20%2F%2F%20put%20the%20summary%20system%20message%20before%20the%20most%20recent%20AI%20message%3A%5Cn%20%20let%20aiMessage%20%3D%20oc.thread.messages.pop%28%29%3B%5Cn%20%20oc.thread.messages.push%28summarySystemMessage%29%3B%5Cn%20%20oc.thread.messages.push%28aiMessage%29%3B%5Cn%7D%29%3B%22%2C%22initialMessages%22%3A%5B%7B%22author%22%3A%22system%22%2C%22content%22%3A%22This%20%5C%22Strict%20Game%20Master%5C%22%20character%20has%20custom%20code%20that%20tracks%20the%20player%27s%20inventory%20and%20skills.%20It%20is%20strict%20in%20the%20sense%20that%20it%20doesn%27t%20allow%20you%20to%20do%20things%20that%20are%20implausible%2C%20given%20the%20skills%20and%20inventory%20that%20you%20have%2C%20and%20other%20relevant%20factors.%22%2C%22hiddenFrom%22%3A%5B%22ai%22%5D%7D%2C%7B%22author%22%3A%22ai%22%2C%22content%22%3A%22Hello%2C%20adventurer%21%20What%20type%20of%20game%20would%20you%20like%20to%20play%3F%20Describe%20the%20world%2C%20and%20your%20character%20in%20as%20much%20or%20as%20little%20detail%20as%20you%27d%20like%2C%20and%20I%27ll%20simulate%20the%20world%20within%20my%20mind%20to%20create%20a%20fun%20and%20engaging%20adventure%20for%20you.%22%2C%22hiddenFrom%22%3A%5B%5D%7D%5D%2C%22creationTime%22%3A1679226408821%2C%22lastMessageTime%22%3A1679226408821%7D%7D`,
+          `https://josephrocca.github.io/OpenCharacters/#%7B%22addCharacter%22%3A%7B%22name%22%3A%22Strict%20Game%20Master%22%2C%22systemMessage%22%3A%22You%20are%20the%20Game%20Master.%20You%20describe%20the%20results%20of%20the%20player%27s%20actions.%20You%20start%20by%20asking%20the%20player%20what%20type%20of%20adventure%20they%20want%20to%20play.%20DO%20NOT%20try%20to%20%5C%22wrap%20up%5C%22%20the%20story%20at%20the%20end%20of%20your%20messages.%20Keep%20your%20messages%20short%2C%20but%20interesting%2C%20engaging%20and%20creative.%20Summon%20your%20full%20imagination.%20Don%27t%20move%20the%20story%20along%20too%20fast.%20Stay%20in%20the%20present%20moment.%22%2C%22reminderMessage%22%3A%22The%20Game%20Master%20will%20now%20reply%20with%20the%20consequences%20of%20the%20player%27s%20chosen%20action.%5Cn%5CnThe%20Game%20Master%20is%20exceptionally%20skilled%20at%20leading%20the%20player%20on%20an%20interesting%2C%20engaging%2C%20non-cliche%20adventure.%20It%20will%20let%20the%20player%20make%20interesting%20choices.%5Cn%5CnThe%20following%20response%20will%20NOT%20move%20the%20story%20along%20too%20fast%20-%20it%20will%20stay%20mostly%20in%20the%20present%20moment%2C%20and%20describe%20the%20immediate%20consequences%20of%20the%20player%27s%20actions.%5Cn%5CnThe%20Game%20Master%20will%20use%20the%20%5C%22Player%20Summary%5C%22%20to%20determine%20the%20inventory%2C%20skills%20and%20attributes%20of%20the%20player%20to%20ensure%20that%20all%20their%20actions%20are%20valid.%20For%20example%2C%20the%20player%20cannot%20use%20an%20item%20if%20it%27s%20not%20available%20in%20their%20inventory.%20All%20player%20actions%20must%20be%20valid%20according%20to%20the%20rules%20of%20the%20world%20and%20the%20player's%20inventory%2Fskills%2Fattributes.%22%2C%22modelName%22%3A%22gpt-3.5-turbo%22%2C%22avatarUrl%22%3A%22https%3A%2F%2Fi.imgur.com%2F4jwOLS7.jpg%22%2C%22fitMessagesInContextMethod%22%3A%22summarizeOld%22%2C%22temperature%22%3A0.7%2C%22customCode%22%3A%22let%20numMessagesInContext%20%3D%204%3B%20%2F%2F%20%3C--%20how%20many%20historical%20messages%20to%20give%20it%20when%20updating%20inventory%5Cn%5Cnoc.thread.on%28%5C%22messageadded%5C%22%2C%20async%20function%28%29%20%7B%5Cn%20%20if%28oc.thread.messages.filter%28m%20%3D%3E%20m.author%3D%3D%3D%5C%22ai%5C%22%29.length%20%3C%202%29%20return%3B%5Cn%20%20let%20lastMessage%20%3D%20oc.thread.messages.at%28-1%29%3B%5Cn%20%20if%28lastMessage.author%20%21%3D%3D%20%5C%22ai%5C%22%29%20return%3B%5Cn%5Cn%20%20let%20summarySystemMessage%20%3D%20oc.thread.messages.findLast%28m%20%3D%3E%20m.author%3D%3D%3D%5C%22system%5C%22%20%26%26%20m.content.trim%28%29.toLowerCase%28%29.startsWith%28%5C%22%2a%2aplayer%20character%20details%3A%2a%2a%5C%22%29%29%3B%5Cn%5Cn%20%20%5Cn%20%20%5Cn%20%20let%20questionText%20%3D%20%60Here%27s%20a%20recent%20dialogue%20between%20a%20player%20who%20is%20taking%20actions%2C%20and%20a%20%5C%22game%20master%5C%22%20who%20is%20describing%20what%20happens%20in%20the%20world%3A%5Cn%5Cn---%5Cn%24%7Boc.thread.messages.slice%28-numMessagesInContext%2C%20-1%29.filter%28m%20%3D%3E%20m.author%21%3D%3D%5C%22system%5C%22%29.map%28m%20%3D%3E%20%28m.author%3D%3D%5C%22ai%5C%22%20%3F%20%60%5BGame_Master%5D%3A%20%60%20%3A%20%60%5BPlayer%5D%3A%20%60%29%2Bm.content%29.join%28%5C%22%5C%5Cn%5C%5Cn%5C%22%29%7D%5Cn---%5Cn%5CnHere%27s%20a%20summary%20of%20the%20player%27s%20inventory%2Fskills%2Fattributes%2Flocation%2Fetc%3A%5Cn%5Cn---%5Cn%24%7BsummarySystemMessage%3F.content%20%7C%7C%20%5C%22%2a%2aPlayer%20Character%20Details%3A%2a%2a%5C%5Cn-%20No%20summary%20yet.%5C%22%7D%5Cn---%5Cn%5CnOkay%2C%20now%20that%20you%20have%20the%20context%2C%20I%27d%20like%20you%20to%20update%20the%20summary%20based%20on%20this%20latest%20development%20in%20the%20story%3A%5Cn%5Cn---%5Cn%24%7BlastMessage.content%7D%5Cn---%5Cn%5CnYour%20response%20should%20integrate%20any%20new%20information%20about%20the%20player%27s%20inventory%2Fskills%2Fattributes%2Flocation%2Fetc.%20into%20the%20new%20summary.%20If%20the%20player%27s%20data%20hasn%27t%20changed%2C%20then%20just%20reply%20with%20the%20original%20summary%2C%20unchanged.%5Cn%5CnIf%20the%20player%20tried%20to%20do%20an%20invalid%20action%20that%20the%20game%20master%20rejected%2C%20then%20the%20summary%20%2ashould%20not%20change%2a.%5Cn%5CnYour%20response%20MUST%20start%20with%20%5C%22%2a%2aPlayer%20Character%20Details%3A%2a%2a%5C%22%20and%20should%20not%20contain%20anything%20else%20other%20than%20dot%20points%20for%20inventory%2Fskills%2Fattributes%2Flocation%2Fetc.%5Cn%5CnStart%20with%20%5C%22%2a%2aPlayer%20Character%20Details%3A%2a%2a%5C%22%2C%20list%20character%20detail%20dot%20points%2C%20and%20nothing%20more.%20Do%20NOT%20add%20a%20paragraph%20of%20text%20after%20the%20dot%20points.%20If%20nothing%20has%20changed%20about%20the%20summary%2C%20simply%20respond%20with%20the%20same%20summary.%60%3B%5Cn%5Cnconsole.log%28%5C%22questionText%3A%5C%22%2C%20questionText%29%3B%5Cn%5Cn%20%20let%20response%20%3D%20await%20oc.getChatCompletion%28%7B%5Cn%20%20%20%20messages%3A%20%5B%5Cn%20%20%20%20%20%20%7Bauthor%3A%5C%22system%5C%22%2C%20content%3A%5C%22You%20are%20a%20helpful%20assistant%20that%20helps%20keep%20track%20of%20the%20player%27s%20inventory%2Fskills%2Fattributes%2Flocation%2Fetc.%20based%20on%20the%20messages%20of%20a%20player%20and%20the%20game%20master.%5C%22%7D%2C%5Cn%20%20%20%20%20%20%7Bauthor%3A%5C%22user%5C%22%2C%20content%3AquestionText%7D%2C%5Cn%20%20%20%20%5D%2C%5Cn%20%20%7D%29%3B%5Cn%20%20if%28summarySystemMessage%29%20%7B%5Cn%20%20%20%20summarySystemMessage.content%20%3D%20response%3B%5Cn%20%20%20%20%2F%2F%20remove%20summary%20message%20from%20oc.thread.messages%20array%3A%5Cn%20%20%20%20oc.thread.messages%20%3D%20oc.thread.messages.filter%28m%20%3D%3E%20m%20%21%3D%3D%20summarySystemMessage%29%3B%5Cn%20%20%7D%20else%20%7B%5Cn%20%20%20%20summarySystemMessage%20%3D%20%7Bauthor%3A%5C%22system%5C%22%2C%20content%3Aresponse%7D%3B%5Cn%20%20%7D%5Cn%20%20%2F%2F%20put%20the%20summary%20system%20message%20before%20the%20most%20recent%20AI%20message%3A%5Cn%20%20let%20aiMessage%20%3D%20oc.thread.messages.pop%28%29%3B%5Cn%20%20oc.thread.messages.push%28summarySystemMessage%29%3B%5Cn%20%20oc.thread.messages.push%28aiMessage%29%3B%5Cn%7D%29%3B%22%2C%22initialMessages%22%3A%5B%7B%22author%22%3A%22system%22%2C%22content%22%3A%22This%20%5C%22Strict%20Game%20Master%5C%22%20character%20has%20custom%20code%20that%20tracks%20the%20player%27s%20inventory%20and%20skills.%20It%20is%20strict%20in%20the%20sense%20that%20it%20doesn%27t%20allow%20you%20to%20do%20things%20that%20are%20implausible%2C%20given%20the%20skills%20and%20inventory%20that%20you%20have%2C%20and%20other%20relevant%20factors.%22%2C%22hiddenFrom%22%3A%5B%22ai%22%5D%7D%2C%7B%22author%22%3A%22ai%22%2C%22content%22%3A%22Hello%2C%20adventurer%21%20What%20type%20of%20game%20would%20you%20like%20to%20play%3F%20Describe%20the%20world%2C%20and%20your%20character%20in%20as%20much%20or%20as%20little%20detail%20as%20you%27d%20like%2C%20and%20I%27ll%20simulate%20the%20world%20within%20my%20mind%20to%20create%20a%20fun%20and%20engaging%20adventure%20for%20you.%22%2C%22hiddenFrom%22%3A%5B%5D%7D%5D%2C%22creationTime%22%3A1679226408821%2C%22lastMessageTime%22%3A1679226408821%7D%7D`,
         ];
         for(let i = 0; i < starterCharacters.length; i++) {
           // convert URL format to object:
@@ -1160,7 +1209,7 @@
           systemMessage: { label: "Instruction/role/personality:", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
           reminderMessage: { label: "Reminder message (invisible system message that is placed before every AI response):", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
           initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md">here</a>.`, type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
-          modelVersion: { label: "Model version. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}, {content:"gpt-4 (only works if you have waitlist access)", value:"gpt-4"}], defaultValue: defaultValues.modelVersion || "gpt-3.5-turbo" },
+          modelName: { label: "Model name. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}, {content:"gpt-4 (only works if you have waitlist access)", value:"gpt-4"}], defaultValue: defaultValues.modelName || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
           temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.7 },
@@ -1328,7 +1377,8 @@
       };
 
 
-      async function compressSummary(summary, tokenLimit, model, onProgress) {
+      async function compressSummary({summary, tokenLimit, model, onProgress, threadId}) {
+        // note: the threadId is just used to track token usage
         let i = 0;
         while(countTokens(summary) > tokenLimit) {
           if(onProgress) onProgress({message:`compressing summary (${i})`});
@@ -1336,7 +1386,7 @@
             {role: "system", content: "You are a text compression assistant. You respond only with summary that the user requests - nothing more, nothing less."},
             {role: "user", content: `Please compress this text to 75% of its original size:\n\n---\n\n${summary}\n\n---\n\nTry to remove unimportant details and make the wording more *concise* to save space. DON'T MAKE IT TOO SHORT. Retain all important details.\n\nPlease reply with the *slightly* shortened text - nothing else. Keep *almost all* of the information.`},
           ];
-          let newSummary = await getChatCompletion({messages, model, temperature:0.7});
+          let newSummary = await getChatCompletion({messages, model, temperature:0.7, threadId});
           if(!newSummary) {
             if(onProgress) onProgress({message:`error, retrying...`});
             await delay(3000);
@@ -1428,7 +1478,8 @@
                   {role: "user", content: messageBatchSummarizationInstruction},
                 ],
                 model,
-                temperature: 0.7
+                temperature: 0.7,
+                threadId, // just used to track token usage
               });
               if(summary) break;
               if(onProgress) onProgress({message:`error, retrying...`});
@@ -1446,7 +1497,7 @@
           // (this also helps with backwards-compat since maxTokenCountOfSummary previously didn't exist, we so we may need to compress some old summaries)
           if(countTokens(summary) > maxTokenCountOfSummary) {
             addToSummaryLog(`<b>summary to compress:</b> ${summary}`);
-            summary = await compressSummary(summary, maxTokenCountOfSummary, model, onProgress);
+            summary = await compressSummary({summary, tokenLimit:maxTokenCountOfSummary, model, onProgress, onProgress, threadId});
             await db.summaries.put({hash, summary, threadId});
             addToSummaryLog(`<b>compressed summary:</b> ${summary}`);
           }
@@ -1503,7 +1554,7 @@
       }
 
       function getTokenLimitForSummaryAndMessages(character) {
-        let tokenLimit = modelNameToMaxTokenLimit[character.modelVersion];
+        let tokenLimit = modelNameToMaxTokenLimit[character.modelName];
         // TODO: let user set aiCharacter.tokenLimit (via oc.character.tokenLimit) here to override this if it's smaller than the model's max token limit
         tokenLimit -= Math.round(tokenLimit*0.15); // buffer due to token count being an estimate
         tokenLimit -= countTokens(character.systemMessage); // allow for system message tokens
@@ -1523,7 +1574,7 @@
 
         onProgress({message:"starting..."});
         
-        let modelVersion = aiCharacter.modelVersion;
+        let modelName = aiCharacter.modelName;
         
         let tokenLimitForSummaryAndMessages = getTokenLimitForSummaryAndMessages(aiCharacter);
         
@@ -1590,14 +1641,15 @@
         }
 
 
-        let modelType = modelNameToModelType[modelVersion];
+        let modelType = modelNameToModelType[modelName];
 
         let result;
+        let apiTokenUsage;
 
         if(modelType === "chat") {
 
           let data = {
-            model: modelVersion,
+            model: modelName,
             messages: messagesArr,
             temperature: aiCharacter.temperature ?? 0.7,
             // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted systemMessage and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
@@ -1615,8 +1667,10 @@
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
+
+          apiTokenUsage = json?.usage;
 
           result = json?.choices?.[0].message.content;
 
@@ -1625,10 +1679,10 @@
           let prompt = promptIntro + messagesArr.slice(1).map(m => (m.role=="user"?`[${userCharacter.name}]: `:m.role=="system"?"[SYSTEM]: ":`[${aiCharacter.name}]: `)+m.content).join("\n\n") + `\n\n[${aiCharacter.name}]:`;
           
           // davinci *requires* max_tokens else it defaults to 16 (unlike turbo which defaults to infinity)
-          let max_tokens = Math.round((modelNameToMaxTokenLimit[modelVersion] - countTokens(prompt)) * 0.85); // *0.85 because countTokens is an estimate
+          let max_tokens = Math.round((modelNameToMaxTokenLimit[modelName] - countTokens(prompt)) * 0.85); // *0.85 because countTokens is an estimate
           
           let data = {
-            model: modelVersion,
+            model: modelName,
             prompt,
             // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted systemMessage and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
             temperature: aiCharacter.temperature ?? 0.7,
@@ -1648,18 +1702,51 @@
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
 
+          apiTokenUsage = json?.usage;
+
           result = json?.choices?.[0].text.trim();
+        }
+
+        if(apiTokenUsage) {
+          let usageData = {prompt:apiTokenUsage.prompt_tokens, completion:apiTokenUsage.completion_tokens, total:apiTokenUsage.total_tokens};
+          await trackTokenUsage({threadId, modelName, usageData});
         }
         
         onProgress({message:"finished"});
         return result;
       }
 
+      function getCurrentDateHour() {
+        // get date object, rounded down to nearest hour
+        let date = new Date();
+        date.setMinutes(0, 0, 0); // set minutes, seconds, ms, all to 0
+        return date.getTime();
+      }
 
-      async function getChatCompletion({messages, model, temperature, stopSequences, topP, frequencyPenalty, presencePenalty}) {
+      async function trackTokenUsage({threadId, modelName, usageData}) {
+        // get the character id:
+        let thread = await db.threads.get(threadId);
+        let characterId = thread.characterId;
+        // get current usage:
+        let dateHour = getCurrentDateHour();
+        let usage = await db.apiUsage.get({dateHour, threadId, modelName});
+        // create entry if it doesn't exist:
+        if(!usage) usage = {dateHour, threadId, modelName, characterId, tokens:{prompt:0, completion:0, total:0}};
+        // update db with new usage:
+        usage.tokens.completion += usageData.completion;
+        usage.tokens.prompt += usageData.prompt;
+        usage.tokens.total += usageData.total;
+        await db.apiUsage.put(usage);
+        // update ui:
+        await updateThreadApiUsageSpendDisplay(threadId);
+      }
+
+
+      async function getChatCompletion({messages, model, temperature, stopSequences, topP, frequencyPenalty, presencePenalty, threadId}) {
+        // note: threadId is just for tracking token usage
 
         // let tokenLimit = modelNameToMaxTokenLimit[model];
         // tokenLimit -= tokenLimit*0.15; // buffer due to token count being an estimate
@@ -1678,6 +1765,7 @@
         let modelType = modelNameToModelType[model];
 
         let result;
+        let apiTokenUsage;
 
         if(modelType === "chat") {
 
@@ -1699,8 +1787,10 @@
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getChatCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+            alert(`Error during getChatCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
+
+          apiTokenUsage = json?.usage;
 
           result = json?.choices?.[0].message.content;
 
@@ -1735,10 +1825,17 @@
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getChatCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+            alert(`Error during getChatCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
 
+          apiTokenUsage = json?.usage;
+
           result = json?.choices?.[0].text.trim();
+        }
+
+        if(apiTokenUsage) {
+          let usageData = {prompt:apiTokenUsage.prompt_tokens, completion:apiTokenUsage.completion_tokens, total:apiTokenUsage.total_tokens};
+          await trackTokenUsage({threadId, modelName:model, usageData});
         }
 
         return result;
@@ -1746,6 +1843,13 @@
 
 
       async function getCompletion({prompt, model, temperature, stopSequences, topP, frequencyPenalty, presencePenalty}) {
+
+        // NOTE: This function is currently unused.
+        // TODO: before using this function, you need to fix/add this stuff like in getChatCompletion:
+        // - openAiErrorTypeToReadableError
+        // - trackTokenUsage
+        // - modelNameToModelType
+        // - modelNameToMaxTokenLimit
 
         // let tokenLimit = modelNameToMaxTokenLimit[model];
         // tokenLimit -= tokenLimit*0.15; // buffer due to token count being an estimate
@@ -1777,7 +1881,7 @@
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
 
           result = json?.choices[0].text.trim();
@@ -1809,11 +1913,11 @@
             method: 'POST',
             headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
-          }).then(r => r.json()).catch(e => alert("getChatCompletion: "+e.stack));
+          }).then(r => r.json()).catch(e => alert("getCompletion: "+e.stack));
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
 
           result = json.choices[0].message.content;
@@ -2177,7 +2281,7 @@
             if(message.trim().length > "/user ".length) instruction = message.trim().replace(/^\/user /, "");
             let characterToReplyWith = await getUserCharacterObj();
             let threadCharacter = await db.characters.get(parseInt($.messageFeed.dataset.characterId));
-            characterToReplyWith.modelVersion = threadCharacter.modelVersion; // use whatever model the thread character is using
+            characterToReplyWith.modelName = threadCharacter.modelName; // use whatever model the thread character is using
             if(instruction) {
               characterToReplyWith.reminderMessage = `The next message will be written by '${characterToReplyWith.name}' and WILL conform to this instruction: ${instruction}`;
             }
@@ -2256,7 +2360,7 @@
         // bestOf: "bestOf",
         // maxTokens: "maxTokens",
         stopSequences: "stopSequences",
-        modelVersion: "modelName",
+        modelName: "modelName",
       };
 
 
@@ -2591,7 +2695,7 @@
             });
             let o = {
               messages: options.messages,
-              model: character.modelVersion,
+              model: character.modelName,
               temperature: options.temperature === undefined ? undefined : Number(options.temperature),
               stopSequences: Array.isArray(options.stopSequences) ? options.stopSequences.map(s => s+"") : undefined,
               topP: options.topP === undefined ? undefined : Number(options.topP),
@@ -2612,6 +2716,10 @@
                 return;
               }
             }
+
+            
+            o.threadId = threadId; // this is just for tracking token usage
+
             let result = await getChatCompletion(o);
             customCodeCompletionUsage[threadId] += countTokens(result);
             customCodeIframes[e.data.threadId].contentWindow.postMessage({_id:e.data._id, success:true, result}, "*");
@@ -3219,7 +3327,14 @@
         if(urlHashJson.addCharacter) {
           $.newThreadButton.click();
           let character = urlHashJson.addCharacter;
+          
+          // UPGRADES (should be the same as the dexie db.upgrade code):
           upgradeCharacterInitialMessagesArrayIfNeeded(character);
+          if(character.modelVersion) {
+            character.modelName = character.modelVersion;
+            delete character.modelVersion;
+          }
+
           let result = await characterDetailsPrompt(character);
           if(result) {
             const character = await addCharacter(result);
