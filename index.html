@@ -1390,11 +1390,14 @@
           let messageBatchTokenCount = 0;
           let messageBatchArr = [];
           while(messageBatchTokenCount < messageTokensToConsumePerSummary) {
+            if(remainingMessages.length === 0) break; // no more messages
+            
             let m = remainingMessages[0];
             let tokens = countTokensInMessages([m]);
             if(messageBatchTokenCount > 0 && messageBatchTokenCount+tokens >= messageTokensToConsumePerSummary) {
               break; // don't add this message to the batch, because it would put us over the limit
             }
+            
             messageBatchArr.push(m);
             messageBatchTokenCount += tokens;
             remainingMessages.shift();
