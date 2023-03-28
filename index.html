@@ -1493,7 +1493,7 @@
       function getTokenLimitForSummaryAndMessages(character) {
         let tokenLimit = modelNameToMaxTokenLimit[character.modelVersion];
         // TODO: let user set aiCharacter.tokenLimit (via oc.character.tokenLimit) here to override this if it's smaller than the model's max token limit
-        tokenLimit -= Math.round(tokenLimit*0.1); // buffer due to token count being an estimate
+        tokenLimit -= Math.round(tokenLimit*0.15); // buffer due to token count being an estimate
         tokenLimit -= countTokens(character.systemMessage); // allow for system message tokens
         tokenLimit -= countTokens( "("+(character.reminderMessage||"")+")" ); // allow for reminder message tokens
         tokenLimit -= Math.round(tokenLimit*0.2); // allow for bot response
