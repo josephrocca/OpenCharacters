@@ -219,6 +219,7 @@
       }
       #characterSelection .character .info .buttons button {
         font-size: 0.7rem;
+        margin-left: 0.25rem;
       }
       #characterList, #starterCharacterList {
         display: grid;
@@ -543,7 +544,7 @@
             <div class="avatar" style="${thread.character.avatarUrl ? `background-image:url(${sanitizeHtml(thread.character.avatarUrl)})` : ""}; border:1px solid var(--border-color);"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem;">
               <div class="nameWrapper" style="font-weight:bold; font-size:0.9rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
-              <div class="characterName" style="font-size:0.8rem;">${sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span> <span class="characterEditButton">✏️</span></div>
+              <div class="characterName" style="font-size:0.8rem;">${thread.character.name.length > 21 ? sanitizeHtml(thread.character.name.slice(0, 21)+"…") : sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span> <span class="characterEditButton">✏️</span></div>
               <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span>${sanitizeHtml(thread.character.modelName)}</span><span class="apiUsageSpend" title="API usage/spend" style="font-size:0.7rem;display:flex;align-items:center;">$${threadIdToMoneySpent[thread.id].toFixed(2)}</span><span style="font-size:0.7rem; display:flex; align-items:center;" title="Thread ID">#${sanitizeHtml(thread.id)}</span></div>
             </div>
             <div style="display:flex; flex-direction:column; justify-content:space-between; font-size:0.65rem;">
@@ -813,13 +814,14 @@
           <div class="character" data-character-id="${sanitizeHtml(character.id)}" style="display:flex; padding:0.5rem; cursor:pointer;">
             <div class="avatar" style="${character.avatarUrl ? `background-image:url(${sanitizeHtml(character.avatarUrl)})` : ""};"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem;">
-              <div class="name" style="font-weight:bold;">${sanitizeHtml(character.name)} <span style="opacity:0.5; font-weight:normal;">${character.id ? "#"+sanitizeHtml(character.id) : ""}</span></div>
+              <div class="name" style="font-weight:bold;">${character.name.length > 21 ? sanitizeHtml(character.name.slice(0, 21)+"…") : sanitizeHtml(character.name)} <span style="opacity:0.5; font-weight:normal;">${character.id ? "#"+sanitizeHtml(character.id) : ""}</span></div>
               <div class="systemMessage" style="font-size: 0.8rem; text-overflow: ellipsis; word-wrap: break-word; overflow: hidden; height: 2em; line-height: 1em;">${character.systemMessage.length > 85 ? sanitizeHtml(character.systemMessage.slice(0, 85)+"...") : sanitizeHtml(character.systemMessage)}</div>
               <div class="buttons">
                 ${character.id === null ? "" :
-                `<button class="share">🔗 share</button>
-                <button class="edit">✏️ edit</button>
-                <button class="delete">🗑️ delete</button>`
+                `<button class="edit" title="Edit this character">✏️ edit</button>
+                <button class="duplicate" title="Duplicate this character">➕</button>
+                <button class="share" title="Share this character with a link">🔗</button>
+                <button class="delete" title="Delete this character">🗑️</button>`
                 }
               </div>
             </div>
@@ -1096,6 +1098,17 @@
               e.stopPropagation();
               const characterId = parseInt(characterEl.dataset.characterId);
               await editCharacterById(characterId);
+            });
+
+            // duplicate
+            characterEl.querySelector(".duplicate").addEventListener("click", async function(e) {
+              e.stopPropagation();
+              const originalCharacterId = parseInt(characterEl.dataset.characterId);
+              let originalCharacter = await db.characters.get(originalCharacterId);
+              const result = await characterDetailsPrompt(originalCharacter);
+              if(!result) return;
+              const character = await addCharacter(result);
+              await createNewThreadWithCharacterId(character.id);
             });
 
             // delete character if they click the delete button
@@ -1419,7 +1432,7 @@
         const tokenLimitForSummaryAndMessages = getTokenLimitForSummaryAndMessages(aiCharacter);
         const maxTokenCountOfSummary = Math.round(tokenLimitForSummaryAndMessages/3); // <-- probably don't want summary to be any longer than the first third of our token budget
 
-        const messageTokensToConsumePerSummary = Math.round(modelNameToMaxTokenLimit[model]*0.3); // don't make this too much bigger - if messageTokensToConsumePerSummary is 1000, and we're adding messages to batch and are currently at 900, and the next message happens to be 1000 tokens, then we'll end up 900 over. So we set it low-ish to account for that (this is fine, it just means more "incremental" summarization steps - but could fix by breaking up large messages - TODO?)
+        const messageTokensToConsumePerSummary = Math.round(modelNameToMaxTokenLimit[model]*0.3);
 
         if(maxTokenCountOfSummary + messageTokensToConsumePerSummary > modelNameToMaxTokenLimit[model]-500) { // -500 due to token estimation and to make room for summarization prompt
           throw new Error("The specified values of `maxTokenCountOfSummary` and `messageTokensToConsumePerSummary` are such that the summarization process could go over this model's token limit.");
@@ -1451,6 +1464,12 @@
             messageBatchArr.push(m);
             messageBatchTokenCount += tokens;
             remainingMessages.shift();
+          }
+
+          if(messageBatchTokenCount > modelNameToMaxTokenLimit[model]*0.8) {
+            console.warn("The messageBatchTokenCount is nearly the full size of the model's token limit. This could be caused by a *massive* message (i.e. before consuming it we were under messageTokensToConsumePerSummary, but afterwards we were way over).");
+            console.warn("messageBatchTokenCount:", messageBatchTokenCount);  
+            console.warn("TODO: break up large messages during summarization");
           }
 
           let messageBatchSummarizationInstruction;
@@ -1506,10 +1525,12 @@
           summaryObj = await db.summaries.get(hash);
 
           // get size difference between summary and original messages
-          let summaryTokenChange = countTokens(prevSummary || "") - countTokens(summary);
-          let messageArrTokenChange = -messageBatchTokenCount; // since all these messages were "removed" (squashed into the summary)
-          let overallTokenChange = summaryTokenChange + messageArrTokenChange;
-          currentTokenCount += overallTokenChange; // hopefully overallTokenChange is negative but we can't assume that for sure, since it's not technically impossible for the LLM to return a summary that's longer than message batch
+          // let summaryTokenChange = countTokens(prevSummary || "") - countTokens(summary);
+          // let messageArrTokenChange = -messageBatchTokenCount; // since all these messages were "removed" (squashed into the summary)
+          // let overallTokenChange = summaryTokenChange + messageArrTokenChange;
+          // currentTokenCount += overallTokenChange; // overallTokenChange is almost certainly negative but we can't assume that for sure, since it's not technically *impossible* for the LLM to return a summary that's longer than message batch
+
+          currentTokenCount = countTokens(summary || "") + countTokensInMessages(remainingMessages);
           prevSummary = summary;
           prevInstructionHash = hash;
           i++;
@@ -1556,7 +1577,7 @@
       function getTokenLimitForSummaryAndMessages(character) {
         let tokenLimit = modelNameToMaxTokenLimit[character.modelName];
         // TODO: let user set aiCharacter.tokenLimit (via oc.character.tokenLimit) here to override this if it's smaller than the model's max token limit
-        tokenLimit -= Math.round(tokenLimit*0.15); // buffer due to token count being an estimate
+        tokenLimit -= Math.round(tokenLimit*0.10); // buffer due to token count being an estimate
         tokenLimit -= countTokens(character.systemMessage); // allow for system message tokens
         tokenLimit -= countTokens( "("+(character.reminderMessage||"")+")" ); // allow for reminder message tokens
         tokenLimit -= Math.round(tokenLimit*0.2); // allow for bot response
@@ -1687,7 +1708,7 @@
             // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted systemMessage and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
             temperature: aiCharacter.temperature ?? 0.7,
             stop: [`\n[${userCharacter.name}]:`, `\n[SYSTEM]:`],
-            max_tokens, 
+            max_tokens,  // see note above
           };
           if(aiCharacter.topP) data.top_p = aiCharacter.topP;
           if(aiCharacter.frequencyPenalty) data.frequency_penalty = aiCharacter.frequencyPenalty;
@@ -3205,6 +3226,7 @@
             let importedThreads = json.data.data.find(d => d.tableName === "threads").rows;
             let importedMessages = json.data.data.find(d => d.tableName === "messages").rows;
             let importedSummaries = json.data.data.find(d => d.tableName === "summaries")?.rows;
+            let importedApiUsage = json.data.data.find(d => d.tableName === "apiUsage")?.rows;
             
             const existingCharacters = await db.characters.toArray();
 
@@ -3278,11 +3300,35 @@
               importedSummaries = importedSummaries.filter(s => !existingSummaryHashes.has(s.hash));
             }
 
+            if(importedApiUsage) {
+              // convert old apiUsage thread and character ids to new ones
+              for(let entry of importedApiUsage) {
+                entry.threadId = threadIdMap[entry.threadId];
+                entry.characterId = characterIdMap[entry.characterId];
+              }
+            }
+
+            // UPGRADES:
+            // TODO: shouldn't dexie's .upgrade function handle this? doesn't seem to be doing it.
+            for(let character of importedCharacters) {
+              upgradeCharacterInitialMessagesArrayIfNeeded(character);
+              if(character.modelVersion) {
+                character.modelName = character.modelVersion;
+                delete character.modelVersion;
+              }
+            }
+            for(let message of importedMessages) {
+              if(!message.variants) message.variants = [null]; // null is the placeholder for the currently-chosen variant (stored in `message.message`)
+            }
+
             json.data.data.find(d => d.tableName === "characters").rows = importedCharacters;
             json.data.data.find(d => d.tableName === "threads").rows = importedThreads;
             json.data.data.find(d => d.tableName === "messages").rows = importedMessages;
             if(importedSummaries) {
               json.data.data.find(d => d.tableName === "summaries").rows = importedSummaries;
+            }
+            if(importedApiUsage) {
+              json.data.data.find(d => d.tableName === "apiUsage").rows = importedApiUsage;
             }
 
             // check which misc keys user already has, and remove them from the misc table that we're importing:
