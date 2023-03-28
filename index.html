@@ -1615,7 +1615,7 @@
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
+            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
 
           result = json?.choices?.[0].message.content;
@@ -1648,9 +1648,9 @@
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
+            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
-          
+
           result = json?.choices?.[0].text.trim();
         }
         
@@ -1699,7 +1699,7 @@
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getChatCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
+            alert(`Error during getChatCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
 
           result = json?.choices?.[0].message.content;
@@ -1735,7 +1735,7 @@
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getChatCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
+            alert(`Error during getChatCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
 
           result = json?.choices?.[0].text.trim();
@@ -1777,7 +1777,7 @@
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
+            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
 
           result = json?.choices[0].text.trim();
@@ -1813,7 +1813,7 @@
           
           if(json?.error) {
             console.error(json.error);
-            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)));
+            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
           }
 
           result = json.choices[0].message.content;
