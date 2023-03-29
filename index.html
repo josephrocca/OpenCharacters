@@ -1674,7 +1674,7 @@
             if(res?.done) break;
             if(res?.value.trim().startsWith("{")) { // errors don't start with 'data'
               let json = JSON.parse(res.value);
-              alert("Error: "+json.error);
+              alert("Error:\n\n"+JSON.stringify(json.error));
               break;
             } else if(res?.value.trim().startsWith("data:")) {
               // can be multiple 'data: {...}' lines in a single response
