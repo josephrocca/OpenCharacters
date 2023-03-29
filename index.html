@@ -681,6 +681,11 @@
           summaries.rows = summaries.rows.filter(s => s.threadId === threadId);
         }
 
+        let apiUsage = json.data.data.find(d => d.tableName === "apiUsage");
+        if(apiUsage) {
+          apiUsage.rows = apiUsage.rows.filter(m => m.threadId === threadId);
+        }
+
         return json;
       }
 
@@ -1390,18 +1395,18 @@
       };
 
 
-      async function compressSummary({summary, tokenLimit, model, onProgress, threadId}) {
+      async function compressSummary({summary, tokenLimit, model, onProgressMessage, threadId}) {
         // note: the threadId is just used to track token usage
         let i = 0;
         while(countTokens(summary) > tokenLimit) {
-          if(onProgress) onProgress({message:`compressing summary (${i})`});
+          if(onProgressMessage) onProgressMessage({message:`compressing summary (${i})`});
           let messages = [
             {role: "system", content: "You are a text compression assistant. You respond only with summary that the user requests - nothing more, nothing less."},
             {role: "user", content: `Please compress this text to 75% of its original size:\n\n---\n\n${summary}\n\n---\n\nTry to remove unimportant details and make the wording more *concise* to save space. DON'T MAKE IT TOO SHORT. Retain all important details.\n\nPlease reply with the *slightly* shortened text - nothing else. Keep *almost all* of the information.`},
           ];
           let newSummary = await getChatCompletion({messages, model, temperature:0.7, threadId});
           if(!newSummary) {
-            if(onProgress) onProgress({message:`error, retrying...`});
+            if(onProgressMessage) onProgressMessage({message:`error, retrying...`});
             await delay(3000);
           } else {
             summary = newSummary;
@@ -1413,7 +1418,7 @@
       }
 
 
-      async function computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId, onProgress}) {
+      async function computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId, onProgressMessage}) {
         // here's the overall idea: "consume" old messages (remove them from the start of the messages array) until you get to `messageTokensToConsumePerSummary` tokens, and then summarize them (use an existing summary if we already have it - it's kinda treated like the first message), and then keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
         // note: upToMessageId is inclusive. it's needed for things like recomputeBotReply, where it may be that not all messages in the thread are visible to the bot.
         
@@ -1447,7 +1452,7 @@
         // while the total token count is too high, grab batches of old messages, and summarize them
         while(currentTokenCount > tokenLimitForSummaryAndMessages) {
           let progess = 1 - ((currentTokenCount-tokenLimitForSummaryAndMessages) / (initialTokenCount-tokenLimitForSummaryAndMessages));
-          if(onProgress) onProgress({message:`summarizing (step ${i}, ${Math.round(progess*100)}% done)`});
+          if(onProgressMessage) onProgressMessage({message:`summarizing (step ${i}, ${Math.round(progess*100)}% done)`});
           
           // grab old messages until we have at least `messageTokensToConsumePerSummary` tokens worth of text
           let messageBatchTokenCount = 0;
@@ -1501,7 +1506,7 @@
                 threadId, // just used to track token usage
               });
               if(summary) break;
-              if(onProgress) onProgress({message:`error, retrying...`});
+              if(onProgressMessage) onProgressMessage({message:`error, retrying...`});
               await delay(3000);
             }
             console.log("summary:", summary);
@@ -1516,7 +1521,7 @@
           // (this also helps with backwards-compat since maxTokenCountOfSummary previously didn't exist, we so we may need to compress some old summaries)
           if(countTokens(summary) > maxTokenCountOfSummary) {
             addToSummaryLog(`<b>summary to compress:</b> ${summary}`);
-            summary = await compressSummary({summary, tokenLimit:maxTokenCountOfSummary, model, onProgress, onProgress, threadId});
+            summary = await compressSummary({summary, tokenLimit:maxTokenCountOfSummary, model, onProgressMessage, threadId});
             await db.summaries.put({hash, summary, threadId});
             addToSummaryLog(`<b>compressed summary:</b> ${summary}`);
           }
@@ -1589,11 +1594,11 @@
       };
 
       // Note: the reason this doesn't just take threadId as a param is because we use it for recomputeBotReply() which doesn't necessarily use all messages in a thread, and we also use it for "reply with..." which switches characters
-      async function getBotReply({messages, threadId, aiCharacter, userCharacter, onProgress}) {
+      async function getBotReply({messages, threadId, aiCharacter, userCharacter, onStreamingReplyChunk, onProgressMessage}) {
 
         let fullMessagesArr = prepareMessagesForBot(messages, aiCharacter, userCharacter);
 
-        onProgress({message:"starting..."});
+        onProgressMessage({message:"starting..."});
         
         let modelName = aiCharacter.modelName;
         
@@ -1619,7 +1624,7 @@
             
             // note: we need upToMessageId because this could be a call from recomputeBotReply() which doesn't necessarily use all messages in a thread
             // upToMessageId is inclusive.
-            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId: fullMessagesArr.at(-1).id, onProgress});
+            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId: fullMessagesArr.at(-1).id, onProgressMessage});
             if(summary === undefined) throw new Error("There should be a summary, since numTokensInContext > tokenLimitForSummaryAndMessages");
             
             messagesArr = remainingMessages;
@@ -1635,7 +1640,7 @@
           messagesArr = fullMessagesArr.slice(0);
         }
         
-        onProgress({message:"querying api..."});
+        onProgressMessage({message:"querying api..."});
 
         messagesArr.unshift({"role": "system", "content": aiCharacter.systemMessage});
 
@@ -1661,8 +1666,44 @@
           OPENAI_API_KEY = result.openAiApiKey;
         }
 
+        async function handleStreamingResponse(reader) {
+          let result = "";
+          let chunkI = 0;
+          while(true) {
+            const res = await reader?.read();
+            if(res?.done) break;
+            if(res?.value.trim().startsWith("{")) { // errors don't start with 'data'
+              let json = JSON.parse(res.value);
+              alert("Error: "+json.error);
+              break;
+            } else if(res?.value.trim().startsWith("data:")) {
+              // can be multiple 'data: {...}' lines in a single response
+              for(let line of res.value.split("\n").filter(l => l.trim()).map(l => l.trim().slice(6))) {
+                if(line === "[DONE]") break;
+                let json = JSON.parse(line);
+                let text;
+
+                if(json.choices[0].text) { // this indicates that we're streaming from a 'general' (non-chat) model
+                  text = json.choices[0].text;
+                  if(chunkI===0) text = text.trimStart(); // trimStart due to the way we prompt 'general' models (we show messages with a space after `[name]:`)
+                } else {
+                  if(json.choices[0].delta.role) continue; // first response always starts with a role=assistant delta to indicate that the assistant is the one talking
+                  if(!json.choices[0].delta.content) continue; // final response alway has empty delta object
+                  text = json.choices[0].delta.content;
+                }
+                
+                result += text;
+                onStreamingReplyChunk({text, isFirst:chunkI===0});
+                chunkI++;
+              }
+            }
+          }
+          return result;
+        }
+
 
         let modelType = modelNameToModelType[modelName];
+        const getStreamingResponse = true;
 
         let result;
         let apiTokenUsage;
@@ -1680,20 +1721,37 @@
           if(aiCharacter.presencePenalty) data.presence_penalty = aiCharacter.presencePenalty;
           if(aiCharacter.stopSequences && aiCharacter.stopSequences.length > 0) data.stop = aiCharacter.stopSequences;
 
-          let json = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          }).then(r => r.json()).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
-          
-          if(json?.error) {
-            console.error(json.error);
-            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+          if(getStreamingResponse) {
+            data.stream = true;
+            let tokensInPrompt = countTokensInMessages(messagesArr);
+            apiTokenUsage = {prompt:tokensInPrompt, completion:0, total:tokensInPrompt};
+
+            let response = await fetch("https://api.openai.com/v1/chat/completions", {
+              "headers": { "authorization": `Bearer ${OPENAI_API_KEY}`, "content-type": "application/json" },
+              "body": JSON.stringify(data),
+              "method": "POST",
+            }).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
+            const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
+            result = await handleStreamingResponse(reader);
+
+            apiTokenUsage.completion += countTokens(result);
+            apiTokenUsage.total += countTokens(result);
+          } else {
+            let json = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify(data),
+            }).then(r => r.json()).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
+
+            if(json?.error) {
+              console.error(json.error);
+              alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+            }
+            if(json?.usage) {
+              apiTokenUsage = {prompt:json?.usage.prompt_tokens, completion:json?.usage.completion_tokens, total:json?.usage.total_tokens};
+            }
+            result = json?.choices?.[0].message.content;
           }
-
-          apiTokenUsage = json?.usage;
-
-          result = json?.choices?.[0].message.content;
 
         } else {
           let promptIntro = `You are ${aiCharacter.name}. You're talking to '${userCharacter.name}'. Some messages are "System" messages which do not originate from either party.\n\n` + messagesArr[0].content + "\n\nThe chat begins now:\n\n\n\n";
@@ -1715,28 +1773,45 @@
           if(aiCharacter.presencePenalty) data.presence_penalty = aiCharacter.presencePenalty;
           if(aiCharacter.stopSequences && aiCharacter.stopSequences.length > 0) data.stop.push(...aiCharacter.stopSequences);
 
-          let json = await fetch("https://api.openai.com/v1/completions", {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-          }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
-          
-          if(json?.error) {
-            console.error(json.error);
-            alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+          if(getStreamingResponse) {
+            data.stream = true;
+            let tokensInPrompt = countTokensInMessages(messagesArr);
+            apiTokenUsage = {prompt:tokensInPrompt, completion:0, total:tokensInPrompt};
+
+            let response = await fetch("https://api.openai.com/v1/completions", {
+              "headers": { "authorization": `Bearer ${OPENAI_API_KEY}`, "content-type": "application/json" },
+              "body": JSON.stringify(data),
+              "method": "POST",
+            }).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
+            const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
+            result = await handleStreamingResponse(reader);
+
+            apiTokenUsage.completion += countTokens(result);
+            apiTokenUsage.total += countTokens(result);
+          } else {
+            let json = await fetch("https://api.openai.com/v1/completions", {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
+            
+            if(json?.error) {
+              console.error(json.error);
+              alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+            }
+
+            if(json?.usage) {
+              apiTokenUsage = {prompt:json?.usage.prompt_tokens, completion:json?.usage.completion_tokens, total:json?.usage.total_tokens};
+            }
+            result = json?.choices?.[0].text.trim();
           }
-
-          apiTokenUsage = json?.usage;
-
-          result = json?.choices?.[0].text.trim();
         }
 
         if(apiTokenUsage) {
-          let usageData = {prompt:apiTokenUsage.prompt_tokens, completion:apiTokenUsage.completion_tokens, total:apiTokenUsage.total_tokens};
-          await trackTokenUsage({threadId, modelName, usageData});
+          await trackTokenUsage({threadId, modelName, usageData:apiTokenUsage});
         }
         
-        onProgress({message:"finished"});
+        onProgressMessage({message:"finished"});
         return result;
       }
 
@@ -1948,6 +2023,16 @@
       }
 
 
+      function handleStreamingReplyChunk(chunk, messageEl) {
+        let messageTextEl = messageEl.querySelector(".messageText");
+        if(chunk.isFirst) messageEl.dataset.streamedMessageText = "";
+        messageEl.dataset.streamedMessageText += chunk.text;
+        let streamedMessageText = messageEl.dataset.streamedMessageText;
+
+        messageTextEl.innerHTML = DOMPurify.sanitize(marked.parse(streamedMessageText));
+        messageTextEl.querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+      }
+
 
       let lastBotReplyTime = 0;
       let botIsCurrentlyReplying = false;
@@ -2001,9 +2086,9 @@
             messageEl.remove();
             await updateInlineReminderMessage();
           });
-          
-          const onProgress = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-          const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, onProgress});
+
+          const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
+          const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl)});
           messageEl.querySelector(".statusMessage").innerHTML = "";
 
           if(userDeletedMessage) {
@@ -2048,8 +2133,8 @@
         const characterId = parseInt($.messageFeed.dataset.characterId);
         const character = await db.characters.get(characterId);
 
-        const onProgress = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-        const message = await getBotReply({messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, onProgress});
+        const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
+        const message = await getBotReply({messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl)});
         messageEl.querySelector(".statusMessage").innerHTML = "";
 
         if(message) {
@@ -2311,8 +2396,8 @@
             // first ensure summary is up to date:
             $.messageInput.value = "Please wait...";
             $.messageInput.disabled = true;
-            const onProgress = (e) => $.messageInput.value = "Please wait... "+e.message;
-            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, onProgress});
+            const onProgressMessage = (e) => $.messageInput.value = "Please wait... "+e.message;
+            let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, onProgressMessage});
             $.messageInput.value = "";
             $.messageInput.disabled = false;
             if(summary === undefined) {
@@ -2881,8 +2966,8 @@
         }
         
         // the "aiCharacter" is the one that replies 
-        const onProgress = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-        let message = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, onProgress});
+        const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
+        let message = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl)});
         messageEl.querySelector(".statusMessage").innerHTML = "";
 
         // if `message` is falsy, it means the bot failed to reply, so delete the message and end the loop
