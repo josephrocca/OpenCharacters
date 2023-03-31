@@ -6,7 +6,7 @@ To get started with Pyodide, try pasting this code in the custom code input box 
 import "https://cdn.jsdelivr.net/pyodide/v0.23.0/full/pyodide.js";
 let pyodide = await loadPyodide();
 // now we can use `pyodide.runPython("1+2+3")` to run code
-// and within our python code we can run `micropip.install("numpy")` install stuff
+// and within our python code we can run `micropip.install("numpy")` to install stuff
 
 oc.thread.on("MessageAdded", function() {
   let lastMessage = oc.thread.messages.at(-1);
