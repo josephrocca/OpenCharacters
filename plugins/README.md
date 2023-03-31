@@ -1,3 +1,5 @@
+# Plugins
+
 OpenCharacters allows you to add [custom code](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md) to your characters. This allows you to extend your characters with functionality that goes far beyond what is provided by default.
 
 Anyone can add custom code to their character - simply open up the advanced options in the character creation dialog and add some code. However, not everyone knows how to code, and there are a bunch of common features which people request which aren't available by default.
