@@ -8,6 +8,6 @@ So this page lists some "official" custom code "plugins" which you can enable by
 
 ## Text-to-Speech
 This causes your character to "speak" the text that it generates. To use it, just open the advanced character settings and paste this on a new line in the custom code box:
-```
+```js
 import "./plugins/tts/main.js";
 ```
