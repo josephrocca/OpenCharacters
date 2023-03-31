@@ -15,7 +15,7 @@ oc.thread.on("MessageAdded", function() {
   if(codeBlockMatch) {
     let code = codeBlockMatch[1];
     // execute the code and add the output to a new message:
-    oc.thread.messages.push({content:"Code Output:\n\n"+pyodide.runPython(code), author:"user", expectsReply:false});
+    oc.thread.messages.push({content:"Python Code Output:\n\n"+pyodide.runPython(code), author:"user", expectsReply:false});
   }
 });
 ```
