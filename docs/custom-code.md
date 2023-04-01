@@ -75,8 +75,7 @@ oc.thread.on("MessageAdded", async function () {
     let urlsInLastMessage = [...lastMessage.content.matchAll(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g)].map(m => m[0]);
     if(urlsInLastMessage.length === 0) return messages;
     // just grab contents for last URL
-    // NOTE: you need to replace corsproxy.com with an actual cors proxy - you can make one easily using replit or glitch.com, for example
-    let html = await fetch("https://corsproxy.com/?url="+encodeURIComponent(urlsInLastMessage.at(-1)).then(r => r.text()));
+    let html = await fetch(urlsInLastMessage.at(-1)).then(r => r.text());
     let doc = new DOMParser().parseFromString(html, "text/html");
     let text = [...doc.querySelectorAll("h1,h2,h3,h4,p,pre")].map(el => el.textContent).join("\n");
     text = text.slice(0, 1000); // only grab first 1000 characters
