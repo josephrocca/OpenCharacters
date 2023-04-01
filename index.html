@@ -1186,6 +1186,8 @@
         const result = await characterDetailsPrompt(character);
         if(!result) return;
 
+        await db.characters.update(characterId, result);
+
         if(result.customCode !== character.customCode) {
           // get all threads with this character and delete custom code iframes for them if they exist
           const threads = await db.threads.where("characterId").equals(characterId).toArray();
@@ -1203,7 +1205,6 @@
           }
         }
 
-        await db.characters.update(characterId, result);
         await renderCharacterList();
         await renderThreadList();
       }
