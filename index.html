@@ -1439,10 +1439,19 @@
         // TODO: have a tokenizer per modelName, and use the right one here.
         return gpt3Tokenizer(str).length
       }
-      function countTokensInMessages(messages) {
-        return countTokens(messages.map(m => `\n\n[${m.name || m.role}]: ${m.content || m.message}`).join("")); // can't join with two newlines because this function is sometimes used on messages one-by-one, and that would undercount since no newlines would be counted at all
-      }
 
+      let messageHashToTokenCountCache = {};
+      async function countTokensInMessages(messages) {
+        let sum = 0;
+        for(let messageText of messages.map(m => `\n\n[${m.name || m.role}]: ${m.content || m.message}`)) {
+          let hash = await sha256Text(messageText);
+          if(messageHashToTokenCountCache[hash] === undefined) {
+            messageHashToTokenCountCache[hash] = countTokens(messageText);
+          }
+          sum += messageHashToTokenCountCache[hash];
+        }
+        return sum;
+      }
 
       const modelNameToMaxTokenLimit = {
         "gpt-3.5-turbo": 4096,
@@ -1505,7 +1514,7 @@
         }
 
         // get total tokens in all messages
-        let initialTokenCount = countTokensInMessages(remainingMessages);
+        let initialTokenCount = await countTokensInMessages(remainingMessages);
         let currentTokenCount = initialTokenCount;
         let prevSummary;
         let prevInstructionHash;
@@ -1522,7 +1531,7 @@
             if(remainingMessages.length === 0) break; // no more messages
             
             let m = remainingMessages[0];
-            let tokens = countTokensInMessages([m]);
+            let tokens = await countTokensInMessages([m]);
             if(messageBatchTokenCount > 0 && messageBatchTokenCount+tokens >= messageTokensToConsumePerSummary) {
               break; // don't add this message to the batch, because it would put us over the limit
             }
@@ -1596,7 +1605,7 @@
           // let overallTokenChange = summaryTokenChange + messageArrTokenChange;
           // currentTokenCount += overallTokenChange; // overallTokenChange is almost certainly negative but we can't assume that for sure, since it's not technically *impossible* for the LLM to return a summary that's longer than message batch
 
-          currentTokenCount = countTokens(summary || "") + countTokensInMessages(remainingMessages);
+          currentTokenCount = countTokens(summary || "") + await countTokensInMessages(remainingMessages);
           prevSummary = summary;
           prevInstructionHash = hash;
           i++;
@@ -1668,7 +1677,7 @@
         console.log("getBotReply() - fullMessagesArr:", fullMessagesArr);
         
         let messagesArr = [];
-        let numTokensInContext = countTokensInMessages(fullMessagesArr);
+        let numTokensInContext = await countTokensInMessages(fullMessagesArr);
         
         if(numTokensInContext > tokenLimitForSummaryAndMessages) {
           let fitMessagesInContextMethod = aiCharacter.fitMessagesInContextMethod ?? "summarizeOld";
@@ -1679,7 +1688,7 @@
             for(let i = fullMessagesArr.length-1; i >= 0; i--) {
               if(numTokensInContext + fullMessagesArr[i].content.length > tokenLimitForSummaryAndMessages) break;
               messagesArr.unshift(fullMessagesArr[i]);
-              numTokensInContext += countTokensInMessages([fullMessagesArr[i]]);
+              numTokensInContext += await countTokensInMessages([fullMessagesArr[i]]);
             }
           } else if(fitMessagesInContextMethod === "summarizeOld") {
             
@@ -1826,7 +1835,7 @@
 
           if(getStreamingResponse) {
             data.stream = true;
-            let tokensInPrompt = countTokensInMessages(messagesArr);
+            let tokensInPrompt = await countTokensInMessages(messagesArr);
             apiTokenUsage = {prompt:tokensInPrompt, completion:0, total:tokensInPrompt};
 
             let response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -1878,7 +1887,7 @@
 
           if(getStreamingResponse) {
             data.stream = true;
-            let tokensInPrompt = countTokensInMessages(messagesArr);
+            let tokensInPrompt = await countTokensInMessages(messagesArr);
             apiTokenUsage = {prompt:tokensInPrompt, completion:0, total:tokensInPrompt};
 
             let response = await fetch("https://api.openai.com/v1/completions", {
@@ -1954,7 +1963,7 @@
 
         // let tokenLimit = modelNameToMaxTokenLimit[model];
         // tokenLimit -= tokenLimit*0.15; // buffer due to token count being an estimate
-        // let numTokensInContext = countTokensInMessages(messages);
+        // let numTokensInContext = await countTokensInMessages(messages);
 
         messages = JSON.parse(JSON.stringify(messages));
 
@@ -2057,7 +2066,7 @@
 
         // let tokenLimit = modelNameToMaxTokenLimit[model];
         // tokenLimit -= tokenLimit*0.15; // buffer due to token count being an estimate
-        // let numTokensInContext = countTokensInMessages(messages);
+        // let numTokensInContext = await countTokensInMessages(messages);
 
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
 
@@ -3076,7 +3085,7 @@
               presencePenalty: options.presencePenalty === undefined ? undefined : Number(options.presencePenalty),
             };
             if(!customCodeCompletionUsage[threadId]) customCodeCompletionUsage[threadId] = 0;
-            let tokens = countTokensInMessages(o.messages);
+            let tokens = await countTokensInMessages(o.messages);
             customCodeCompletionUsage[threadId] += tokens;
             if(customCodeCompletionUsage[threadId] > customCodeCompletionTokenWarnLimit && !threadIdsAllowedToGoOverTokenLimit.has(threadId)) {
               if(threadIdsBlockedFromGoingOverTokenLimit.has(threadId)) {
