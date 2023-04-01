@@ -20,6 +20,7 @@
   * Give your character an internal thought process that runs alongside the chat
   * Give your character a voice via the browser's built-in TTS, or via an external API like ElevenLabs
   * Characters can [edit their own personality and custom code](https://tinyurl.com/4ccnn9zb) - self-improving and change over time
+  * Allow your character to execute [Python](https://github.com/josephrocca/OpenCharacters/blob/main/docs/running-python-code.md) or JavaScript code.
 * Auto-summarization algorithm (for old messages) which extends effective character memory/context size massively.
 * Currently only supports OpenAI APIs, but can add more (like LLaMA) later.
 * Import TavernAI `.jsonl` chat/thread files.
