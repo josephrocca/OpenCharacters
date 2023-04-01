@@ -143,6 +143,8 @@ And to reference `personality`, you'd use `${c[3]}` in the code. GPT-4 should be
 
 This example has its own doc: https://github.com/josephrocca/OpenCharacters/blob/main/docs/running-python-code.md
 
+Also see the "starter character" called "Python Coder".
+
 # Let your character see the contents of URLs that are in your messages
 
 You'll likely want to edit this example a bit, but it works, and it's enough to give you an idea:
@@ -171,5 +173,9 @@ oc.thread.on("MessageAdded", async function () {
 # Give you character a voice
 
 See the code for the text-to-speech plugin: https://github.com/josephrocca/OpenCharacters/blob/main/plugins/README.md
+
+# Allow your character to edit its own settings
+
+See the starter character called "Fire Alarm Bot".
 
 [append facial expression image nick wilde]: https://tinyurl.com/3767xprx
