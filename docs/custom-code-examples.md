@@ -143,4 +143,33 @@ And to reference `personality`, you'd use `${c[3]}` in the code. GPT-4 should be
 
 This example has its own doc: https://github.com/josephrocca/OpenCharacters/blob/main/docs/running-python-code.md
 
+# Let your character see the contents of URLs that are in your messages
+
+You'll likely want to edit this example a bit, but it works, and it's enough to give you an idea:
+
+```js
+oc.thread.on("MessageAdded", async function () {
+  let messages = oc.thread.messages;
+  let lastMessage = messages.at(-1);
+  if(lastMessage.author === "user") {
+    let urlsInLastMessage = [...lastMessage.content.matchAll(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g)].map(m => m[0]);
+    if(urlsInLastMessage.length === 0) return messages;
+    // just grab contents for last URL
+    let html = await fetch(urlsInLastMessage.at(-1)).then(r => r.text());
+    let doc = new DOMParser().parseFromString(html, "text/html");
+    let text = [...doc.querySelectorAll("h1,h2,h3,h4,p,pre")].map(el => el.textContent).join("\n");
+    text = text.slice(0, 1000); // only grab first 1000 characters
+    messages.push({
+      author: "system",
+      hiddenFrom: ["user"], // hide the message from user so it doesn't get in the way of the conversation
+      content: "Here's the content of the webpage that was linked in the previous message: \n\n"+text,
+    });
+  }
+});
+```
+
+# Give you character a voice
+
+See the code for the text-to-speech plugin: https://github.com/josephrocca/OpenCharacters/blob/main/plugins/README.md
+
 [append facial expression image nick wilde]: https://tinyurl.com/3767xprx
