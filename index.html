@@ -1287,9 +1287,13 @@
 
         // process prompt results back into well-formed character object:
 
-        result.initialMessages = parseMessagesFromTextFormat(result.initialMessagesText);
-        if(result.initialMessages === null) { // invalid, so just throw it all into a single message (mainly so they don't lose their work)
-          result.initialMessages = [{content:result.initialMessagesText, author:"ai", hiddenFrom:[]}];
+        if(result.initialMessagesText?.trim()) {
+          result.initialMessages = parseMessagesFromTextFormat(result.initialMessagesText);
+          if(result.initialMessages === null) { // invalid, so just throw it all into a single message (mainly so they don't lose their work)
+            result.initialMessages = [{content:result.initialMessagesText, author:"ai", hiddenFrom:[]}];
+          }
+        } else {
+          result.initialMessages = [];
         }
         delete result.initialMessagesText;
         
