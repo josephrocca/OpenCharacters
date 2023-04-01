@@ -172,7 +172,7 @@ oc.thread.on("MessageAdded", async function () {
 
 # Give you character a voice
 
-See the code for the text-to-speech plugin: https://github.com/josephrocca/OpenCharacters/blob/main/plugins/README.md
+See the code for the text-to-speech plugin: https://github.com/josephrocca/OpenCharacters/blob/main/plugins/tts/main.js
 
 # Allow your character to edit its own settings
 
