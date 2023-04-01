@@ -139,5 +139,8 @@ And to reference `personality`, you'd use `${c[3]}` in the code. GPT-4 should be
 
 (BTW, the reason you'll want to sign up for Github is because it's one of the few places that you can create a simple text file that can be downloaded from another webpage. Normally the JS code on one page can't download some files from a different website due to a thing called "CORS". On top of this, Github is just really reputable and can be trusted to host your file forever. If you use some random pastebin type site there's a 100% chance you file will eventually either be deleted, or be redirected to some ad-filled embedded version. Github is hands-down the best place to host text files.)
 
+# Give a character the ability to execute Python code
+
+This example has its own doc: https://github.com/josephrocca/OpenCharacters/blob/main/docs/running-python-code.md
 
 [append facial expression image nick wilde]: https://tinyurl.com/3767xprx
