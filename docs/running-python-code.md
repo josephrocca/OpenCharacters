@@ -25,17 +25,17 @@ await pyodide.loadPackage("micropip");
 oc.thread.on("MessageAdded", async function() {
   let lastMessage = oc.thread.messages.at(-1);
   if(lastMessage.author !== "ai") return;
-  let codeBlockMatch = lastMessage.content.match(/```(?:python|py)?\n(.+?)\n```/s);
-  if(codeBlockMatch) {
-    let code = codeBlockMatch[1];
+  let codeBlockMatches = [...lastMessage.content.matchAll(/```(?:python|py)?\n(.+?)\n```/gs)];
+  if(codeBlockMatches.length > 0) {
+    let code = codeBlockMatches.map(m => m[1]).join("\n"); // merge all code blocks into one
     // execute the code and add the output to a new message:
     printed = [];
     errors = [];
-    let output = await pyodide.runPythonAsync(code);
-    printed.push(output);
+    await pyodide.runPythonAsync(code).catch(e => errors.push(e.message));
     let content = "";
     if(printed.length > 0) content += `**Code Execution Output**:\n\n${printed.join("\n")}`;
-    if(errors.length > 0) content += `\n\n**Code Execution Errors**:\n\n${errors.join("\n")}`;
+    if(errors.length > 0) content += `\n\n**Code Execution Errors**:\n\n\`\`\`\n${errors.join("\n")}\n\`\`\``;
+    if(!content.trim()) content = "(The code block in the previous message did not `print` anything - there was no output.)";
     oc.thread.messages.push({content, author:"user", expectsReply:false});
   }
 });
