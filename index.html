@@ -324,7 +324,7 @@
               <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
             </div> -->
             <div style="display:flex;">
-              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/sys &lt;message&gt; - reply as system&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sum - edit summary"></textarea>
+              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/sys &lt;message&gt; - reply as system&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sum - edit summary&#10;/import - add chat messages in bulk"></textarea>
               <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
                 <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
                 <button id="replyWithButton" style="min-width:80px; margin-top:0.25rem;">reply with…</button>
@@ -389,7 +389,7 @@
       // add menu open/close button for narrow screens
       if(isMobile) {
         document.body.classList.add("isMobile"); // to use in CSS selectors
-        
+
         hideEl($.leftColumn);
         showEl($.leftColumnToggleButton);
         $.leftColumnToggleButton.dataset.state = "closed";
@@ -1394,7 +1394,7 @@
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:"[A-Za-z0-9_\\- ]{1,64}" },
           systemMessage: { label: "Instruction/role/personality (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message defines the personality or 'role' that the AI will take during the chat. Every request to the API will include this as the first message. If you later decide to edit this, all existing and new threads will be immediately updated. This message does not get summarized by the summarization algorithm - it will always be present as the first message.", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
           reminderMessage: { label: "Reminder message - an invisible system message that is placed before every AI response (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message is inserted as a reminder at the end of the chat right before each AI response. This will always be the last/most-recent message that the AI sees when writing its response. If you later decide to edit this, all existing and new threads will be immediately updated. This message is not seen/summarized by the summarization algorithm - it will always be present as the final message.", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
-          initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md">here</a>.`, infoTooltip:"During the initialization of every new thread with this character, these messages will be created and placed at the start of the thread. Note that the summarization algorithm will eventually summarize these messages - so they won't stay around forever (unlike the instruction and reminder messages, which *do* stay around forever). Also note that if you edit the initial messages, only *new* threads will have the updated initial messages. In other words, once a chat thread has been created, the initial messages that are added to a thread during init 'belong' to that thread, not to the character.", type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
+          initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md" target='blank'>here</a>.`, infoTooltip:"During the initialization of every new thread with this character, these messages will be created and placed at the start of the thread. Note that the summarization algorithm will eventually summarize these messages - so they won't stay around forever (unlike the instruction and reminder messages, which *do* stay around forever). Also note that if you edit the initial messages, only *new* threads will have the updated initial messages. In other words, once a chat thread has been created, the initial messages that are added to a thread during init 'belong' to that thread, not to the character.", type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
           modelName: { label: "Model name. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}, {content:"gpt-4 (only works if you have waitlist access)", value:"gpt-4"}], defaultValue: defaultValues.modelName || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
@@ -2443,8 +2443,12 @@
       }
 
       async function appendMessageToFeed(messageObj) {
+        if(!messageObj.character) {
+          if(messageObj.characterId === -1) messageObj.character = await getUserCharacterObj();
+          else if(messageObj.characterId === -2) messageObj.character = await getSystemCharacterObj();
+          else messageObj.character = await db.characters.get(messageObj.characterId);
+        }
         let el = createMessageElement(messageObj);
-        
         
         let shouldScrollDown = messageFeedIsNearBottom();
         $.messageFeed.appendChild(el);
@@ -2680,6 +2684,32 @@
               await db.summaries.update(instructionHash, {summary:result.summary});
               addToSummaryLog(`<b>edited summary:</b> ${result.summary}`);
             }
+          } else if(message.trim() === "/import") {
+            let defaultValue = "";
+            while(1) {
+              let result = await prompt2({
+                messagesText: {label: "Add messages in the same format as <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md' target='blank'>initial messages</a> to add them to this thread:", type: "text", height:"fit-content", defaultValue: "", placeholder:"[USER]: Here's a user message.\n[SYSTEM]: Here's a system message.\n[AI]: Here's an AI message.\n[USER]: Messages can be multi-line\nlike this.", focus:true},
+              });
+              if(!result) break;
+              let messages = parseMessagesFromTextFormat(result.messagesText);
+              if(!messages) {
+                defaultValue = result.messagesText;
+                alert("Invalid message formating. Should start with either '[SYSTEM]:' or '[USER]:' or '[AI]:' (without the quotes).");
+              } else {
+                for(let message of messages) {
+                  let characterId;
+                  if(message.author === "ai") characterId = parseInt($.messageFeed.dataset.characterId);
+                  else if(message.author === "user") characterId = -1;
+                  else if(message.author === "system") characterId = -2;
+                  else throw new Error("There's a problem with parseMessagesFromTextFormat - it's producing an invalid 'author' value.");
+                  let messageObj = createMessageObj({threadId, message:message.content, characterId:characterId, hiddenFrom:message.hiddenFrom || []});
+                  messageObj.id = await addMessageToDb(messageObj);
+                  let el = await appendMessageToFeed(messageObj);
+                }
+                break;
+              }
+            }
+            $.messageInput.value = "";
           } else {
 
             let senderCharacterId = -1;
