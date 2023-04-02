@@ -2815,7 +2815,7 @@
 
         let srcDoc = dedent(`
         <script type="module">
-          let ___dataInitializationIsComplete_836283628 = false;
+          window.___dataInitializationIsComplete_836283628 = false;
 
           // Proxy fetch to remove CORS restrictions
           const proxyHandler = {
@@ -3124,7 +3124,7 @@
                 for(let key in data.character) {
                   oc.character[key] = data.character[key];
                 }
-                ___dataInitializationIsComplete_836283628 = true;
+                window.___dataInitializationIsComplete_836283628 = true;
                 
                 window.parent.postMessage({_id:e.data._id, success:true, result:null}, "${window.location.origin}");
                 dataChangedByCustomCode = false;
@@ -3138,16 +3138,17 @@
             window.parent.postMessage({_id:"${pageLoadId}"}, "${window.location.origin}");
           });
 
-          // we need to wait for the oc data to load because they may immediately reference it in their custom code
-          while(1) {
-            if(___dataInitializationIsComplete_836283628) break;
-            await new Promise(r => setTimeout(r, 2));
-          }
-
         <\/script>
 
         <!-- note: this must be a separate code block from above, because otherwise static imports are initialised before window.oc exists -->
         <script type="module">
+          // we need to wait for the oc data to load because they may immediately reference it in their custom code
+          while(1) {
+            if(window.___dataInitializationIsComplete_836283628) break;
+            await new Promise(r => setTimeout(r, 3));
+          }
+          console.log("data initialization of sandboxed iframe is complete");
+
           {{customCode}}
 
           // backwards-compat with old processMessages function:
@@ -3883,7 +3884,7 @@
               }
             }
 
-            
+
             // UPGRADES:
             // TODO: shouldn't dexie's .upgrade function handle this? doesn't seem to be doing it.
             for(let character of importedCharacters) {
