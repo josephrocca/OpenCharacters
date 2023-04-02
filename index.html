@@ -710,12 +710,16 @@
       }
 
       // Given a threadId, this renders the message feed for that thread in the middle column.
+      const numMessagesPerDisplayBatch = 50;
       async function renderMessageFeed(threadId) {
         $.messageFeed.dataset.threadId = threadId;
         const thread = (await db.threads.where("id").equals(threadId).toArray())[0];
         const messages = await db.messages.where("threadId").equals(threadId).toArray();
         const character = (await db.characters.where("id").equals(thread.characterId).toArray())[0];
-        for(let message of messages) {
+
+        let displayedMessages = messages.slice(-numMessagesPerDisplayBatch);
+
+        for(let message of displayedMessages) {
           if(message.characterId === -1) {
             message.character = await getUserCharacterObj();
           } else if(message.characterId === -2) {
@@ -726,7 +730,7 @@
         }
         $.messageFeed.dataset.characterId = character.id;
         $.messageFeed.innerHTML = "";
-        let messageEls = messages.map(m => createMessageElement(m));
+        let messageEls = displayedMessages.map(m => createMessageElement(m));
         for(let el of messageEls) {
           $.messageFeed.appendChild(el);
         }
@@ -743,15 +747,83 @@
         // scroll to bottom of feed
         $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
         
-        if(messages.length === 0) {
+        if(displayedMessages.length === 0) {
           showEl($.noMessagesNotice);
         } else {
           hideEl($.noMessagesNotice);
         }
 
+        if(messages.length > displayedMessages.length) {
+          // add a "load earlier" element at the top of the feed with an intersection observer that triggers when it's scrolled into view
+          let triggerEl = document.createElement("div");
+          triggerEl.cssText = `height:50px;`;
+          let triggerIsEnabled = true;
+          $.messageFeed.insertBefore(triggerEl, $.messageFeed.firstChild);
+          // add intersection observer
+          let observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(async entry => {
+              if(entry.isIntersecting && triggerIsEnabled) {
+                triggerIsEnabled = false;
+                let { finished } = await prependEarlierMessagesToFeed();
+                if(finished) {
+                  observer.unobserve(triggerEl);
+                  triggerEl.remove();
+                } else {
+                  // move trigger to top of message feed and enable:
+                  $.messageFeed.prepend(triggerEl);
+                  triggerIsEnabled = true;
+                }
+              }
+            });
+          });
+          observer.observe(triggerEl);
+        }
+
         await updateInlineReminderMessage();
 
         doBotReplyIfNeeded(); // we shouldn't `await` this because thread is already rendered.
+      }
+
+      async function prependEarlierMessagesToFeed() {
+        let threadId = parseInt($.messageFeed.dataset.threadId);
+        // get id of first message in feed
+        let firstMessageId = $.messageFeed.querySelector(".message").dataset.id;
+        // get all messages before that from db
+        let messages = await db.messages.where("threadId").equals(threadId).and(m => m.id < firstMessageId).toArray();
+        if(messages.length === 0) {
+          return {finished:true};
+        }
+        // grab the last `numMessagesPerDisplayBatch` messages
+        let displayedMessages = messages.slice(-numMessagesPerDisplayBatch);
+        const thread = (await db.threads.where("id").equals(threadId).toArray())[0];
+        const character = (await db.characters.where("id").equals(thread.characterId).toArray())[0];
+
+        for(let message of displayedMessages) {
+          if(message.characterId === -1) {
+            message.character = await getUserCharacterObj();
+          } else if(message.characterId === -2) {
+            message.character = await getSystemCharacterObj();
+          } else {
+            message.character = character;
+          }
+        }
+
+        // get top element in feed
+        let topEl = $.messageFeed.querySelector(".message");
+        // get scroll distance from top element
+        let scrollDistanceFromTopEl = topEl.getBoundingClientRect().top - $.messageFeed.getBoundingClientRect().top;
+
+        let messageEls = displayedMessages.map(m => createMessageElement(m));
+        messageEls.reverse();
+        for(let el of messageEls) {
+          $.messageFeed.prepend(el);
+          attachEventHandlersToMessageEl(el);
+        }
+
+        // scroll to original top element, restoring original distance
+        $.messageFeed.scrollTop = topEl.getBoundingClientRect().top - $.messageFeed.getBoundingClientRect().top - scrollDistanceFromTopEl;
+        
+        return {finished:false};
       }
 
       // function createInlineSummaryEditor(summaryText) {
@@ -845,10 +917,10 @@
         return `
           <div class="character" data-character-id="${sanitizeHtml(character.id)}" style="display:flex; padding:0.5rem; cursor:pointer;">
             <div class="avatar" style="${character.avatarUrl ? `background-image:url(${sanitizeHtml(character.avatarUrl)})` : ""};"></div>
-            <div class="info" style="flex-grow:1; padding-left:0.5rem;">
-              <div class="name" style="font-weight:bold;">${character.name.length > 21 ? sanitizeHtml(character.name.slice(0, 21)+"…") : sanitizeHtml(character.name)} <span style="opacity:0.5; font-weight:normal;">${character.id ? "#"+sanitizeHtml(character.id) : ""}</span></div>
-              <div class="systemMessage" style="font-size: 0.8rem; text-overflow: ellipsis; word-wrap: break-word; overflow: hidden; height: 2em; line-height: 1em;">${character.systemMessage.length > 85 ? sanitizeHtml(character.systemMessage.slice(0, 85)+"...") : sanitizeHtml(character.systemMessage)}</div>
-              <div class="buttons">
+            <div class="info" style="flex-grow:1; padding-left:0.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+              <div class="name" style="font-weight:bold;">${character.name.length > 21 ? sanitizeHtml(character.name.slice(0, 21)+"…") : sanitizeHtml(character.name)} <span style="opacity:0.5; font-weight:normal;">${character.id !== null ? "#"+sanitizeHtml(character.id) : ""}</span></div>
+              <!-- <div class="systemMessage" style="font-size: 0.8rem; text-overflow: ellipsis; word-wrap: break-word; overflow: hidden; height: 2em; line-height: 1em;">${character.systemMessage.length > 85 ? sanitizeHtml(character.systemMessage.slice(0, 85)+"...") : sanitizeHtml(character.systemMessage)}</div> -->
+              <div class="buttons" style="text-align:right;">
                 ${character.id === null ? "" :
                 `<button class="edit" title="Edit this character">✏️ edit</button>
                 <button class="duplicate" title="Duplicate this character">➕</button>
