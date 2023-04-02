@@ -3883,6 +3883,7 @@
               }
             }
 
+            
             // UPGRADES:
             // TODO: shouldn't dexie's .upgrade function handle this? doesn't seem to be doing it.
             for(let character of importedCharacters) {
@@ -3895,6 +3896,10 @@
             for(let message of importedMessages) {
               if(!message.variants) message.variants = [null]; // null is the placeholder for the currently-chosen variant (stored in `message.message`)
             }
+            if(importedUsageStats) {
+              importedUsageStats = importedUsageStats.filter(entry => entry.threadId !== undefined);
+            }
+
 
             json.data.data.find(d => d.tableName === "characters").rows = importedCharacters;
             json.data.data.find(d => d.tableName === "threads").rows = importedThreads;
