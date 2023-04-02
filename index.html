@@ -298,7 +298,7 @@
               <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
             </div> -->
             <div style="display:flex;">
-              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;message&gt; - reply as ai&#10;/sys &lt;message&gt; - reply as system&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sum - edit summary"></textarea>
+              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/sys &lt;message&gt; - reply as system&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sum - edit summary"></textarea>
               <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
                 <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
                 <button id="replyWithButton" style="min-width:80px; margin-top:0.25rem;">reply with…</button>
@@ -1664,7 +1664,7 @@
       };
 
       // Note: the reason this doesn't just take threadId as a param is because we use it for recomputeBotReply() which doesn't necessarily use all messages in a thread, and we also use it for "reply with..." which switches characters
-      async function getBotReply({messages, threadId, aiCharacter, userCharacter, onStreamingReplyChunk, onProgressMessage}) {
+      async function getBotReply({messages, threadId, aiCharacter, userCharacter, replyInstruction, onStreamingReplyChunk, onProgressMessage}) {
 
         let fullMessagesArr = prepareMessagesForBot(messages, aiCharacter, userCharacter);
 
@@ -1752,6 +1752,10 @@
         // this is already done in prepareMessagesForBot() but we do it again here to ensure we've removed hidden stuff from reminder message, instruction message, etc.
         for(let m of messagesArr) {
           m.content = m.content.replace(/<!--hidden-from-ai-start-->.+?<!--hidden-from-ai-end-->/gs, "");
+        }
+
+        if(replyInstruction) {
+          messagesArr.push({role:"system", content:`The next message should be written according to this instruction: ${replyInstruction}`});
         }
 
         console.log("getBotReply() - messagesArr:", messagesArr);
@@ -2162,7 +2166,7 @@
 
       let lastBotReplyTime = 0;
       let botIsCurrentlyReplying = false;
-      async function doBotReplyIfNeeded({forceReply=false}={}) {
+      async function doBotReplyIfNeeded({forceReply=false, replyInstruction=null}={}) {
         while(Date.now()-lastBotReplyTime < 1000) {
           await delay(200); // don't reply too fast in case of infinite bot reply loop (e.g. due to custom code stuff)
         }
@@ -2225,7 +2229,7 @@
           });
 
           const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-          const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl)});
+          const message = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(), threadId, replyInstruction, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl)});
           messageEl.querySelector(".statusMessage").innerHTML = "";
 
           if(userDeletedMessage) {
@@ -2510,19 +2514,20 @@
         let message = $.messageInput.value;
         try {
 
-          if(message.startsWith("/ai")) {
+          if(message.trim() === "/ai" || message.startsWith("/ai ")) {
             // $.messageInput.value = "";
 
             if(message.trim() === "/ai") {
               await doBotReplyIfNeeded({forceReply:true});
             } else {
               message = message.replace(/^\/ai /, "");
-              const characterId = parseInt($.messageFeed.dataset.characterId);
-              const character = await db.characters.get(characterId);
-              let messageObj = createMessageObj({threadId, message, characterId});
-              messageObj.character = character;
-              messageObj.id = await addMessageToDb(messageObj);
-              let el = await appendMessageToFeed(messageObj);
+              await doBotReplyIfNeeded({forceReply:true, replyInstruction:message});
+              // const characterId = parseInt($.messageFeed.dataset.characterId);
+              // const character = await db.characters.get(characterId);
+              // let messageObj = createMessageObj({threadId, message, characterId});
+              // messageObj.character = character;
+              // messageObj.id = await addMessageToDb(messageObj);
+              // let el = await appendMessageToFeed(messageObj);
             }
 
           } else if(message.trim().startsWith("/user")) {
