@@ -156,7 +156,8 @@
       #chatThreads .thread:hover .favStar {
         display: inline;
       }
-      #chatThreads .thread.selected .favStar {
+      /* can't hover on mobile, so display button on selected thread: */
+      body.isMobile #chatThreads .thread.selected .favStar {
         display: inline;
       }
       #chatThreads .thread .favStar[data-is-fav="true"] {
@@ -387,6 +388,8 @@
 
       // add menu open/close button for narrow screens
       if(isMobile) {
+        document.body.classList.add("isMobile"); // to use in CSS selectors
+        
         hideEl($.leftColumn);
         showEl($.leftColumnToggleButton);
         $.leftColumnToggleButton.dataset.state = "closed";
