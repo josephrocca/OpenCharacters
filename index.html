@@ -324,7 +324,7 @@
               <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
             </div> -->
             <div style="display:flex;">
-              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/sys &lt;message&gt; - reply as system&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sum - edit summary&#10;/import - add chat messages in bulk"></textarea>
+              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sys &lt;message&gt; - reply as system&#10;/sum - edit summary&#10;/import - add chat messages in bulk"></textarea>
               <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
                 <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
                 <button id="replyWithButton" style="min-width:80px; margin-top:0.25rem;">reply with…</button>
@@ -416,7 +416,7 @@
       }
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(16).stores({
+      db.version(17).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -446,6 +446,11 @@
         });
 
         if(db.apiUsage) await db.apiUsage.delete();
+
+        await tx.table("usageStats").toCollection().modify((entry, ref) => {
+          if(entry.threadId === undefined) delete ref.value; // delete rows/entries that don't have a threadId - this was caused by some sort of bug in early implementation
+        });
+
       });
 
       function upgradeCharacterInitialMessagesArrayIfNeeded(character) {
@@ -3650,7 +3655,7 @@
 
       // clear the database if the user clicks the clear data button.
       $.clearDataButton.addEventListener("click", async function() {
-        if(!confirm("⚠️ Are you sure you want to DELETE ALL DATA? This cannot be undone.")) {
+        if(!confirm("🚨 Are you sure you want to DELETE ALL DATA? This cannot be undone. 🚨")) {
           return;
         }
         await db.delete();
