@@ -20,15 +20,21 @@ Within your custom code, you can access and update `oc.thread.messages`. It's an
 ```json5
 [
   {
-    "author": "user",
-    "hiddenFrom": [], // can contain "user" and/or "ai"
-    "content": "Hello",
+    author: "user",
+    hiddenFrom: [], // can contain "user" and/or "ai"
+    content: "Hello",
   },
   {
-    "author": "ai",
-    "hiddenFrom": [],
-    "content": "Hello, how can I help you today?",
-  }
+    author: "ai",
+    hiddenFrom: [],
+    content: "Hello, how can I help you today?",
+  },
+  {
+    author: "system",
+    hiddenFrom: ["user"],
+    content: "Here's an example system message that's hidden from the user.",
+    expectsReply: false, // this means the AI won't automatically reply to this message
+  },
 ]
 ```
 The most recent message is at the bottom. The `author` field can be `user`, `ai`, or `system`. Use "system" for guiding the AI's behavior, and including context/info where it wouldn't make sense to have that context/info come from the user or the AI.
