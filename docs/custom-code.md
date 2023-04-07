@@ -96,7 +96,7 @@ oc.thread.on("MessageAdded", async function () {
 
 Custom code is executed securely (i.e. in a sandboxed iframe), so if you're using a character that was created by someone else (and that has some custom code), then their code won't be able to access your OpenAI API key, or your messages with other characters, for example. The custom code only has access to the character data and the messages for your current conversation.
 
-Here's some custom code that adds a `/charname` command that changes the name of the character. It intercepts the user messages, and if it begins with `/name`, then it changes `oc.character.name` to whatever comes after `/charname`, and then deletes the message.
+Here's some custom code that adds a `/charname` command that changes the name of the character. It intercepts the user messages, and if it begins with `/charname`, then it changes `oc.character.name` to whatever comes after `/charname`, and then deletes the message.
 ```js
 oc.thread.on("MessageAdded", async function () {
   let m = oc.thread.messages.at(-1); // most recent message
