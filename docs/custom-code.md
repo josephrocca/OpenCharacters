@@ -65,7 +65,7 @@ You can also access and edit character data via `oc.character.propertyName`. Her
 
 Yes, a character can even edit its own custom code!
 
-Note that currently only the `temperature` setting is available in the character editor, so if you e.g. wanted to add a stop sequence for your character so it stops whenever it writes ":)" and also set presence pentalty to 1, then you could do it by adding this text to the custom code text box in the character editor:
+Note that currently only the `temperature` setting is available in the character editor UI, so if you e.g. wanted to add a stop sequence for your character so it stops whenever it writes ":)" and also set presence pentalty to 1, then you could do it by adding this text to the custom code text box in the character editor:
 ```js
 oc.character.stopSequences = [":)"];
 oc.character.presencePenalty = 1;
@@ -96,12 +96,12 @@ oc.thread.on("MessageAdded", async function () {
 
 Custom code is executed securely (i.e. in a sandboxed iframe), so if you're using a character that was created by someone else (and that has some custom code), then their code won't be able to access your OpenAI API key, or your messages with other characters, for example. The custom code only has access to the character data and the messages for your current conversation.
 
-Here's some custom code that adds a `/name` command that changes the name of the character. It intercepts the user messages, and if it begins with `/name`, then it changes `oc.character.name` to whatever comes after `/name`, and then deletes the message.
+Here's some custom code that adds a `/charname` command that changes the name of the character. It intercepts the user messages, and if it begins with `/name`, then it changes `oc.character.name` to whatever comes after `/charname`, and then deletes the message.
 ```js
 oc.thread.on("MessageAdded", async function () {
   let m = oc.thread.messages.at(-1); // most recent message
-  if(m.author === "user" && m.content.startsWith("/name ")) {
-    oc.character.name = m.content.replace(/^\/name /, "");
+  if(m.author === "user" && m.content.startsWith("/charname ")) {
+    oc.character.name = m.content.replace(/^\/charname /, "");
     oc.thread.messages.pop(); // remove the message
   }
 });
