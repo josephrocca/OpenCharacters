@@ -37,7 +37,7 @@ Within your custom code, you can access and update `oc.thread.messages`. It's an
   },
 ]
 ```
-The most recent message is at the bottom. The `author` field can be `user`, `ai`, or `system`. Use "system" for guiding the AI's behavior, and including context/info where it wouldn't make sense to have that context/info come from the user or the AI.
+The most recent message is at the bottom/end of the array. The `author` field can be `user`, `ai`, or `system`. Use "system" for guiding the AI's behavior, and including context/info where it wouldn't make sense to have that context/info come from the user or the AI.
 
 Here's an example that replaces `:)` with `૮ ˶ᵔ ᵕ ᵔ˶ ა` in every message that is added to the thread:
 ```js
@@ -46,7 +46,7 @@ oc.thread.on("MessageAdded", function() {
   m.content = m.content.replaceAll(":)", "૮ ˶ᵔ ᵕ ᵔ˶ ა");
 });
 ```
-You can edit existing messages like in this example, and you can also delete them, or add new ones.
+You can edit existing messages like in this example, and you can also delete them by just removing them from the `oc.thread.messages` array (with `pop`, `shift`, `splice`, or however else), and you can of course add new ones - e.g. with `push`/`unshift`.
 
 You can also access and edit character data via `oc.character.propertyName`. Here are the property names that you can access and edit:
 
