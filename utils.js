@@ -36,7 +36,7 @@ export async function prompt2(specs, opts={}) {
   for(let [key, spec] of Object.entries(specs)) {
     if(spec.type == "select") {
       sections += `
-        <section data-initially-hidden="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
+        <section data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
           <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
@@ -46,7 +46,7 @@ export async function prompt2(specs, opts={}) {
         </section>`;
     } else if(spec.type == "textLine") {
       sections += `
-        <section data-initially-hidden="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
+        <section data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
           <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
@@ -56,13 +56,18 @@ export async function prompt2(specs, opts={}) {
         </section>`;
     } else if(spec.type == "text") {
       sections += `
-        <section data-initially-hidden="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
+        <section data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
           <div style="margin:0.5rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
               <textarea data-initial-focus="${spec.focus === true ? "yes" : "no"}" data-spec-key="${sanitizeHtml(key)}" ${spec.height === "fit-content" ? `data-height="fit-content"` : ``} style="width:100%; ${spec.height === "fit-content" ? "" : `height:${sanitizeHtml(spec.height)}`}; min-height:${spec.minHeight ?? "4rem"}; max-height:${spec.maxHeight ?? "50vh"}; border: 1px solid lightgrey; border-radius: 3px; padding:0.25rem; ${spec.cssText || ""};" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
             </div>
           </div>
+        </section>`;
+    } else if(spec.type == "none") {
+      sections += `
+        <section data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
+          ${spec.html}
         </section>`;
     }
     i++;
@@ -78,8 +83,8 @@ export async function prompt2(specs, opts={}) {
           </div>
           ` : ""}
         </div>
-        <div style="text-align:center; margin-top:1rem; display:flex; justify-content:space-between;">
-          <button class="cancel" style="padding: 0.25rem;">Cancel</button>
+        <div style="text-align:center; margin-top:1rem; ${opts.cancelButtonText === null ? "" : `display:flex; justify-content:space-between;`}">
+          ${opts.cancelButtonText === null ? "" : `<button class="cancel" style="padding: 0.25rem;">${opts.cancelButtonText ?? "Cancel"}</button>`}
           <button class="submit" style="padding: 0.25rem;">${opts.submitButtonText || "Submit"}</button>
         </div>
       </div>
@@ -115,9 +120,13 @@ export async function prompt2(specs, opts={}) {
 
   if(ctn.querySelector("button.showHidden")) {
     ctn.querySelector("button.showHidden").onclick = () => {
-      ctn.querySelectorAll('.sectionsContainer [data-initially-hidden=yes]').forEach(el => el.style.display='');
+      ctn.querySelectorAll('.sectionsContainer [data-is-hidden-extra=yes]').forEach(el => {
+        el.style.display='';
+        el.dataset.isHiddenExtra = "no";
+      });
       ctn.querySelector("button.showHidden").remove();
       updateFitHeights();
+      updateInputVisibilies();
     };
   }
 
@@ -145,6 +154,11 @@ export async function prompt2(specs, opts={}) {
         el.closest('section').style.display = "";
       } else {
         el.closest('section').style.display = "none";
+      }
+
+      // the "show advanced" hidden-ness overrides the show() function
+      if(el.closest("section").dataset.isHiddenExtra === "yes") {
+        el.closest("section").style.display = "none";
       }
     }
   }
@@ -175,9 +189,11 @@ export async function prompt2(specs, opts={}) {
     ctn.querySelector("button.submit").onclick = () => {
       let values = getAllValues();
       resolve(values);
-    }
-    ctn.querySelector("button.cancel").onclick = () => {
-      resolve(null);
+    };
+    if(ctn.querySelector("button.cancel")) {
+      ctn.querySelector("button.cancel").onclick = () => {
+        resolve(null);
+      };
     }
   });
   ctn.remove();
@@ -353,7 +369,17 @@ export function downloadText(text, filename) {
 } 
 
 
-
+export function cosineDistance(vector1, vector2) {
+  let dotProduct = 0;
+  let norm1 = 0;
+  let norm2 = 0;
+  for(let i=0; i<vector1.length; i++) {
+    dotProduct += vector1[i] * vector2[i];
+    norm1 += vector1[i] * vector1[i];
+    norm2 += vector2[i] * vector2[i];
+  }
+  return 1 - (dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2)));
+}
 
 
 
