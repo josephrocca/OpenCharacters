@@ -2737,6 +2737,11 @@ OVERALL SUMMARY:
             await updateInlineReminderMessage();
           });
 
+          if(!replyInstruction && instructionForNextBotReply) {
+            replyInstruction = instructionForNextBotReply;
+          }
+          instructionForNextBotReply = null; // TODO: refactor various calls to doBotReplyIfNeeded (e.g. at end of renderMessageFeed) so we don't need it and can easily just pass replyInstruction without all the threading-through-multiple-functions issues
+
           const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
           const {message, memoryIdBatchesUsed, summaryHashUsed} = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, replyInstruction, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl), signals});
           messageEl.querySelector(".statusMessage").innerHTML = "";
@@ -3072,6 +3077,7 @@ OVERALL SUMMARY:
         };
       }
 
+      let instructionForNextBotReply = null; // this is a convenient global alternative to passing replyInstruction to doBotReplyIfNeeded, because that is triggered in various places so it's hard to "thread" the instruction through the various functions that end up calling it (e.g. triggerMessageAddedCustomCodeEvent --> renderMessageThread --> doBotReplyIfNeeded)
 
       async function sendButtonClickHandler() {
         $.sendButton.disabled = true;
@@ -3255,14 +3261,13 @@ OVERALL SUMMARY:
               senderCharacterId = -2;
             }
 
-            let replyInstruction = null;
             if(senderCharacterId === -1) {
               // user can end message with /ai <instruction> to give instruction to the AI for their reply:
               let messageLines = message.trim().split("\n");
               let lastLine = messageLines.pop();
               if(lastLine?.startsWith("/ai ")) {
                 message = messageLines.join("\n");
-                replyInstruction = lastLine.replace(/^\/ai /, "");
+                instructionForNextBotReply = lastLine.replace(/^\/ai /, "");
               }
             }
 
@@ -3280,7 +3285,7 @@ OVERALL SUMMARY:
             $.messageInput.style.height = "";
             
             await triggerMessageAddedCustomCodeEvent(threadId);
-            await doBotReplyIfNeeded({replyInstruction});
+            await doBotReplyIfNeeded(); // note that we can't just pass the replyInstruction here because doBotReplyIfNeeded can get called in the process of executing triggerMessageAddedCustomCodeEvent, so we use the global instructionForNextBotReply instead
 
           }
         } catch(e) {
