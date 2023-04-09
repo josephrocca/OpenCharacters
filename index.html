@@ -337,7 +337,7 @@
               <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
             </div> -->
             <div style="display:flex;">
-              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sys &lt;message&gt; - reply as system&#10;/sum - edit summary&#10;/name &lt;name&gt; - set your name for this thread&#10;/avatar &lt;url&gt; - set your avatar image for this thread&#10;/import - add chat messages in bulk&#10;&#10;Note: You can add '/ai &lt;instruction&gt;' as the final line in your normal messages to instruct AI for its reply."></textarea>
+              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sys &lt;message&gt; - reply as system&#10;/sum - edit summary&#10;/mem - add custom memory/lore entries&#10;/name &lt;name&gt; - set your name for this thread&#10;/avatar &lt;url&gt; - set your avatar image for this thread&#10;/import - add chat messages in bulk&#10;&#10;Note: You can add '/ai &lt;instruction&gt;' as the final line in your normal messages to instruct AI for its reply."></textarea>
               <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
                 <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
                 <button id="replyWithButton" style="min-width:80px; margin-top:0.25rem;">reply with…</button>
@@ -432,13 +432,13 @@
       }
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(24).stores({
+      db.version(25).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
         // NOTE: The properties listed here are just the INDEXES, not *all* the columns/properties.
         characters: "++id,modelName,fitMessagesInContextMethod,temperature,creationTime,lastMessageTime",
-        threads: "++id,name,characterId,creationTime,lastMessageTime",
+        threads: "++id,name,characterId,creationTime,lastMessageTime,lastViewTime",
         messages: "++id,threadId,characterId,creationTime", // characterId is -1 for user, and for system it is -2.
         misc: "key,value",
         summaries: "hash,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries. we also need it for grabbing summaries for the edit interface.
@@ -455,8 +455,7 @@
         });
 
         await tx.table("threads").toCollection().modify(thread => {
-          if(thread.isFav === undefined) thread.isFav = false;
-          if(thread.userCharacter === undefined) thread.userCharacter = {}; // this overrides the default user character object (for this specific thread)
+          upgradeThreadFromOldVersion(thread);
         });
 
         if(db.apiUsage) await db.apiUsage.delete();
@@ -517,6 +516,12 @@
         if(!message.hasOwnProperty("expectsReply")) message.expectsReply = undefined;
         if(!message.hasOwnProperty("summaryHashUsed")) message.summaryHashUsed = undefined; // undefined means that we don't know whether a summary was used because the message was created before this 'summaryUsed' feature was added
         if(!message.hasOwnProperty("memoryIdBatchesUsed")) message.memoryIdBatchesUsed = [];
+      }
+
+      function upgradeThreadFromOldVersion(thread) {
+        if(thread.isFav === undefined) thread.isFav = false;
+        if(thread.userCharacter === undefined) thread.userCharacter = {}; // this overrides the default user character object (for this specific thread)
+        if(thread.lastViewTime === undefined) thread.lastViewTime = thread.lastMessageTime; // this overrides the default user character object (for this specific thread)
       }
       
 
@@ -1428,6 +1433,8 @@
         let thread = await db.threads.get(threadId);
         let characterObj = await db.characters.get(thread.characterId);
 
+        await db.threads.where({id:threadId}).modify({lastViewTime:Date.now()});
+
         if(!customCodeIframes[threadId] && characterObj.customCode) {
           await createNewCustomCodeIframeForThread(threadId); // this adds iframe as here: customCodeIframes[threadId]
         }
@@ -1998,7 +2005,7 @@ OVERALL SUMMARY:
         
         let tokenLimitForSummaryAndMessages = getTokenLimitForSummaryAndMessages(aiCharacter);
         
-        console.log("getBotReply() - fullMessagesArr:", fullMessagesArr);
+        console.log("getBotReply - fullMessagesArr:", fullMessagesArr);
         
         let messagesArr = [];
         let numTokensInContext = await countTokensInMessages(fullMessagesArr);
@@ -2251,14 +2258,14 @@ OVERALL SUMMARY:
         }
 
         // _isSummary and _isReminder are used above for memory stuff
-        let summaryMessage = messagesArr.find(m => m._isSummary);
-        if(summaryMessage) delete summaryMessage._isSummary;
-        let reminderMessage = messagesArr.find(m => m._isReminder);
-        if(reminderMessage) delete reminderMessage._isReminder;
+        for(let message of messagesArr) {
+          if(message._isSummary !== undefined) delete message._isSummary;
+          if(message._isReminder !== undefined) delete message._isReminder;
+        }
 
         onProgressMessage({message:"querying api..."});
 
-        console.log("getBotReply() - messagesArr:", messagesArr);
+        console.log("getBotReply - messagesArr:", messagesArr);
         
         let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
         if(!OPENAI_API_KEY) {
@@ -2286,7 +2293,13 @@ OVERALL SUMMARY:
               // can be multiple 'data: {...}' lines in a single response
               for(let line of res.value.split("\n").filter(l => l.trim()).map(l => l.trim().slice(6))) {
                 if(line === "[DONE]") break;
-                let json = JSON.parse(line);
+                let json;
+                try {
+                  json = JSON.parse(line);
+                } catch(e) {
+                  console.error(e);
+                  alert(`The streaming API response had some invalid JSON:\n\n${line}\n\n---\n\n${res?.value}`);
+                }
                 let text;
 
                 if(json.choices[0].text) { // this indicates that we're streaming from a 'general' (non-chat) model
@@ -2719,6 +2732,10 @@ OVERALL SUMMARY:
           }
         }
         botIsCurrentlyReplying = true;
+
+        // this is to prevent custom code data updates during bot replies, because otherwise it deletes the "typing indicator" and streaming response message during the renderMessageFeed() that follows
+        let botIsCurrentlyReplyingPromiseResolve;
+        botIsCurrentlyReplyingPromise = new Promise(r => botIsCurrentlyReplyingPromiseResolve = r);
         try {
 
           const character = await db.characters.get(characterId);
@@ -2775,7 +2792,11 @@ OVERALL SUMMARY:
           alert(e.stack);
           botIsCurrentlyReplying = false;
         }
+
         botIsCurrentlyReplying = false;
+        
+        botIsCurrentlyReplyingPromiseResolve();
+        botIsCurrentlyReplyingPromise = null;
       }
 
 
@@ -2948,7 +2969,7 @@ OVERALL SUMMARY:
           if(memoryBatchesUsed.length > 0) {
             content.push(`<b>Memories Used:</b>\n${memoryBatchesUsed.map(batch => batch.map(m => m.text).join(" ⮕ ")).join("\n\n")}`);
           } else {
-            content.push(`<b>Memories Used:</b>\n(No memories were used to generate this message. This is likely because the conversation was not yet long enough to warrant memory storage/retrieval)`);
+            content.push(`<b>Memories Used:</b>\n(No memories were used to generate this message. This is likely because the conversation was not yet long enough to warrant memory storage/retrieval, or your don't have memories enabled in the character settings)`);
           }
           
           prompt2({
@@ -3777,6 +3798,9 @@ OVERALL SUMMARY:
       });
 
 
+      let botIsCurrentlyReplyingPromise = null;
+
+
       // TODO: make this a user setting (in misc db)
       const customCodeCompletionTokenWarnLimit = 5_000_000; // $10 at current turbo-3.5 prices
 
@@ -3849,6 +3873,9 @@ OVERALL SUMMARY:
             if(changedData.thread.messages && new Set(changedData.thread.messages.map(m => m.content)).size < changedData.thread.messages.length) {
               debugger;
             }
+            if(botIsCurrentlyReplyingPromise) {
+              await botIsCurrentlyReplyingPromise; // otherwise we'll render the feed and thus delete the "typing indicator" placeholder or the streaming response
+            }
             await updateDbWithNewDataFromCustomCode(threadId, changedData);
             await renderMessageFeed(threadId);
             customCodeIframes[e.data.threadId].contentWindow.postMessage({_id:e.data._id, success:true, result:null}, "*");
@@ -3871,16 +3898,18 @@ OVERALL SUMMARY:
         let thread = await db.threads.get(threadId);
         let threadCharacter = await db.characters.get(thread.characterId);
 
+        let userCharacter = await getUserCharacterObj(threadId); // note that this function takes threadId as input because it thread-specific overrides, like for name and avatar url
+
         if(!threadCharacter.customCode?.trim()) return;
 
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
         let formattedMessages = messages.map((m, i) => {
-          let author;
-          if(m.characterId == threadCharacter.id) author = "ai";
-          if(m.characterId == -1) author = "user";
-          if(m.characterId == -2) author = "system";
+          let author, name;
+          if(m.characterId == threadCharacter.id) { author = "ai"; name = threadCharacter.name; }
+          if(m.characterId == -1) { author = "user"; name = userCharacter.name; }
+          if(m.characterId == -2) { author = "system"; name = "System"; }
           let hiddenFrom = m.hiddenFrom || [];
-          return {author, content:m.message, hiddenFrom, expectsReply:m.expectsReply};
+          return {author, content:m.message, hiddenFrom, expectsReply:m.expectsReply, name};
         });
         let data = {
           thread: {
@@ -4352,13 +4381,17 @@ OVERALL SUMMARY:
 
         try {
 
-          if(options.keepExistingData === "no") {
-            try {
-              JSON.parse(await new Blob([file]).text());
-            } catch(e) {
-              alert("Error: Import file is not valid JSON.");
-              return;
+          try {
+            let json = JSON.parse(await new Blob([file]).text());
+            if(!json.formatName && json.type === "application/json" && json.uri?.starsWith("file:///")) {
+              alert("The file you provided is invalid. It's likely you tried to upload it to Discord, or something like that, and instead of actually uploading the file itself, it uploaded a *reference* to the file. I'm not sure why Discord does this, but you might want to try a different method of transferring the file. To check if your file is valid, you can open it up with a text editor and check that it starts with: {\"formatName\":\"dexie\"");
             }
+          } catch(e) {
+            alert("Error: Import file is not valid JSON.");
+            return;
+          }
+
+          if(options.keepExistingData === "no") {
             await db.delete();
             db = await Dexie.import(file);
           } else {
@@ -4491,6 +4524,9 @@ OVERALL SUMMARY:
             for(let character of importedCharacters) {
               upgradeCharacterFromOldVersion(character);
             }
+            for(let thread of importedThreads) {
+              upgradeThreadFromOldVersion(thread);
+            }
             for(let message of importedMessages) {
               upgradeMessageFromOldVersion(message);
             }
@@ -4550,8 +4586,9 @@ OVERALL SUMMARY:
       if(!$("#chatThreads .thread")) {
         $.newThreadButton.click();
       } else {
-        // otherwise click the top thread
-        $("#chatThreads .thread").click();
+        // otherwise click the most recently-interacted-with thread
+        let threads = await db.threads.orderBy("lastViewTime").reverse().toArray();
+        $.chatThreads.querySelector(`.thread[data-thread-id="${threads[0].id}"]`).click();
       }
 
       // parse url hash as json
