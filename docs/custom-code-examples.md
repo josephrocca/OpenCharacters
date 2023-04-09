@@ -1,4 +1,4 @@
-# Add a "refinement" step to the messages that your character generates [](#message-refinement-step)
+# Add a "refinement" step to the messages that your character generates
 
 After your character generates a message, the message will be edited by GPT according to your instructions. Just edit the "include more emojis..." instruction text to something else, and then paste this script in the custom code input box of the advanced character options.
 
@@ -27,7 +27,7 @@ Please rewrite this message to include more emojis. Respond with only the rewrit
 });
 ```
 
-# Append image based on predicted facial expression of the message [](#facial-expression-image)
+# Append image based on predicted facial expression of the message
 
 This example adds an image/GIF to each message to visually display the facial expression of the character, like in **[this example character][append facial expression image nick wilde]**:
 
