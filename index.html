@@ -3587,11 +3587,17 @@ OVERALL SUMMARY:
 
             // https://stackoverflow.com/a/58983264/11950764
             // This tracks all changes to the object, including nested objects, and including new objects/arrays that are added as properties.
+            let deepOnChangeProxyCache = new WeakMap();
             function createDeepOnChangeProxy(target, onChange) {
               return new Proxy(target, {
                 get(target, property) {
                   const item = target[property];
-                  if (item && typeof item === 'object') return createDeepOnChangeProxy(item, onChange);
+                  if (item && typeof item === 'object') {
+                    if (deepOnChangeProxyCache.has(item)) return deepOnChangeProxyCache.get(item);
+                    const proxy = createDeepOnChangeProxy(item, onChange);
+                    deepOnChangeProxyCache.set(item, proxy);
+                    return proxy;
+                  }
                   return item;
                 },
                 set(target, property, newValue) {
