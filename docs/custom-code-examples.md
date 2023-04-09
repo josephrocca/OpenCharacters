@@ -1,4 +1,4 @@
-# Add a "refinement" step to the messages that your character generates
+# [Add a "refinement" step to the messages that your character generates](#message-refinement-step)
 
 After your character generates a message, the message will be edited by GPT according to your instructions. Just edit the "include more emojis..." instruction text to something else, and then paste this script in the custom code input box of the advanced character options.
 
