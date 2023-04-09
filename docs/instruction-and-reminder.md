@@ -41,4 +41,6 @@ All of the above applies for reminder messages too. For example, below we set a 
 ```
 If you didn't include the `[AI]: ` part at the start, then it'd just be a 'normal' reminder message, and would be 'spoken' by 'SYSTEM'.
 
+Notice that I put "Thought:" at the start of the message and wrapped it in parentheses. I could have also used `(OOC: ...)`, which mean "out of character", or something like that. That way the message doesn't get treated like it's part of the actual discussion.
+
 And you can of course add as many reminder messages as you like using this `[AI]:`/`[USER]:`/`[SYSTEM]:` format. Just follow the examples above, and in the [initial messages](https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md) doc.
