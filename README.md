@@ -28,7 +28,7 @@
 
 ## Changelog
 
-Please see the `#announcements` channel on the [Discord server](https://discord.gg/5tkWXJFqPV).
+Please see the `#announcements` channel on the [Discord server](https://discord.gg/5tkWXJFqPV) for latest updates.
 
 ## Video Demo
 
