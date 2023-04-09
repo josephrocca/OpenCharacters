@@ -114,7 +114,7 @@ oc.thread.on("MessageAdded", async function () {
 
 Your custom code runs inside an iframe. You can visually display the iframe using `oc.window.show()` (and hide with `oc.window.hide()`). The user can drag the embed around on the page and resize it. All your custom code is running within the iframe embed whether it's currently displayed or not. You can display content in the embed by just executing custom code like `document.body.innerHTML = "hello world"`.
 
-You can use the embed to e.g. display a dynamic video/gif avatar for your character that changes depending on the emotion that is evident in the characters messages. Or to e.g. display the result of the p5.js code that the character is helping you write. And so on.
+You can use the embed to e.g. display a dynamic video/gif avatar for your character that changes depending on the emotion that is evident in the characters messages ([example](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code-examples.md#append-image-based-on-predicted-facial-expression-of-the-message)). Or to e.g. display the result of the p5.js code that the character is helping you write. And so on.
 
 ### Using the GPT API in Your Custom Code
 
