@@ -27,7 +27,7 @@ Please rewrite this message to include more emojis. Respond with only the rewrit
 });
 ```
 
-# Append image based on predicted facial expression of the message
+# Append image based on predicted facial expression of the message [](#facial-expression-image)
 
 This example adds an image/GIF to each message to visually display the facial expression of the character, like in **[this example character][append facial expression image nick wilde]**:
 
