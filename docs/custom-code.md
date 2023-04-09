@@ -21,16 +21,19 @@ Within your custom code, you can access and update `oc.thread.messages`. It's an
 [
   {
     author: "user",
+    name: "Anon",
     hiddenFrom: [], // can contain "user" and/or "ai"
     content: "Hello",
   },
   {
     author: "ai",
+    name: "Levi Ackerman",
     hiddenFrom: [],
-    content: "Hello, how can I help you today?",
+    content: "Hi.",
   },
   {
     author: "system",
+    name: "System",
     hiddenFrom: ["user"],
     expectsReply: false, // this means the AI won't automatically reply to this message
     content: "Here's an example system message that's hidden from the user and which the AI won't automatically reply to.",
