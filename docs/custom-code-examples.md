@@ -199,6 +199,45 @@ oc.thread.on("MessageAdded", async function () {
 });
 ```
 
+# Allow a character to update its own personality/reminder
+
+After your character generates a message, the message will be used GPT to update the character's `reminderMessage`. You can edit the prompt text to your liking, and then paste this script in the custom code input box of the advanced character options.
+```js
+oc.thread.on("MessageAdded", async function() {
+  let lastMessage = oc.thread.messages.at(-1);
+  if(lastMessage.author !== "ai") return; // only run this code on AI messages
+  let [ nonEditablePart, editablePart ] = oc.character.reminderMessage.split("---").map(text => text.trim());
+let instruction = `
+
+Here's a character's current personality and/or emotional state:
+---
+${editablePart}
+---
+Here's a message that this character just wrote:
+---
+${oc.character.name}: ${lastMessage.content}
+---
+Please rewrite the personality text to take into account their latest message. Respond with only the rewritten personality - nothing more, nothing less. If nothing about their personality changed, just respond verbatim with exactly the same text as the existing personality.
+
+`.trim();
+
+  let response = await oc.getChatCompletion({
+    messages: [
+      {author:"system", content:"You are a helpful editing assistant. You text messages according the the user's instruction, and you respond with only the edited/modified message - nothing more, nothing less."},
+      {author:"user", content:instruction},
+    ],
+  });
+
+  oc.character.reminderMessage = nonEditablePart + "\n---\n" + response.trim();
+});
+```
+For the above code to work, your reminder message should be structured with a `---` between the non-editable and editable stuff, like this:
+```
+Your regular reminder message content.
+---
+The character's self-editable stuff.
+```
+
 # Give you character a voice
 
 See the code for the text-to-speech plugin: https://github.com/josephrocca/OpenCharacters/blob/main/plugins/tts/main.js
