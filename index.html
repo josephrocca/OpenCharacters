@@ -1483,6 +1483,12 @@
         result.temperature = Number(result.temperature);
 
         if(isNaN(result.temperature)) result.temperature = 0.7;
+
+        // If it contains [AI], [SYSTEM], or [USER], but doesn't *start* with one of those, warn them that it's being treated as one big system message
+        if(/(^|\s)\[(AI|SYSTEM|USER)\]:/.test(result.reminderMessage) && !/^\[(AI|SYSTEM|USER)\]:/.test(result.reminderMessage.trim())) {
+          alert("It looks like you're using the advanced [AI]/[USER]/[SYSTEM] reminder message format, but your reminder message doesn't start with either [AI]: or [USER]: or [SYSTEM]:. If you want to use the advanced format, make sure your reminder message starts with [AI]: or [USER]: or [SYSTEM]:, otherwise your whole reminder message will be assumed to be one big 'SYSTEM' message (i.e. it assumes you're not using the advanced format).");
+        }
+
         return result;
       }
 
