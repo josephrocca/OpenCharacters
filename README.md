@@ -26,6 +26,10 @@
 * Import TavernAI `.jsonl` chat/thread files.
 * Send new feature ideas or bug reports [here](https://github.com/josephrocca/OpenCharacters/issues) or on our [Discord server](https://discord.gg/5tkWXJFqPV).
 
+## Changelog
+
+Please see the `#announcements` channel on the [Discord server](https://discord.gg/5tkWXJFqPV).
+
 ## Video Demo
 
 Here's a video demo of two bots chatting with one another using the "reply with..." button:
