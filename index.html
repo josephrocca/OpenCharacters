@@ -288,6 +288,25 @@
         user-select:none;
       }
 
+      .loadingModalCtn {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        z-index: 100;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .loadingModalContent {
+        background-color: var(--bg-color);
+        border-radius: var(--border-radius);
+        padding: 1rem;
+        text-align: center;
+      }
+
       /* typing indicator from https://codepen.io/arthak/pen/rmqvgo */
       .tiblock { align-items: center; display: flex; height: 17px; }
       .ticontainer{ display: inline-block; }
@@ -352,7 +371,7 @@
     </div>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance } from "./utils.js?v=20";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal } from "./utils.js?v=21";
 
       window.onerror = function(errorMsg, url, lineNumber, columnNumber, errorObj) {
         alert(`Please report this error on the Discord or Github:\n\n${errorMsg}\n\nstack: ${errorObj?.stack}\n\nline: ${lineNumber}`);
@@ -755,6 +774,10 @@
         "text-davinci-003": {
           prompt: 0.02,
           completion: 0.02,
+        },
+        "text-embedding-ada-002": {
+          prompt: 0.0004,
+          completion: 0.0004,
         },
       };
 
@@ -1383,6 +1406,55 @@
           }
         }
 
+        let memories = await db.memories.where({characterId:characterId}).toArray();
+        if(memories.length > 0 && character.associativeMemoryMethod !== "none" && character.associativeMemoryEmbeddingModelName !== result.associativeMemoryEmbeddingModelName) {
+          // character already had memories, and they changed the embedding model. we need to recompute memory embeddings
+          let recomputeCost = (countTokens(memories.map(m => m.text).join(""))/1000) * modelNameToTokenCosts[result.associativeMemoryEmbeddingModelName].prompt;
+          let choiceResult = await prompt2({
+            action: {label: `Your character has existing memories that were created using a different 'embedding model'. We'll need to recompute the memory embeddings (<b>estimated cost: $${recomputeCost.toFixed(2)}</b>), or you can revert to the previous embedding model.`, type: "select", options:[{content:"Recompute memory embeddings", value:"recompute"}, {content:"Revert to previous embedding model", value:"revert"}]},
+          });
+          if(!choiceResult) {
+            choiceResult = {action:"revert"};
+            alert("The embedding model will be reverted to the previous setting.");
+          }
+          if(choiceResult.action === "revert") {
+            await db.characters.update(characterId, {associativeMemoryEmbeddingModelName:character.associativeMemoryEmbeddingModelName});
+          } else if(choiceResult.action === "recompute") {
+            let loadingModal = createLoadingModal("Recomputing memory embeddings... This may take a while if there were a lot of memories.");
+            let newModelName = result.associativeMemoryEmbeddingModelName;
+            
+            // for restoring if needed:
+            let memoryIdToOldEmbedding = {};
+            for(let m of memories) {
+              memoryIdToOldEmbedding[m.id] = m.embedding;
+            }
+
+            let memoryIdToNewEmbedding = {};
+            try {
+              let embeddings = await embedTexts(memories.map(m => m.text), newModelName);
+              for(let i = 0; i < memories.length; i++) {
+                let m = memories[i];
+                memoryIdToNewEmbedding[m.id] = embeddings[i];
+              }
+              await db.memories.where({characterId:characterId}).modify(m => {
+                m.embedding = memoryIdToNewEmbedding[m.id];
+              });
+            } catch(e) {
+              alert("Failed to recompute memory embeddings. Reverting to previous model.\n\n"+e.stack);
+              await db.characters.update(characterId, {associativeMemoryEmbeddingModelName:character.associativeMemoryEmbeddingModelName});
+              await db.memories.where({characterId:characterId}).modify(m => {
+                m.embedding = memoryIdToOldEmbedding[m.id];
+              });
+            }
+            
+            (async function() {
+              loadingModal.updateContent(`Done.`);
+              await new Promise(r => setTimeout(r, 700));
+              loadingModal.delete();
+            })();
+          }
+        }
+
         await renderCharacterList();
         await renderThreadList();
       }
@@ -1646,21 +1718,27 @@
         return sum;
       }
 
-      async function embedText(text, modelName) {
-        let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
-        let result = await fetch("https://api.openai.com/v1/embeddings", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${OPENAI_API_KEY}`
-          },
-          body: JSON.stringify({
-            input: text,
-            model: modelName,
-          })
-        }).then(response => response.json());
-        // TODO: this returns token counts under result.usage.total_tokens - I should add it to cost usageStats for cost estimation
-        return result.data[0].embedding;
+      async function embedTexts(textArr, modelName) {
+        // batch textArr into chunks of 100
+        let textsRemaining = textArr.slice(0);
+        let embeddings = [];
+        while(textsRemaining.length > 0) {
+          let textsToEmbed = textsRemaining.splice(0, 100);
+          let result = await fetch("https://api.openai.com/v1/embeddings", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${(await db.misc.get("openAiApiKey"))?.value}`
+            },
+            body: JSON.stringify({
+              input: textsToEmbed,
+              model: modelName,
+            })
+          }).then(response => response.json()); // TODO: this returns token counts under result.usage.total_tokens - I should add it to cost usageStats for cost estimation
+          let embeddingsForThisBatch = result.data.map(o => o.embedding);
+          embeddings.push(...embeddingsForThisBatch);
+        }
+        return embeddings;
       }
 
 
@@ -1878,11 +1956,11 @@ OVERALL SUMMARY:
             if(aiCharacter.associativeMemoryMethod === "v1") {
               let [ memoriesText, summaryText ] = result.split(/OVERALL SUMMARY:|NEW OVERALL SUMMARY:/);
               let memories = memoriesText.trim().replace(/^LEARNINGS:|NEW LEARNINGS:/, "").trim().split("\n").map(m => m.trim().replace(/^\* (We learned that )?/, "").trim()).filter(m => m);
+              memories = memories.map(m => m.replace(/\n+/g, "\n")); // not ideal, but: memories cannot have two consecutive newlines, since in the memory editing UI two newlines indicate a gap between entries
 
               let embeddingModelName = aiCharacter.associativeMemoryEmbeddingModelName;
 
-              let embeddingPromises = memories.map(m => embedText(m, embeddingModelName));
-              let embeddings = await Promise.all(embeddingPromises);
+              let embeddings = await embedTexts(memories, embeddingModelName);
 
               // counter-intuitively, in rare cases it's possible for us to already have memories for this batch of messages (i.e. for this summary hash).
               // e.g. if the user closed the tab right as the memories were being added to the db, but the summary didn't get a chance to be added.
@@ -2139,8 +2217,7 @@ OVERALL SUMMARY:
           console.log(`MEMORY SEARCH QUERIES:\n${searchQueries.join("\n")}`);
 
           let embeddingModelName = aiCharacter.associativeMemoryEmbeddingModelName;
-          let searchEmbeddingPromises = searchQueries.map(m => embedText(m, embeddingModelName));
-          let searchEmbeddings = await Promise.all(searchEmbeddingPromises);
+          let searchEmbeddings = await embedTexts(searchQueries, embeddingModelName);
 
           const scoreThreshold = 0; // this is zero now because we subtract the average inverseDistance from the score when computing the score
           console.log("memory score threshold:", scoreThreshold);
@@ -2585,7 +2662,8 @@ OVERALL SUMMARY:
         return result;
       }
 
-      window.embedText = embedText;
+      // for debugging:
+      window.embedTexts = embedTexts;
       window.cosineDistance = cosineDistance;
 
 
@@ -3192,63 +3270,90 @@ OVERALL SUMMARY:
             }
             $.messageInput.value = "";
           } else if(message.trim() === "/mem") {
-            let memories = await db.memories.where({threadId, type:"user-written"}).toArray();
-            let defaultValue = memories.map(m => `${m.text}`).join("\n\n");
+            let originalManualMemories = await db.memories.where({threadId, type:"user-written"}).toArray();
+            let originalGeneratedMemories = await db.memories.where({threadId, type:"generated", status:"current"}).toArray();
 
-            let memoryTextHashToMemoryMap = {};
-            for(let memory of memories) {
-              memoryTextHashToMemoryMap[await sha256Text(memory.text)] = memory;
+            let textToEmbeddingCache = new Map();
+            for(let memory of originalManualMemories) {
+              textToEmbeddingCache.set(memory.text, memory.embedding);
             }
+            for(let memory of originalGeneratedMemories) {
+              textToEmbeddingCache.set(memory.text, memory.embedding);
+            }
+
+            let originalManualMemoriesText = originalManualMemories.map(m => `${m.text}`).join("\n\n");
+            let originalGeneratedMemoriesText = originalGeneratedMemories.map(m => `${m.text}`).join("\n\n");
+
+            let manualDefaultValue = originalManualMemoriesText;
+            let generatedDefaultValue = originalGeneratedMemoriesText;
 
             while(1) {
               let result = await prompt2({
-                memoriesText: {label: "Add/edit manually-written memories. Your character will try to recall these memories when appropriate.", type: "text", height:"fit-content", defaultValue, placeholder:"Here's an example memory.\n\nAnd here's another.\n\nAnd here's yet another. As you can see, memories should be separated with a blank line.", focus:true, infoTooltip:"Memories are automatically created by the AI based on the conversation, but you can use this input box to manually add memories - e.g. to describe the lore of your world without having to explicitely tell the AI, or remind the AI of things that it seems to be forgetting. Memories are recalled by the AI at times where it deems that they're appropriate. Use relevant words, phrases, character names, etc. in the memory to help it trigger the memory at the appropriate time."},
-              });
+                manualMemoriesText: {label: "<b>Add or edit</b> manually-written memories. Your character will try to recall these memories when appropriate. You must separate entries with a blank line.", type: "text", height:"fit-content", defaultValue:manualDefaultValue, placeholder:"Here's an example memory.\n\nAnd here's another.\n\nAnd here's yet another. As you can see, memories should be separated with a blank line.", focus:true, infoTooltip:"Memories are automatically created by the AI based on the conversation, but you can use this input box to manually add memories - e.g. to describe the lore of your world without having to explicitely tell the AI, or remind the AI of things that it seems to be forgetting. Memories are recalled by the AI at times where it deems that they're appropriate. Use relevant words, phrases, character names, etc. in the memory to help it trigger the memory at the appropriate time."},
+                generatedMemoriesText: {hidden:true, label: "You can also <b>edit</b> memories that your character has automatically created, but for technical reasons <b>you must not add or delete entries</b>. I.e. the number of entries should remain the same, and edits should not significantly change the overall chronology.", type: "text", height:"fit-content", defaultValue:generatedDefaultValue, placeholder:"If this box is empty, your character hasn't stored any memories yet because the chat thread isn't long enough to warrant it."},
+              }, {showHiddenInputsText:"Show automatically-created memories", submitButtonText:"Save"});
               if(!result) break;
-              defaultValue = result.memoriesText;
-
-              let memoryTextEntries = result.memoriesText.split("\n\n").map(m => m.trim()).filter(m => m);
               
-              let newHashToText = {};
-              for(let memoryText of memoryTextEntries) {
-                newHashToText[await sha256Text(memoryText)] = memoryText;
+              // we set these so that if there's an error (e.g. while embedding, or with database) the while loop continues and they don't lose their edits
+              manualDefaultValue = result.manualMemoriesText;
+              generatedDefaultValue = result.generatedMemoriesText;
+
+              let newManualMemoryTextEntries = result.manualMemoriesText.split("\n\n").map(m => m.trim()).filter(m => m);
+              let newGeneratedMemoryTextEntries = result.generatedMemoriesText.split("\n\n").map(m => m.trim()).filter(m => m);
+
+              if(newGeneratedMemoryTextEntries.length !== originalGeneratedMemories.length) {
+                alert("Looks like you've added or removed some automatically-created character memories. Currently this is not possible - you can only edit them.");
+                continue;
               }
 
-              let memoryIdsToDelete = [];
-              for(let memoryHash of Object.keys(memoryTextHashToMemoryMap)) {
-                if(!newHashToText[memoryHash]) { // new map doesn't have it, so user deleted/edited it
-                  memoryIdsToDelete.push(memoryTextHashToMemoryMap[memoryHash].id);
-                } 
-              }
+              let loadingModal = createLoadingModal("Computing memory embeddings. Please wait...");
 
-              $.messageInput.value = "Computing memory embeddings. Please wait...";
-              $.messageInput.disabled = true;
-
-              let memoriesToAdd = [];
-              for(let memoryHash of Object.keys(newHashToText)) {
-                if(!memoryTextHashToMemoryMap[memoryHash]) { // old map doesn't have it, so user added it
-                  memoriesToAdd.push({threadId, characterId, summaryHash:null, text:newHashToText[memoryHash], type:"user-written", status:"current", previousMemoryId:-1, nextMemoryId:-1, triggers:[]});
-                } 
-              }
               let embeddingModelName = threadCharacter.associativeMemoryEmbeddingModelName;
-              let embeddingPromises = memoriesToAdd.map(m => embedText(m.text, embeddingModelName));
-              let embeddings = await Promise.all(embeddingPromises);
-              for(let i = 0; i < memoriesToAdd.length; i++) {
-                memoriesToAdd[i].embedding = embeddings[i];
+              let newTexts = [];
+              for(let text of newManualMemoryTextEntries) {
+                if(!textToEmbeddingCache.has(text)) {
+                  newTexts.push(text);
+                }
               }
-              
+              for(let text of newGeneratedMemoryTextEntries) {
+                if(!textToEmbeddingCache.has(text)) {
+                  newTexts.push(text);
+                }
+              }
+
               try {
+
+                let newEmbeddings = await embedTexts(newTexts, embeddingModelName);
+                for(let i = 0; i < newTexts.length; i++) {
+                  textToEmbeddingCache.set(newTexts[i], newEmbeddings[i]);
+                }
+
+                let newManualMemories = [];
+                for(let text of newManualMemoryTextEntries) {
+                  let embedding = textToEmbeddingCache.get(text);
+                  newManualMemories.push({threadId, characterId, summaryHash:null, text, embedding, type:"user-written", status:"current", previousMemoryId:-1, nextMemoryId:-1, triggers:[]});
+                }
                 await db.transaction('rw', db.memories, async () => {
-                  await db.memories.bulkAdd(memoriesToAdd);
-                  await db.memories.where("id").anyOf(memoryIdsToDelete).delete();
+                  await db.memories.where({threadId, type:"user-written"}).delete();
+                  await db.memories.bulkAdd(newManualMemories);
                 });
+
+                {
+                  let i = 0;
+                  // TODO: double-check that dexie.js returns entries in a deterministic order - it does in my tests, but want to be 100% sure
+                  await db.memories.where({threadId, type:"generated", status:"current"}).modify(memory => {
+                    memory.text = newGeneratedMemoryTextEntries[i];
+                    memory.embedding = textToEmbeddingCache.get(newGeneratedMemoryTextEntries[i]);
+                    i++;
+                  });
+                }
+
               } catch(e) {
                 alert("There was an error while saving the memories:\n"+e.stack);
                 continue;
               }
-
-              $.messageInput.value = "";
-              $.messageInput.disabled = false;
+              
+              loadingModal.delete();
               break;
             }
             $.messageInput.value = "";
