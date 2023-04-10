@@ -381,6 +381,48 @@ export function cosineDistance(vector1, vector2) {
   return 1 - (dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2)));
 }
 
+export function createLoadingModal(initialContent) {
+  let loadingModalCtn = document.createElement("div");
+  loadingModalCtn.innerHTML = `<style>
+    .loadingModalCtn {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 99999999;
+    }
+    .loadingModalContent {
+      background-color: white;
+      border-radius: 3px;
+      background-color: var(--background);
+      border-radius: var(--border-radius);
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0px 1px 10px 3px rgb(130 130 130 / 24%);
+    }
+  </style>`
+  let contentEl = document.createElement("div");
+  contentEl.classList.add("loadingModalContent");
+  contentEl.innerHTML = initialContent || "";
+  loadingModalCtn.appendChild(contentEl);
+  loadingModalCtn.classList.add("loadingModalCtn");
+  document.body.appendChild(loadingModalCtn);
+  return {
+    updateContent: function(content) {
+      contentEl.innerHTML = content;
+    },
+    delete: function() {
+      loadingModalCtn.remove();
+    },
+  }
+}
+
 
 
 
