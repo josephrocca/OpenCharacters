@@ -4522,7 +4522,6 @@ OVERALL SUMMARY:
 
         let success = false;
         try {
-          debugger;
           if(await tryImportingDexieFile(file, options).catch(e => "fail") === "finished") {
             success = true;
           } else if(await tryImportingTavernAIThreadFile(file, options).catch(e => "fail") === "finished") {
@@ -4799,7 +4798,8 @@ OVERALL SUMMARY:
         }
 
         let name = json.name ?? json.char_name;
-        let personality = json.personality ?? json.char_persona ?? json.description ?? null;
+        let personality = json.personality ?? json.char_persona ?? null;
+        let description = json.description ?? null;
         let firstAIMessage = json.char_greeting ?? json.first_mes ?? null;
         let exampleDialogue = json.example_dialogue ?? json.mes_example ?? ""
         let scenario = json.scenario ?? json.world_scenario ?? "";
@@ -4815,6 +4815,7 @@ OVERALL SUMMARY:
         }
 
         let systemMessageChunks = [];
+        if(description) systemMessageChunks.push(`# {{char}} Description:\n${description}`);
         if(personality) systemMessageChunks.push(`# {{char}}'s Personality:\n${personality}`);
 
         let character = {};
