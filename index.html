@@ -1771,6 +1771,9 @@
               model: modelName,
             })
           }).then(response => response.json()); // TODO: this returns token counts under result.usage.total_tokens - I should add it to cost usageStats for cost estimation
+          if(!result.data) {
+            alert("Error:\n" + JSON.stringify(result, null, 2));
+          }
           let embeddingsForThisBatch = result.data.map(o => o.embedding);
           embeddings.push(...embeddingsForThisBatch);
         }
