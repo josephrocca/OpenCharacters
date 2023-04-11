@@ -220,6 +220,12 @@
         display: none;  /* Safari and Chrome */
       }
 
+      #builtInChatInterfaceWrapper {
+        display: flex;
+        flex-grow: 1;
+        flex-direction: column;
+        height: 100%;
+      }
 
       #messageFeed .message .bottomButtons {
         display:none;
@@ -255,6 +261,7 @@
       }
       #messageFeed .messageText {
         margin-top: 0.125rem;
+        overflow: hidden; /* keep messageText content from "escaping" the message area */
       }
       #messageFeed .messageText p:first-child {
         margin-top:0;
@@ -348,18 +355,21 @@
           <br><br>
         </div>
         <div id="chatInterface" class="middleColumnScreen" style="display:flex; flex-grow:1; flex-direction:column; height:100%;">
-          <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem;">Type a message to begin the chat.</div>
-          <div id="messageFeed" style="flex-grow:1; overflow-y:auto;"></div>
-          <div id="statusNotifier" style="text-align: center; display: none; height: 0; position: relative; top: -0.4rem; display: flex; align-items: center; justify-content: center;"></div>
-          <div id="inputWrapper" style="display:flex; padding:0.5rem; padding-left:0; flex-direction:column;">
-            <!-- <div style="display:flex;margin-bottom: 0.25rem;">
-              <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
-            </div> -->
-            <div style="display:flex;">
-              <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sys &lt;message&gt; - reply as system&#10;/sum - edit summary&#10;/mem - add custom memory/lore entries&#10;/name &lt;name&gt; - set your name for this thread&#10;/avatar &lt;url&gt; - set your avatar image for this thread&#10;/import - add chat messages in bulk&#10;&#10;Note: You can add '/ai &lt;instruction&gt;' as the final line in your normal messages to instruct AI for its reply."></textarea>
-              <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
-                <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
-                <button id="replyWithButton" style="min-width:80px; margin-top:0.25rem;">reply with…</button>
+          <div id="customCodeChatInterfaceWrapper" style="display:none;"></div>
+          <div id="builtInChatInterfaceWrapper">
+            <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem;">Type a message to begin the chat.</div>
+            <div id="messageFeed" style="flex-grow:1; overflow-y:auto;"></div>
+            <div id="statusNotifier" style="text-align: center; display: none; height: 0; position: relative; top: -0.4rem; display: flex; align-items: center; justify-content: center;"></div>
+            <div id="inputWrapper" style="display:flex; padding:0.5rem; padding-left:0; flex-direction:column;">
+              <!-- <div style="display:flex;margin-bottom: 0.25rem;">
+                <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
+              </div> -->
+              <div style="display:flex;">
+                <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sys &lt;message&gt; - reply as system&#10;/sum - edit summary&#10;/mem - add custom memory/lore entries&#10;/name &lt;name&gt; - set your name for this thread&#10;/avatar &lt;url&gt; - set your avatar image for this thread&#10;/import - add chat messages in bulk&#10;&#10;Note: You can add '/ai &lt;instruction&gt;' as the final line in your normal messages to instruct AI for its reply."></textarea>
+                <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
+                  <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
+                  <button id="replyWithButton" style="min-width:80px; margin-top:0.25rem;">reply with…</button>
+                </div>
               </div>
             </div>
           </div>
@@ -371,7 +381,10 @@
     </div>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal } from "./utils.js?v=21";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal } from "./utils.js?v=22";
+
+      // TODO: allow <style> when you work out how to scope it to the current message only - maybe just use a CSS parser and add .messageText prefix to selectors - https://github.com/jotform/css.js
+      let domPurifyOptions = {FORBID_TAGS: ['style']};
 
       window.onerror = function(errorMsg, url, lineNumber, columnNumber, errorObj) {
         alert(`Please report this error on the Discord or Github:\n\n${errorMsg}\n\nstack: ${errorObj?.stack}\n\nline: ${lineNumber}`);
@@ -451,7 +464,7 @@
       }
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(25).stores({
+      db.version(27).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -461,7 +474,7 @@
         messages: "++id,threadId,characterId,creationTime", // characterId is -1 for user, and for system it is -2.
         misc: "key,value",
         summaries: "hash,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries. we also need it for grabbing summaries for the edit interface.
-        memories: "++id,[summaryHash+threadId+type],[characterId+status],[threadId+type+status],[threadId+status],[threadId+type]", // memories are associated with a summary hash because they are computed alongside the summary. We need to track the hash so that if earlier messages are edited (and therefore the summaries need to be recomputed), we know to only consider "valid"/"current" the memories that are associated with currently-"used". The "type" property is used to track the "currentness", and also to track whether a memory was manually added by the user (in which case it is *always* considered valid)
+        memories: "++id,[summaryHash+threadId+type],[characterId+status],[threadId+type+status],[threadId+status],[threadId+type],threadId", // memories are associated with a summary hash because they are computed alongside the summary. We need to track the hash so that if earlier messages are edited (and therefore the summaries need to be recomputed), we know to only consider "valid"/"current" the memories that are associated with currently-"used". The "type" property is used to track the "currentness", and also to track whether a memory was manually added by the user (in which case it is *always* considered valid)
         usageStats: "[dateHour+threadId+modelName],threadId,characterId,dateHour", // note that characterId can be derived from threadId - it's just included for quick aggregation. modelName is like "gpt-3.5-turbo", dateHour is like "2023-3-29-14"
       }).upgrade(async tx => {
 
@@ -621,7 +634,7 @@
 
       // This renders the list of threads in the left column.
       async function renderThreadList(opts={}) {
-        let threads = await db.threads.orderBy("lastMessageTime").reverse().toArray();
+        let threads = await db.threads.orderBy("lastViewTime").reverse().toArray();
 
         if(threads.length >= 3) {
           showEl($.threadSearchCtn);
@@ -717,6 +730,12 @@
             }
           });
         });
+        $.chatThreads.querySelectorAll(".usageStatsSpend").forEach(btn => {
+          btn.addEventListener("click", async function(e) {
+            e.stopPropagation();
+            alert("OpenCharacters is a completely free application, but to use it, you need to connect it with one or more 'API' providers which act as the 'brains' of your characters. The spend figure you just clicked represents an estimate for the amount of money you've spent using the API that you have connected. If you're using OpenAI, you can see authorative spend amounts here:\n\nhttps://platform.openai.com/account/usage");
+          });
+        });
         $.chatThreads.querySelectorAll(".exportButton").forEach(btn => {
           btn.addEventListener("click", async function(e) {
             e.stopPropagation();
@@ -748,9 +767,11 @@
             if(confirm("Are you sure you want to delete this thread?")) {
               const threadId = parseInt(btn.closest(".thread").dataset.threadId);
               await db.threads.delete(threadId);
-              // delete messages and summaries for this thread:
+              // delete messages, summaries, memories, and usagestats for this thread:
               await db.messages.where("threadId").equals(threadId).delete();
               await db.summaries.where("threadId").equals(threadId).delete();
+              await db.memories.where("threadId").equals(threadId).delete();
+              await db.usageStats.where("threadId").equals(threadId).delete();
               await renderThreadList();
               // switch to character selection area
               await renderCharacterList();
@@ -804,8 +825,9 @@
         const blob = await db.export({prettyJson: true});
         const json = JSON.parse(await blob.text());
 
-        // delete misc data:
-        json.data.data.find(d => d.tableName === "misc").rows = [];
+        // in case I add a new table and forget to update this function, tables must be explicitely allowed here:
+        let tableNamesAllowList = ["characters", "threads", "messages", "summaries", "memories", "usageStats"];
+        json.data.data.find(d => !tableNamesAllowList.includes(d.tableName)).rows = [];
 
         // only keep the data for the current thread:
         let characters = json.data.data.find(d => d.tableName === "characters");
@@ -821,6 +843,11 @@
         let summaries = json.data.data.find(d => d.tableName === "summaries");
         if(summaries) {
           summaries.rows = summaries.rows.filter(s => s.threadId === threadId);
+        }
+
+        let memories = json.data.data.find(d => d.tableName === "memories");
+        if(memories) {
+          memories.rows = memories.rows.filter(s => s.threadId === threadId);
         }
 
         let usageStats = json.data.data.find(d => d.tableName === "usageStats");
@@ -1470,6 +1497,8 @@
       async function createNewThreadWithCharacterId(characterId) {
         const thread = await addThread("Unnamed Thread", characterId);
 
+        let userCharacter = await getUserCharacterObj(thread.id);
+
         // add initial messages
         const character = await db.characters.get(characterId);
         for(let m of character.initialMessages) {
@@ -1484,6 +1513,9 @@
           data.expectsReply = m.expectsReply;
 
           if(m.hiddenFrom) data.hiddenFrom = m.hiddenFrom;
+          
+          data.message = data.message.replaceAll("{{user}}", userCharacter.name);
+          data.message = data.message.replaceAll("{{char}}", character.name);
 
           let messageObj = createMessageObj(data);
           await addMessageToDb(messageObj)
@@ -1514,6 +1546,8 @@
         }
       }
 
+      // NOTE: spaces aren't actually allowed by OpenAI - I replace them with underscores in prepareMessagesForBot
+      // If you change this, update stuff in prepareMessagesForBot too
       const characterNameValidationPattern = "^[A-Za-z0-9_\\- ]{1,64}$"; // needed due to OpenAI API limitations
 
       async function characterDetailsPrompt(defaultValues={}) {
@@ -1527,12 +1561,13 @@
           systemMessage: { label: "Instruction/role/personality (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message defines the personality or 'role' that the AI will take during the chat. Every request to the API will include this as the first message. If you later decide to edit this, all existing and new threads will be immediately updated. This message does not get summarized by the summarization algorithm - it will always be present as the first message.", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
           reminderMessage: { label: "Reminder message - an invisible system message that is placed before every AI response (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message is inserted as a reminder at the end of the chat right before each AI response. This will always be the last/most-recent message that the AI sees when writing its response. If you later decide to edit this, all existing and new threads will be immediately updated. This message is not seen/summarized by the summarization algorithm - it will always be present as the final message.", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
           initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md" target='blank'>here</a>.`, infoTooltip:"During the initialization of every new thread with this character, these messages will be created and placed at the start of the thread. Note that the summarization algorithm will eventually summarize these messages - so they won't stay around forever (unlike the instruction and reminder messages, which *do* stay around forever). Also note that if you edit the initial messages, only *new* threads will have the updated initial messages. In other words, once a chat thread has been created, the initial messages that are added to a thread during init 'belong' to that thread, not to the character.", type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
-          modelName: { label: "Model name. The text-davinci-003 model is more creative, but 10x more expensive.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}, {content:"gpt-4 (only works if you have waitlist access)", value:"gpt-4"}], defaultValue: defaultValues.modelName || "gpt-3.5-turbo" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
+          modelName: { hidden:true, label: "Model name. The text-davinci-003 model is a bit more creative, but 10x more expensive.", infoTooltip:"If use gpt-3.5-turbo and set the 'temperature' option (see advanced settings) to 1, then apparently (according to community members) it's pretty close to davinci in terms of creativity.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}, {content:"gpt-4 (only works if you have waitlist access)", value:"gpt-4"}], defaultValue: defaultValues.modelName || "gpt-3.5-turbo" },
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
           associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Persistent, 'infinite' character memory:", infoTooltip:"This increases the cost by up to 2x and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. Please request cross-thread memory in the Discord server if you want it.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod ?? "none" },
           associativeMemoryEmbeddingModelName: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Memory embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory (text) into a list of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[{value:"text-embedding-ada-002", content:"text-embedding-ada-002"}], defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "text-embedding-ada-002" },
-          temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.7 },
+          // initialThreadMemories: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Initial thread-specific memories. The character will create memories based on the chat, but you can add some starter memories/lore here.", infoTooltip:"Manually-written memories can be used as 'dynamic' instruction/role/reminders that engage when relevant. This saves you from having to pack too much text into your instruction/reminder, which will 'eat up' your context, which means the AI will be able to see fewer recent messages, and summarization will have to be done more often.", type:"text", defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "" },
+          temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.8 },
           customCode: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
         }, {submitButtonText: "Save Character", showHiddenInputsText: "Show advanced options"});
         
@@ -1659,7 +1694,7 @@
           characterId,
           hiddenFrom,
           creationTime: creationTime ?? Date.now(),
-          variants: [null],
+          variants: [null], // null is the placeholder for the currently-selected variant (i.e. the one in the `message` property)
           expectsReply,
           memoryIdBatchesUsed: [],
           summaryHashUsed: null,
@@ -1689,6 +1724,7 @@
           characterId,
           creationTime: Date.now(),
           lastMessageTime: Date.now(),
+          lastViewTime: Date.now(),
           userCharacter: {},
         };
         await db.threads.add(threadObj);
@@ -1758,21 +1794,28 @@
       async function compressText({text, tokenLimit, modelName, onProgressMessage, threadId}) {
         // note: the threadId is just used to track token usage
         let i = 0;
+        let textArr = [text]; // just for debugging
         while(countTokens(text) > tokenLimit) {
           if(onProgressMessage) onProgressMessage({message:`compressing text (${i})`});
           let messages = [
             {role: "system", content: "You are a text compression assistant. You respond only with the text that the user requests - nothing more, nothing less."},
-            {role: "user", content: `Please compress this text to 75% of its original size:\n\n---\n\n${text}\n\n---\n\nTry to remove unimportant details and make the wording more *concise* to save space. DON'T MAKE IT TOO SHORT. Retain all important details.\n\nPlease reply with the *slightly* shortened text - nothing else. Keep *almost all* of the information.`},
+            {role: "user", content: `Please compress this text to 75% of its original size:\n\n---\n\n${text}\n\n---\n\nTry to remove unimportant details and make the wording more *concise* to save space. DON'T MAKE IT TOO SHORT. Retain all important details.\n\nPlease reply with the *slightly* shortened text - nothing else. Keep *almost all* of the information. Make it slightly shorter.`},
           ];
           let newText = await getChatCompletion({messages, modelName, temperature:0.7, threadId});
           if(!newText) {
-            if(onProgressMessage) onProgressMessage({message:`error, retrying...`});
+            if(onProgressMessage) onProgressMessage({message:`error, retrying compression...`});
             await delay(3000);
           } else {
             text = newText;
+            textArr.push(text);
             console.log(`compressed text (${countTokens(text)} tokens): ${text}`);
           }
           i++;
+          if(i > 10) {
+            await prompt2({
+              display:{html:`<div style="white-space:pre-wrap;">For some reason the summarizer is struggling to summarize your text. If you close this message it will continue trying to compress the summary, but be aware that it may use a lot of API credits if it's caught in a loop. Refresh the page if you'd like to stop, or click close to continue. This could be a bug in OpenCharacters, so please report it on Github or Discord if this happens regularly. It should happen very rarely if at all. You can manually edit the summary by typing <b>/sum</b> in the chat. Here's the sequence of compression steps it has taken so far:\n\n${textArr.map((t, i) => `<b>Summary ${i}:</b>\n${t}`).join("\n\n")}</div>`, type:"none"},
+            }, { submitButtonText: "Close", cancelButtonText: null });
+          }
         }
         return text;
       }
@@ -2050,9 +2093,11 @@ OVERALL SUMMARY:
           else if(m.characterId === -2) role = "system";
 
           let name;
-          if(m.characterId === userCharacter.id) name = userCharacter.name.replaceAll(" ", "_");
-          else if(m.characterId === aiCharacter.id) name = aiCharacter.name.replaceAll(" ", "_");
+          if(m.characterId === userCharacter.id) name = userCharacter.name;
+          else if(m.characterId === aiCharacter.id) name = aiCharacter.name;
           else if(m.characterId === -2) name = systemName;
+          name = name.replaceAll(" ", "_");
+          name = name.replace(/[^A-Za-z0-9_\-]/g, ""); // <-- we need to replace invalid characters here since the name could have been set with custom code, and in that case it wouldn't have been validated as happens when name is set in the character editor UI
 
           return { role, content: m.message+"", name, id: m.id }; // id is used for summary upToMessageId stuff, and tracking the messages that were used in each summary and memory
         });
@@ -2148,12 +2193,18 @@ OVERALL SUMMARY:
         if(aiCharacter.systemMessage?.trim()) {
           let messages = parseMessagesFromTextFormat(aiCharacter.systemMessage);
           if(messages === null) {
-            messagesArr.unshift({role:"system", content:aiCharacter.systemMessage});
+            let content = aiCharacter.systemMessage;
+            content = content.replaceAll("{{user}}", userCharacter.name);
+            content = content.replaceAll("{{char}}", aiCharacter.name);
+            messagesArr.unshift({role:"system", content});
           } else {
             let messagesToAdd = [];
             for(let message of messages) {
               if(message.hiddenFrom?.includes("ai")) continue; // doesn't really make sense to hide from ai in reminder message - this is just to be consistent
-              messagesToAdd.push({role:authorToRoleMap[message.author], content:message.content});
+              let content = message.content;
+              content = content.replaceAll("{{user}}", userCharacter.name);
+              content = content.replaceAll("{{char}}", aiCharacter.name);
+              messagesToAdd.push({role:authorToRoleMap[message.author], content});
               // can't just unshift on to messagesArr here because messages would be in wrong order
             }
             messagesArr = [...messagesToAdd, ...messagesArr];
@@ -2163,11 +2214,17 @@ OVERALL SUMMARY:
         if(aiCharacter.reminderMessage?.trim()) {
           let messages = parseMessagesFromTextFormat(aiCharacter.reminderMessage);
           if(messages === null) {
-            messagesArr.push({role:"system", content:aiCharacter.reminderMessage, _isReminder:true});
+            let content = aiCharacter.reminderMessage;
+            content = content.replaceAll("{{user}}", userCharacter.name);
+            content = content.replaceAll("{{char}}", aiCharacter.name);
+            messagesArr.push({role:"system", content, _isReminder:true});
           } else {
             for(let message of messages) {
               if(message.hiddenFrom?.includes("ai")) continue; // doesn't really make sense to hide from ai in reminder message - this is just to be consistent
-              messagesArr.push({role:authorToRoleMap[message.author], content:message.content, _isReminder:true});
+              let content = message.content;
+              content = content.replaceAll("{{user}}", userCharacter.name);
+              content = content.replaceAll("{{char}}", aiCharacter.name);
+              messagesArr.push({role:authorToRoleMap[message.author], content, _isReminder:true});
             }
           }          
         }
@@ -2323,6 +2380,10 @@ OVERALL SUMMARY:
             if(memoryBatches.length > 0) {
               memoryIdBatchesUsed = memoryBatches.map(b => b.memories.map(m => m.id));
 
+              if(memoryIdBatchesUsed.flat().filter(id => id === undefined).length > 0) {
+                debugger; // this shouldn't happen
+              }
+
               let summaryMessageIndex = messagesArr.findIndex(m => m._isSummary);
               let memoriesMessage = {role:"system", content:createMemoriesMessageContent()};
               if(summaryMessageIndex === -1) {
@@ -2342,8 +2403,8 @@ OVERALL SUMMARY:
           return undefined;
         }
 
-        // _isSummary and _isReminder are used above for memory stuff
         for(let message of messagesArr) {
+          // _isSummary and _isReminder are used above for memory stuff
           if(message._isSummary !== undefined) delete message._isSummary;
           if(message._isReminder !== undefined) delete message._isReminder;
         }
@@ -2417,7 +2478,7 @@ OVERALL SUMMARY:
 
 
         let modelType = modelNameToModelType[modelName];
-        const getStreamingResponse = true;
+        let getStreamingResponse = true;
 
         let result;
         let apiTokenUsage;
@@ -2765,7 +2826,7 @@ OVERALL SUMMARY:
           streamedMessageText += "\n```";
         }
 
-        messageTextEl.innerHTML = DOMPurify.sanitize(marked.parse(streamedMessageText));
+        messageTextEl.innerHTML = DOMPurify.sanitize(marked.parse(streamedMessageText), domPurifyOptions);
         messageTextEl.querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
 
         if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
@@ -3030,8 +3091,9 @@ OVERALL SUMMARY:
         messageEl.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
         messageEl.querySelector(".statusMessage").addEventListener("click", () => summariesWindow.show());
 
-        messageEl.querySelector(".brainButton").addEventListener("click", async function() {
+        messageEl.querySelector(".brainButton")?.addEventListener("click", async function() {
           let message = await db.messages.get(parseInt(messageEl.dataset.id));
+          
           let summaryUsed;
           if(message.summaryHashUsed) {
             summaryUsed = await db.summaries.get(message.summaryHashUsed);
@@ -3048,22 +3110,23 @@ OVERALL SUMMARY:
           }
 
           let content = [];
-          if(summaryUsed === undefined) summaryUsed = "(This message was created before message-summary-usage tracking was implemented)";
-          if(summaryUsed === null) summaryUsed = "(No summary was used to generate this message. This is likely because the conversation was not yet long enough to warrant summarization)";
-          content.push(`<b>Summary Used:</b>\n${summaryUsed}<div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(you can edit the latest summary by typing <b>/sum</b> in the chat)</div>`);
+          if(message.summaryHashUsed === undefined) {
+            content.push(`<b>Summary Used:</b><div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(This message was created before message-summary-usage tracking was implemented)</div>`);
+          } else if(message.summaryHashUsed === null) {
+            content.push(`<b>Summary Used:</b><div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(No summary was used to generate this message. This is likely because the conversation was not yet long enough to warrant summarization)</div>`);
+          } else {
+            content.push(`<b>Summary Used:</b>\n${summaryUsed}<div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(you can edit the latest summary by typing <b>/sum</b> in the chat)</div>`);
+          }
 
           if(memoryBatchesUsed.length > 0) {
-            content.push(`<b>Memories Used:</b>\n${memoryBatchesUsed.map(batch => batch.map(m => m.text).join(" ⮕ ")).join("\n\n")}`);
+            content.push(`<b>Memories Used:</b>\n${memoryBatchesUsed.map(batch => batch.map(m => m.text).join(" ⮕ ")).join("\n\n")}<div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(you can add and edit memories by typing <b>/mem</b> in the chat)</div>`);
           } else {
-            content.push(`<b>Memories Used:</b>\n(No memories were used to generate this message. This is likely because the conversation was not yet long enough to warrant memory storage/retrieval, or your don't have memories enabled in the character settings)`);
+            content.push(`<b>Memories Used:</b>\n<div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(No memories were used to generate this message. This is likely because the conversation was not yet long enough to warrant memory storage/retrieval, or you don't have memories enabled in the character settings)</div>`);
           }
           
           prompt2({
-            display:{html:`<div style="white-space:pre-wrap;">Here's some data that the AI used to generate this message:\n\n${content.join("\n\n")}</div>`, type:"none"},
-          }, {
-            submitButtonText: "Close",
-            cancelButtonText: null,
-          });
+            display:{html:`<div style="white-space:pre-wrap;">Here's some data that the character used to generate this message:\n\n${content.join("\n\n")}</div>`, type:"none"},
+          }, { submitButtonText: "Close", cancelButtonText: null });
         });
       }
 
@@ -3094,7 +3157,7 @@ OVERALL SUMMARY:
           <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" style="padding:0.5rem; padding-left:0; position:relative;">
             <div style="text-align:center;"><button class="showHiddenMessageButton" style="cursor:pointer; font-size:0.65rem;">Show hidden message</button></div>
             <div class="bottomButtons">
-              <div class="brainButton emojiButton">🧠</div>
+              ${messageObj.characterId >= 0 ? `<div class="brainButton emojiButton">🧠</div>` : ""}
             </div>
             <div class="messageWrap">
               <div class="avatar" style="${messageObj.character.avatarUrl ? `background-image:url(${sanitizeHtml(messageObj.character.avatarUrl)})` : ""};"></div>
@@ -3218,7 +3281,7 @@ OVERALL SUMMARY:
             let threadCharacter = await db.characters.get(parseInt($.messageFeed.dataset.characterId));
             characterToReplyWith.modelName = threadCharacter.modelName; // use whatever model the thread character is using
             if(instruction) {
-              characterToReplyWith.reminderMessage = `The next message will be written by '${characterToReplyWith.name}' and WILL conform to this instruction: ${instruction}\n\nThe message WILL NOT be prefixed with '${characterToReplyWith.name}:' - it'll just be ${characterToReplyWith.name}'s reply, and it will follow the above instruction.`;
+              characterToReplyWith.reminderMessage = `(The next message will be written by '${characterToReplyWith.name}' and WILL conform to this instruction: ${instruction})`;
             }
             await doBotReplyInPlaceOfUser(characterToReplyWith);
             await doBotReplyIfNeeded();
@@ -3289,7 +3352,7 @@ OVERALL SUMMARY:
 
             while(1) {
               let result = await prompt2({
-                manualMemoriesText: {label: "<b>Add or edit</b> manually-written memories. Your character will try to recall these memories when appropriate. You must separate entries with a blank line.", type: "text", height:"fit-content", defaultValue:manualDefaultValue, placeholder:"Here's an example memory.\n\nAnd here's another.\n\nAnd here's yet another. As you can see, memories should be separated with a blank line.", focus:true, infoTooltip:"Memories are automatically created by the AI based on the conversation, but you can use this input box to manually add memories - e.g. to describe the lore of your world without having to explicitely tell the AI, or remind the AI of things that it seems to be forgetting. Memories are recalled by the AI at times where it deems that they're appropriate. Use relevant words, phrases, character names, etc. in the memory to help it trigger the memory at the appropriate time."},
+                manualMemoriesText: {label: "<b>Add or edit</b> manually-written memories. Your character will try to recall these memories when appropriate. You must separate entries with a blank line.", type: "text", height:"fit-content", defaultValue:manualDefaultValue, placeholder:"Here's an example memory.\n\nAnd here's another.\n\nAnd here's yet another. As you can see, memories should be separated with a blank line.", focus:true, infoTooltip:"Memories are automatically created by the AI based on the conversation, but you can use this input box to manually add memories - e.g. to describe the lore of your world without having to explicitely tell the AI, or remind the AI of things that it seems to be forgetting. Memories are recalled by the AI at times where it deems that they're appropriate. Use relevant words, phrases, character names, etc. in the memory to help it trigger the memory at the appropriate time. Don't make memories too big - probably under 5 sentences is fine."},
                 generatedMemoriesText: {hidden:true, label: "You can also <b>edit</b> memories that your character has automatically created, but for technical reasons <b>you must not add or delete entries</b>. I.e. the number of entries should remain the same, and edits should not significantly change the overall chronology.", type: "text", height:"fit-content", defaultValue:generatedDefaultValue, placeholder:"If this box is empty, your character hasn't stored any memories yet because the chat thread isn't long enough to warrant it."},
               }, {showHiddenInputsText:"Show automatically-created memories", submitButtonText:"Save"});
               if(!result) break;
@@ -3372,8 +3435,9 @@ OVERALL SUMMARY:
               // warn about changing name after summarization has started:
               let summaryCount = await db.summaries.where("threadId").equals(threadId).count();
               if(summaryCount > 0 && threadCharacter.fitMessagesInContextMethod === "summarizeOld") {
-                let warningMessage = `Warning: This character has summaries enabled which means that the summaries may contain references to your old name.`;
-                if(threadCharacter.associativeMemoryMethod !== "none") warningMessage += ` This is also the case for character memories. This could confuse the AI, so often it's best to make sure you change your name at the start of the thread, before summaries and memories start to be computed/stored.`;
+                let warningMessage = `Warning: This character has summaries enabled which means that the summaries may contain references to your old name. You can see and edit the summary by typing /sum in the chat.`;
+                if(threadCharacter.associativeMemoryMethod !== "none") warningMessage += ` This is also the case for character memories. You can see and edit memories by typing /mem in the chat.`;
+                warningMessage += `\n\nIt's best to do any name changes at the start of the thread, before summaries${threadCharacter.associativeMemoryMethod !== "none" ? " and memories" : ""} start to be computed/stored.`;
                 alert(warningMessage);
               }
 
@@ -3454,7 +3518,7 @@ OVERALL SUMMARY:
         modelName: "modelName",
       };
 
-
+      
       const customCodeIframes = {}; // threadId -> iframe
       const customCodeFloatingWindows = {}; // threadId -> createFloatingWindow obj
       async function createNewCustomCodeIframeForThread(threadId) {
@@ -3485,7 +3549,7 @@ OVERALL SUMMARY:
         iframe.setAttribute("sandbox", "allow-scripts");
         iframe.style.cssText = "border:0; width:100%; height:100%; display:block;";
         
-        let floatingWindow = createFloatingWindow({header:character.name});
+        let floatingWindow = createFloatingWindow({header:character.name, closeButtonAction:"hide"});
         floatingWindow.bodyEl.appendChild(iframe);
         floatingWindow.hide();
         
@@ -4299,7 +4363,7 @@ OVERALL SUMMARY:
 
         let message = messageObj.message;
 
-        el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message));
+        el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message), domPurifyOptions);
         el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
 
         // add 'copy' button to code blocks
@@ -4456,51 +4520,24 @@ OVERALL SUMMARY:
 
         $.importDataFileInput.value = "";
 
-        // check if it's an external/non-standard format:
+        let success = false;
         try {
-          let text = await new Blob([file]).text();
-          // parse text as jsonl format (lines are json objects):
-          let jsonl = text.trim().split("\n").map(line => JSON.parse(line));
-          // check if it's jsonl format:
-          if(!jsonl.every(obj => typeof obj === "object" && obj !== null)) {
-            throw new Error("Not JSONL format");
+          if(await tryImportingDexieFile(file, options).catch(e => "fail") === "finished") {
+            success = true;
+          } else if(await tryImportingTavernAIThreadFile(file, options).catch(e => "fail") === "finished") {
+            success = true;
+          } else if(await tryImportingExternalCharacterFileFormat(file, options).catch(e => "fail") === "finished") {
+            success = true;
           }
-          // check if it's TavernAI thread format (first line is header/meta):
-          if(jsonl[0].user_name!==undefined && jsonl[0].character_name!==undefined && jsonl[0].create_date!==undefined && jsonl.slice(1).every(m => m.name!==undefined && m.is_user!==undefined && m.mes!==undefined && m.send_date!==undefined)) {
+        } catch(e) {}
 
-            if(options.keepExistingData === "no") {
-              if(!confirm("You're importing a TavernAI thread, but you've requested that all existing data be deleted. This is not supported when importing TavernAI threads. Existing data will NOT be deleted.")) {
-                return;
-              }
-            }
-
-            // if so, ask user which character it corresponds to, and then add it as a thread
-            const characters = await db.characters.orderBy("lastMessageTime").reverse().toArray();
-            let tavernOptions = await prompt2({
-              characterId: {label: "You're importing a TavernAI thread. Choose the character for this thread. If you haven't created/imported it yet, you should click cancel and do that first.", type: "select", options:characters.map(c => ({content:`${c.name} #${c.id}`, value:c.id}))},
-            }, {submitButtonText:"Submit"});
-            if(!tavernOptions) {
-              return;
-            }
-            tavernOptions.characterId = parseInt(tavernOptions.characterId);
-            let character = await db.characters.get(tavernOptions.characterId);
-            let thread = await addThread("Unnamed Thread", character.id);
-            for(let m of jsonl.slice(1)) {
-              let characterId;
-              if(m.is_user) characterId = -1;
-              else characterId = character.id;
-              let data = {threadId:thread.id, message:m.mes, characterId, creationTime:m.send_date};
-              let messageObj = createMessageObj(data);
-              await addMessageToDb(messageObj)
-            }
-            await renderThreadList();
-            await showThread(thread.id);
-            return; // DONE
-          }
-        } catch(e) {
-          console.log("Imported file is not an external/non-standard format.");
+        if(!success) {
+          alert("The file that you're importing doesn't seem to be a valid format. If you think it is valid, please report this as a bug on Github or Discord.");
         }
 
+      });
+
+      async function tryImportingDexieFile(file, options) {
         // backup existing data just in cast this wrecks the db for some reason (used in catch block below):
         const originalDbJsonText = await db.export({prettyJson: true}).then(blob => blob.text());
 
@@ -4510,10 +4547,10 @@ OVERALL SUMMARY:
             let json = JSON.parse(await new Blob([file]).text());
             if(!json.formatName && json.type === "application/json" && json.uri?.starsWith("file:///")) {
               alert("The file you provided is invalid. It's likely you tried to upload it to Discord, or something like that, and instead of actually uploading the file itself, it uploaded a *reference* to the file. I'm not sure why Discord does this, but you might want to try a different method of transferring the file. To check if your file is valid, you can open it up with a text editor and check that it starts with: {\"formatName\":\"dexie\"");
+              return "fail";
             }
           } catch(e) {
-            alert("Error: Import file is not valid JSON.");
-            return;
+            return "fail";
           }
 
           if(options.keepExistingData === "no") {
@@ -4611,6 +4648,12 @@ OVERALL SUMMARY:
               }
             }
 
+            // re-number message.memoryIdBatchesUsed
+            for(let message of importedMessages) {
+              message.memoryIdBatchesUsed = message.memoryIdBatchesUsed.map(b => b.map(id => memoryIdMap[id]));
+            }
+            // (note: we don't need to do the same as above for summaryHashUsed since it obviously uses a hash instead of an id)
+
             if(importedSummaries) {
               // delete summaries that don't have messageIds (from an old version of the app)
               importedSummaries = importedSummaries.filter(s => s.messageIds !== undefined);
@@ -4641,6 +4684,14 @@ OVERALL SUMMARY:
                 if(memory.previousMemoryId !== -1) memory.previousMemoryId = memoryIdMap[memory.previousMemoryId];
                 if(memory.nextMemoryId !== -1) memory.nextMemoryId = memoryIdMap[memory.nextMemoryId];
               }
+            }
+
+            // if there's just one thread, then we assume it was from a single-thread export
+            // and in that case we probably don't want isFav to persist, and we also probably
+            // want that thread to be at the top - i.e. lastViewTime = now
+            if(importedThreads.length === 1) {
+              importedThreads[0].isFav = false;
+              importedThreads[0].lastViewTime = Date.now();
             }
 
 
@@ -4685,7 +4736,7 @@ OVERALL SUMMARY:
             let existingMiscKeys = (await db.misc.toArray()).map(m => m.key);
             let miscData = json.data.data.find(d => d.tableName === "misc");
             miscData.rows = miscData.rows.filter(m => !existingMiscKeys.includes(m.key));
-            
+
             // convert json back to blob and import
             let blob = new Blob([JSON.stringify(json)], {type: "application/json"});
             await db.import(blob, {acceptVersionDiff:true, acceptMissingTables:true});
@@ -4703,7 +4754,119 @@ OVERALL SUMMARY:
         }
 
         window.location.reload();
-      });
+      }
+
+      async function tryImportingExternalCharacterFileFormat(file, options) {
+        let text;
+        let json;
+        try {
+          text = await new Blob([file]).text();
+          json = JSON.parse(text);
+        } catch(e) {}
+
+        if(!json && file.name.endsWith(".json")) return "fail";
+
+        // wasn't a json file - try parsing as webp/png
+        if(!json) {
+          try {
+            let loadingModal = createLoadingModal("Loading parser...");
+            let JSON5 = await import('https://unpkg.com/json5@2/dist/index.min.mjs').then(m => m.default);
+            let ExifReader = await import('https://cdn.jsdelivr.net/npm/exifreader@4.12.0/+esm');
+            loadingModal.delete();
+
+            let tags = await ExifReader.load(file);
+            if(tags.chara) {
+              json = JSON5.parse(atob(tags.chara.value));
+            } else if(tags.UserComment) {
+              json = JSON5.parse(tags.UserComment.value[0]);
+            }
+          } catch(e) {
+            return "fail";
+          }
+        }
+
+        if(!json) return "fail";
+
+        if(json.name === undefined && json.char_name === undefined) return "fail";
+
+        if(options.keepExistingData === "no") {
+          if(!confirm("You're importing an external character format, but you've requested that all existing data be deleted. This is not currently supported when importing external formats. Existing data will NOT be deleted.")) {
+            return "finished";
+          }
+        }
+
+        let name = json.name ?? json.char_name;
+        let personality = json.personality ?? json.char_persona ?? json.description ?? null;
+        let firstAIMessage = json.char_greeting ?? json.first_mes ?? null;
+        let exampleDialogue = json.example_dialogue ?? json.mes_example ?? ""
+        if(exampleDialogue) exampleDialogue = exampleDialogue.replaceAll("<START>", "<START EXAMPLE>")+"\n<END EXAMPLE>";
+        let scenario = json.scenario ?? json.world_scenario ?? "";
+        let avatarUrl = json.avatar === undefined || json.avatar === "none" || json.avatar === "" ? "" : json.avatar;
+
+        let systemMessageChunks = [];
+        if(personality) systemMessageChunks.push(`# Personality\n${personality}`);
+        if(exampleDialogue) systemMessageChunks.push(`# Example Dialogue:\n${exampleDialogue}`);
+        if(scenario) systemMessageChunks.push(`# Starting Scenario:\n${scenario}`);
+
+        let character = {};
+
+        character.name = name;
+        character.avatarUrl = avatarUrl;
+        character.systemMessage = systemMessageChunks.join("\n\n");
+        if(firstAIMessage) character.initialMessages = [{author:"ai", content:firstAIMessage}];
+
+        let result = await characterDetailsPrompt(character);
+        if(result) {
+          const character = await addCharacter(result);
+          await createNewThreadWithCharacterId(character.id);
+        }
+        
+        return "finished";
+      }
+
+      async function tryImportingTavernAIThreadFile(file, options) {
+        let text = await new Blob([file]).text();
+        // parse text as jsonl format (lines are json objects):
+        let jsonl = text.trim().split("\n").map(line => JSON.parse(line));
+        // check if it's jsonl format:
+        if(!jsonl.every(obj => typeof obj === "object" && obj !== null)) {
+          return "fail";
+        }
+        // check if it's TavernAI thread format (first line is header/meta):
+        let seemsValid = jsonl[0].user_name!==undefined && jsonl[0].character_name!==undefined && jsonl[0].create_date!==undefined && jsonl.slice(1).every(m => m.name!==undefined && m.is_user!==undefined && m.mes!==undefined && m.send_date!==undefined);
+        if(!seemsValid) {
+          return "fail";
+        }
+
+        if(options.keepExistingData === "no") {
+          if(!confirm("You're importing a TavernAI thread, but you've requested that all existing data be deleted. This is not supported when importing TavernAI threads. Existing data will NOT be deleted.")) {
+            return "finished";
+          }
+        }
+
+        // if so, ask user which character it corresponds to, and then add it as a thread
+        const characters = await db.characters.orderBy("lastMessageTime").reverse().toArray();
+        let tavernOptions = await prompt2({
+          characterId: {label: "You're importing a TavernAI thread. Choose the character for this thread. If you haven't created/imported it yet, you should click cancel and do that first.", type: "select", options:characters.map(c => ({content:`${c.name} #${c.id}`, value:c.id}))},
+        }, {submitButtonText:"Submit"});
+        if(!tavernOptions) {
+          return "finished";
+        }
+        tavernOptions.characterId = parseInt(tavernOptions.characterId);
+        let character = await db.characters.get(tavernOptions.characterId);
+        let thread = await addThread("Unnamed Thread", character.id);
+        for(let m of jsonl.slice(1)) {
+          let characterId;
+          if(m.is_user) characterId = -1;
+          else characterId = character.id;
+          let data = {threadId:thread.id, message:m.mes, characterId, creationTime:m.send_date};
+          let messageObj = createMessageObj(data);
+          await addMessageToDb(messageObj)
+        }
+        await renderThreadList();
+        await showThread(thread.id);
+        return "finished";
+      }
 
       await renderThreadList();
       
