@@ -51,6 +51,8 @@ oc.thread.on("MessageAdded", function() {
 ```
 You can edit existing messages like in this example, and you can also delete them by just removing them from the `oc.thread.messages` array (with `pop`, `shift`, `splice`, or however else), and you can of course add new ones - e.g. with `push`/`unshift`.
 
+Note that your `MessageAdded` handler can be `async`, and it'll be `await`ed so that you can be sure your code has finished running before the AI responds.
+
 You can also access and edit character data via `oc.character.propertyName`. Here are the property names that you can access and edit:
 
  * name
