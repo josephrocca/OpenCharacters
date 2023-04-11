@@ -11,6 +11,8 @@
 * The whole web app is a single HTML file - no server (serve it [locally](https://github.com/josephrocca/OpenCharacters/blob/main/docs/local-setup.md) if you want).
 * All your data is stored in your browser's local storage (again, there is no server).
 * Share characters with a link - all character data is embedded within the link.
+* Auto-summarization algorithm (for old messages) which extends effective character memory/context size massively.
+* Characters automatically compress messages into 'memories' and retrieve relevant memories based on context (currently in beta, enable in advanced options). You can manually add memories and use them like "lorebook" entries.
 * Fully extensible with [custom code](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md). See examples [here](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code-examples.md).
   * Give your character access to the internet
   * Create your own slash commands
@@ -21,7 +23,6 @@
   * Give your character a voice via the browser's built-in TTS, or via an external API like ElevenLabs
   * Characters can [edit their own personality and custom code](https://tinyurl.com/4ccnn9zb) - self-improving and change over time
   * Allow your character to execute [Python](https://github.com/josephrocca/OpenCharacters/blob/main/docs/running-python-code.md) or JavaScript code.
-* Auto-summarization algorithm (for old messages) which extends effective character memory/context size massively.
 * Currently only supports OpenAI APIs, but can add more (like LLaMA) later.
 * Import TavernAI `.jsonl` chat/thread files.
 * Send new feature ideas or bug reports [here](https://github.com/josephrocca/OpenCharacters/issues) or on our [Discord server](https://discord.gg/5tkWXJFqPV).
