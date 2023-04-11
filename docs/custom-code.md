@@ -171,3 +171,8 @@ let data = JSON.parse(oc.thread.messages[0].content); // load data
 data.blah = 123; // edit data
 oc.thread.messages[0].content = JSON.stringify(data); // save data
 ```
+
+# FAQ
+
+* Is it possible to run a custom function before the AI tries to respond? I.e., after the user message lands, but before the AI responds? And then kick off the AI response process after the async call returns?
+  * **Answer:** Yep, the `MessageAdded` event runs every time a message is added - user or ai. So you can check `if(oc.thread.messages.at(-1).author === "user") { ... }` (i.e. if latest message is from user) and the `...` code will run right after the user responds, and *before* the ai responds.
