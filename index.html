@@ -4802,6 +4802,15 @@ OVERALL SUMMARY:
         let scenario = json.scenario ?? json.world_scenario ?? "";
         let avatarUrl = json.avatar === undefined || json.avatar === "none" || json.avatar === "" ? "" : json.avatar;
 
+        let exampleDialogueChunks = [];
+        if(exampleDialogue) {
+          if(exampleDialogue.includes("<START>")) {
+            exampleDialogueChunks = exampleDialogue.split("<START>").map(c => c.trim()).filter(c => c);
+          } else {
+            exampleDialogueChunks = [exampleDialogue];
+          }
+        }
+
         let systemMessageChunks = [];
         if(personality) systemMessageChunks.push(`# {{char}}'s Personality:\n${personality}`);
 
@@ -4811,7 +4820,7 @@ OVERALL SUMMARY:
         character.avatarUrl = avatarUrl;
         character.systemMessage = systemMessageChunks.join("\n\n");
         character.initialMessages = [];
-        if(exampleDialogue) character.initialMessages.push({author:"system", content:`## Example Dialogue:\n${exampleDialogue}\n--- end of dialogue examples ---`, hiddenFrom:["user"]});
+        if(exampleDialogueChunks.length > 0) character.initialMessages.push({author:"system", content:`### Example Dialogue:\n${exampleDialogueChunks.map(c => `---start example---\n${c}\n---end example---`).join("\n\n")}`, hiddenFrom:["user"]});
         if(scenario) character.initialMessages.push({author:"system", content:"Scenario: "+scenario});
         if(firstAIMessage) character.initialMessages.push({author:"ai", content:firstAIMessage});
 
