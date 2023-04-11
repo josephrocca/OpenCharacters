@@ -4522,6 +4522,7 @@ OVERALL SUMMARY:
 
         let success = false;
         try {
+          debugger;
           if(await tryImportingDexieFile(file, options).catch(e => "fail") === "finished") {
             success = true;
           } else if(await tryImportingTavernAIThreadFile(file, options).catch(e => "fail") === "finished") {
@@ -4558,6 +4559,8 @@ OVERALL SUMMARY:
             db = await Dexie.import(file);
           } else {
             let json = JSON.parse(await new Blob([file]).text());
+
+            if(!json.data || !json.data.data) return "fail";
 
             // TODO: I should probably convert IDs to UUIDs so I don't need to do this sort of thing, but this is fine for now. Note: If you do this, you need to update the export modal because it currently uses comma-separated IDs
             
