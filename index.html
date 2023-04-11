@@ -4770,7 +4770,7 @@ OVERALL SUMMARY:
         if(!json) {
           try {
             let loadingModal = createLoadingModal("Loading parser...");
-            let JSON5 = await import('https://unpkg.com/json5@2/dist/index.min.mjs').then(m => m.default);
+            let JSON5 = await import('https://cdn.jsdelivr.net/npm/json5@2.2.2/dist/index.min.mjs').then(m => m.default);
             let ExifReader = await import('https://cdn.jsdelivr.net/npm/exifreader@4.12.0/+esm');
             loadingModal.delete();
 
@@ -4803,16 +4803,17 @@ OVERALL SUMMARY:
         let avatarUrl = json.avatar === undefined || json.avatar === "none" || json.avatar === "" ? "" : json.avatar;
 
         let systemMessageChunks = [];
-        if(personality) systemMessageChunks.push(`# Character Personality:\n${personality}`);
-        if(exampleDialogue) systemMessageChunks.push(`# Example Dialogue:\n${exampleDialogue}\n--- end of dialogue examples ---`);
-        if(scenario) systemMessageChunks.push(`# Starting Scenario:\n${scenario}`);
+        if(personality) systemMessageChunks.push(`# {{char}}'s Personality:\n${personality}`);
 
         let character = {};
 
         character.name = name;
         character.avatarUrl = avatarUrl;
         character.systemMessage = systemMessageChunks.join("\n\n");
-        if(firstAIMessage) character.initialMessages = [{author:"ai", content:firstAIMessage}];
+        character.initialMessages = [];
+        if(exampleDialogue) character.initialMessages.push({author:"system", content:`## Example Dialogue:\n${exampleDialogue}\n--- end of dialogue examples ---`, hiddenFrom:["user"]});
+        if(scenario) character.initialMessages.push({author:"system", content:"Scenario: "+scenario});
+        if(firstAIMessage) character.initialMessages.push({author:"ai", content:firstAIMessage});
 
         let result = await characterDetailsPrompt(character);
         if(result) {
