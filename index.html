@@ -1567,7 +1567,7 @@
           associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Persistent, 'infinite' character memory:", infoTooltip:"This increases the cost by up to 2x and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. Please request cross-thread memory in the Discord server if you want it.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod ?? "none" },
           associativeMemoryEmbeddingModelName: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Memory embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory (text) into a list of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[{value:"text-embedding-ada-002", content:"text-embedding-ada-002"}], defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "text-embedding-ada-002" },
           // initialThreadMemories: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Initial thread-specific memories. The character will create memories based on the chat, but you can add some starter memories/lore here.", infoTooltip:"Manually-written memories can be used as 'dynamic' instruction/role/reminders that engage when relevant. This saves you from having to pack too much text into your instruction/reminder, which will 'eat up' your context, which means the AI will be able to see fewer recent messages, and summarization will have to be done more often.", type:"text", defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "" },
-          temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.8 },
+          temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.85 },
           customCode: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
         }, {submitButtonText: "Save Character", showHiddenInputsText: "Show advanced options"});
         
@@ -4799,13 +4799,12 @@ OVERALL SUMMARY:
         let personality = json.personality ?? json.char_persona ?? json.description ?? null;
         let firstAIMessage = json.char_greeting ?? json.first_mes ?? null;
         let exampleDialogue = json.example_dialogue ?? json.mes_example ?? ""
-        if(exampleDialogue) exampleDialogue = exampleDialogue.replaceAll("<START>", "<START EXAMPLE>")+"\n<END EXAMPLE>";
         let scenario = json.scenario ?? json.world_scenario ?? "";
         let avatarUrl = json.avatar === undefined || json.avatar === "none" || json.avatar === "" ? "" : json.avatar;
 
         let systemMessageChunks = [];
-        if(personality) systemMessageChunks.push(`# Personality\n${personality}`);
-        if(exampleDialogue) systemMessageChunks.push(`# Example Dialogue:\n${exampleDialogue}`);
+        if(personality) systemMessageChunks.push(`# Character Personality:\n${personality}`);
+        if(exampleDialogue) systemMessageChunks.push(`# Example Dialogue:\n${exampleDialogue}\n--- end of dialogue examples ---`);
         if(scenario) systemMessageChunks.push(`# Starting Scenario:\n${scenario}`);
 
         let character = {};
