@@ -23,7 +23,9 @@
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
-      var socket = io();
+      var namespace = "TestBot".toLowerCase();
+      console.log(namespace)
+      var socket = io(`http://127.0.0.1:4000/${namespace}`);
 
       var messages = document.getElementById('messages');
       var form = document.getElementById('form');
