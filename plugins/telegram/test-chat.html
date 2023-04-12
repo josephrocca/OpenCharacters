@@ -18,18 +18,19 @@
   <body>
     <ul id="messages"></ul>
     <form id="form" action="">
-      <input id="input" autocomplete="off" /><button>Send</button>
+      <input id="input" autocomplete="off" />
+      <input id="namespace-input" type="text" placeholder="Enter bot name" />
+      <button>Send</button>
     </form>
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
-      var namespace = "TestBot".toLowerCase();
-      console.log(namespace)
-      var socket = io(`http://127.0.0.1:4000/${namespace}`);
-
+      var namespace = 'default';
+      var socket = io('http://127.0.0.1:4000/' + namespace);
       var messages = document.getElementById('messages');
       var form = document.getElementById('form');
       var input = document.getElementById('input');
+      var namespaceInput = document.getElementById('namespace-input');
 
       form.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -39,13 +40,44 @@
         }
       });
 
+      namespaceInput.addEventListener('change', function(e) {
+        namespace = e.target.value.toLowerCase();
+        socket.emit("namespace change", namespace);
+        socket.disconnect();
+        socket = io('http://127.0.0.1:4000/' + namespace);
+        console.log(`Namespace changed to ${namespace}`);
+
+        // Subscribe to updates from the new namespace
+        socket.on('ai message', function(msg) {
+          var item = document.createElement('li');
+          item.textContent = msg;
+          messages.appendChild(item);
+          window.scrollTo(0, document.body.scrollHeight);
+        });
+        
+        socket.on('user message', function(msg) {
+          var item = document.createElement('li');
+          item.textContent = msg;
+          messages.appendChild(item);
+          window.scrollTo(0, document.body.scrollHeight);
+        });
+      });
+
+      socket.on("connect", () => {
+        console.log(`Connected to namespace ${namespace}`);
+      });
+
+      socket.on("disconnect", () => {
+        console.log("Disconnected from server");
+      });
+
       socket.on('ai message', function(msg) {
         var item = document.createElement('li');
         item.textContent = msg;
         messages.appendChild(item);
         window.scrollTo(0, document.body.scrollHeight);
       });
-      
+
       socket.on('user message', function(msg) {
         var item = document.createElement('li');
         item.textContent = msg;
