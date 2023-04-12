@@ -10,7 +10,7 @@ const port = process.env.PORT || 4000;
 
 // Serve test-chat page
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/test-chat.html');
+  res.sendFile(__dirname + '/local-chat.html');
 });
 
 // We will create a namespace for each bot, on the client 
