@@ -2124,7 +2124,7 @@ OVERALL SUMMARY:
       }
 
       const openAiErrorTypeToReadableError = {
-        "insufficient_quota": "Looks like you've used up all your OpenAI credits. You can buy more here: https://platform.openai.com/account",
+        "insufficient_quota": "Looks like you've used up all your OpenAI credits. You can buy more here:\nhttps://platform.openai.com/account\n\nNote that OpenCharacters does not receive any money from this. OpenAI is the company that provides the 'brain' for your AI. OpenCharacters itself is completely free.",
       };
 
       // Note: the reason this doesn't just take threadId as a param is because we use it for recomputeBotReply() which doesn't necessarily use all messages in a thread, and we also use it for "reply with..." which switches characters
@@ -4748,6 +4748,7 @@ OVERALL SUMMARY:
 
             // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
             
+            return "finished";
           }
 
         } catch(e) {
