@@ -4544,6 +4544,8 @@ OVERALL SUMMARY:
         // backup existing data just in cast this wrecks the db for some reason (used in catch block below):
         const originalDbJsonText = await db.export({prettyJson: true}).then(blob => blob.text());
 
+        let singleThreadImportId = null;
+
         try {
 
           try {
@@ -4697,6 +4699,7 @@ OVERALL SUMMARY:
             if(importedThreads.length === 1) {
               importedThreads[0].isFav = false;
               importedThreads[0].lastViewTime = Date.now();
+              singleThreadImportId = importedThreads[0].id;
             }
 
 
@@ -4747,8 +4750,6 @@ OVERALL SUMMARY:
             await db.import(blob, {acceptVersionDiff:true, acceptMissingTables:true});
 
             // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
-            
-            return "finished";
           }
 
         } catch(e) {
@@ -4757,9 +4758,15 @@ OVERALL SUMMARY:
           downloadText(originalDbJsonText, `opencharacters-export-${yyyymmdd}.json`);
           await delay(1000);
           alert(`There was an error importing your data. Your data has been downloaded as a backup. Please share this error message on Github:\n\n${e.message}\n\n${e.stack}`);
+          return "fail";
         }
-
-        window.location.reload();
+        
+        await renderCharacterList(); // <-- in case they're currently on the character screen
+        await renderThreadList();
+        if(singleThreadImportId !== null) {
+          await showThread(singleThreadImportId);
+        }
+        return "finished";
       }
 
       async function tryImportingExternalCharacterFileFormat(file, options) {
