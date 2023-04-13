@@ -991,7 +991,6 @@
         }
 
         await updateInlineReminderMessage();
-
         await updateThreadScene();
 
         doBotReplyIfNeeded(); // we shouldn't `await` this because thread is already rendered.
@@ -3427,7 +3426,6 @@ OVERALL SUMMARY:
         attachEventHandlersToMessageEl(el);
         
         await updateInlineReminderMessage();
-
         await updateThreadScene();
 
         return el;
@@ -3684,6 +3682,7 @@ OVERALL SUMMARY:
           showEl($.noMessagesNotice);
         }
         await updateInlineReminderMessage();
+        await updateThreadScene();
       }
 
       const defaultUserName = "Anon";
