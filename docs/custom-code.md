@@ -43,7 +43,7 @@ Within your custom code, you can access and update `oc.thread.messages`. It's an
 ```
 The most recent message is at the bottom/end of the array. The `author` field can be `user`, `ai`, or `system`. Use "system" for guiding the AI's behavior, and including context/info where it wouldn't make sense to have that context/info come from the user or the AI.
 
-Here's an example that replaces `:)` with `૮ ˶ᵔ ᵕ ᵔ˶ ა` in every message that is added to the thread:
+Below is an example that replaces `:)` with `૮ ˶ᵔ ᵕ ᵔ˶ ა` in every message that is added to the thread. Just paste it into the custom code box to try it out.
 ```js
 oc.thread.on("MessageAdded", function() {
   let m = oc.thread.messages.at(-1); // get most recent message
