@@ -1,13 +1,14 @@
-If you open the advanced options in the character creation area then you'll see the "custom code" input. This allows you to define some JavaScript functions that extend the functionality of your character.
+If you open the advanced options in the character creation area then you'll see the "custom code" input. This allows you to add some JavaScript code that extend the functionality of your character.
 
 Some examples of what you can do with this:
 
  * Give your character access to the internet (e.g. so you can ask it to summarise webpages)
- * Improve your character's memory by setting up an embedding/retrieval system (see "Storing Data" section below) 
+ * Improve your character's memory by setting up your own embedding/retrieval system (see "Storing Data" section below) 
  * Give your character a custom voice using an API like [ElevenLabs](https://api.elevenlabs.io/docs)
- * Allow your character to run custom JS or [Python](https://github.com/pyodide/pyodide/) code
+ * Allow your character to run custom JS or [Python](https://github.com/josephrocca/OpenCharacters/blob/main/docs/running-python-code.md) code
  * Give your character the ability to create pictures using Stable Diffusion
- * Auto-delete/retry messages from your character that contain certain keywords
+ * [Auto-delete/retry messages](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code-examples.md#add-a-refinement-step-to-the-messages-that-your-character-generates) from your character that contain certain keywords
+ * Change the background image of the chat, or the chat bubble style, or the avatar images, or the music, depending on what's happening in your story
 
 
 ## Examples
@@ -42,7 +43,7 @@ Within your custom code, you can access and update `oc.thread.messages`. It's an
 ```
 The most recent message is at the bottom/end of the array. The `author` field can be `user`, `ai`, or `system`. Use "system" for guiding the AI's behavior, and including context/info where it wouldn't make sense to have that context/info come from the user or the AI.
 
-Here's an example that replaces `:)` with `૮ ˶ᵔ ᵕ ᵔ˶ ა` in every message that is added to the thread:
+Below is an example that replaces `:)` with `૮ ˶ᵔ ᵕ ᵔ˶ ა` in every message that is added to the thread. Just paste it into the custom code box to try it out.
 ```js
 oc.thread.on("MessageAdded", function() {
   let m = oc.thread.messages.at(-1); // get most recent message
@@ -53,24 +54,49 @@ You can edit existing messages like in this example, and you can also delete the
 
 Note that your `MessageAdded` handler can be `async`, and it'll be `await`ed so that you can be sure your code has finished running before the AI responds.
 
-You can also access and edit character data via `oc.character.propertyName`. Here are the property names that you can access and edit:
+You can also access and edit character data via `oc.character.propertyName`. Here's a full list of all the property names that you can access and edit on the `oc` object:
 
- * name
- * avatarUrl
- * roleInstruction
- * reminderMessage
- * initialMessages
- * customCode
- * temperature
- * topP
- * frequencyPenalty
- * presencePenalty
- * stopSequences
- * modelName
+  * `character`
+    * `name`
+    * `avatar`
+      * `url` - url to an image
+      * `size` - multiple of default size
+      * `shape` - `circle` or `square` or `portrait` 
+    * `roleInstruction`
+    * `reminderMessage`
+    * `initialMessages`
+    * `customCode` - yep, a character can edit its own custom code
+    * `temperature`
+    * `topP`
+    * `frequencyPenalty`
+    * `presencePenalty`
+    * `stopSequences`
+    * `modelName`
+ * `thread`
+   * `messages` - an **array** of messages, where **each message** has:
+     * `author`
+     * `name`
+     * `hiddenFrom` - array that can contain "user" or "ai" or both or neither
+     * `expectsReply` - `true` (bot will reply to this message) or `false` (bot will not reply), or `undefined` (use default behavior - i.e. reply to user messages, but not own messages)
+     * `content`
+     * `customData` - message-specific custom data storage
+     * `messageWrapper` - css for the "message bubble" - note that you can include HTML within a message (tip: use `oc.messageRenderingPipeline` for visuals - see below)
+     * `scene` - the most recent message that has a scene is the scene that is "active"
+       * `background`
+         * `url` - image or video url
+         * `filter` - [css filter](https://developer.mozilla.org/en-US/docs/Web/CSS/filter) - e.g. `hue-rotate(90deg); blur(5px)`
+       * `music`
+         * `url` - audio url (also supports video urls)
+         * `volume` - between 0 and 1
+   * `userCharacter`
+     * `name`
+     * `avatar`
+       * `url`
+       * `size`
+       * `shape`
+   * `customData` - thread-specific custom data storage
 
-Yes, a character can even edit its own custom code!
-
-Note that currently only the `temperature` setting is available in the character editor UI, so if you e.g. wanted to add a stop sequence for your character so it stops whenever it writes ":)" and also set presence pentalty to 1, then you could do it by adding this text to the custom code text box in the character editor:
+Note that many character properties aren't available in the character editor UI, so if you e.g. wanted to add a stop sequence for your character so it stops whenever it writes ":)" and also set presence pentalty to 1, then you could do it by adding this text to the custom code text box in the character editor:
 ```js
 oc.character.stopSequences = [":)"];
 oc.character.presencePenalty = 1;
@@ -109,6 +135,15 @@ oc.thread.on("MessageAdded", async function () {
     oc.character.name = m.content.replace(/^\/charname /, "");
     oc.thread.messages.pop(); // remove the message
   }
+});
+```
+
+### Message "Rendering"
+Sometimes you may want to display different text to the user than what the AI sees. For that, you can use `oc.messageRenderingPipeline`. It's an array that you `.push()` a function into, and that function is used to process messages. Your function should use the `reader` parameter to determine who is "reading" the message (either `user` or `ai`), and then "render" the message `content` accordingly. Here's an example to get you started:
+```js
+oc.messageRenderingPipeline.push(function({message, reader}) {
+  if(reader === "user") message.content += "🌸"; // user will see all messages with a flower emoji appended
+  if(reader === "user") message.content = message.content.replaceAll("wow", "WOW"); // ai will see a version of the message with all instances of "wow" capitalized
 });
 ```
 
@@ -163,16 +198,9 @@ window.hello = function() {
 }
 ```
 
-## Storing Data (not yet implemented! open an issue if you want it)
+## Storing Custom Data
 
-If you'd like to save some data that is generated by your custom code, then you can do that by using the special `oc.thread.storage` and `oc.character.storage` objects. The `oc.character.storage` data will be available in all threads that use this character, whereas the `oc.thread.storage` will only be available within this thread. Just use `oc.character.storage` and `oc.thread.storage` like as if they're regular JS objects (`oc.thread.storage.foo = 10`), and the data will be automatically persisted until the user deletes the character or thread, respectively.
-
-**Note**: This is not currently implemented, but a current work-around for thread-specific data storage is to store your data in the first message of the thread, and add `hiddenFrom:["ai", "user"]` to the message. Then just read and write your data like this:
-```js
-let data = JSON.parse(oc.thread.messages[0].content); // load data
-data.blah = 123; // edit data
-oc.thread.messages[0].content = JSON.stringify(data); // save data
-```
+If you'd like to save some data that is generated by your custom code, then you can do that by using `oc.thread.customData` - e.g. `oc.thread.customData.foo = 10`. You can also store custom data on individual messages like this: `message.customData.foo = 10`.
 
 # FAQ
 
