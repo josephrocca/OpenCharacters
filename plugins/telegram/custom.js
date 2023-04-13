@@ -1,10 +1,9 @@
-console.log("running custom code");
+console.log("Running Telegram integration custom code");
 
 import { io } from "https://cdn.socket.io/4.6.0/socket.io.esm.min.js";
 
 // Create message namespace just for this character/bot
 const namespace = oc.character.name.toLowerCase();
-console.log(namespace);
 const socket = io(`http://127.0.0.1:4000/${namespace}`);
 
 socket.on('user message', function(msg) {

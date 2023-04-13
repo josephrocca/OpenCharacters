@@ -1,4 +1,5 @@
 // Import necessary modules
+const path = require('path');
 const app = require('express')(); // Express web framework
 const http = require('http').Server(app); // HTTP server
 const io = require('socket.io')(http, {
@@ -14,7 +15,6 @@ require('dotenv').config();
 
 // Set up logging
 const winston = require('winston');
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
@@ -48,8 +48,20 @@ bot.telegram.getMe().then((botInfo) => {
 bot.launch();
 
 // Serve local-chat page for testing
-app.get('/', (req, res) => {
+app.get('/local-chat', (req, res) => {
   res.sendFile(__dirname + '/local-chat.html');
+});
+
+// Serve OpenCharacters page
+const indexPath = path.join(__dirname, '..', '..', 'index.html');
+const utilsPath = path.join(__dirname, '..', '..', 'utils.js');
+
+app.get('/', (req, res) => {
+  res.sendFile(indexPath);
+});
+
+app.get('/utils.js', (req, res) => {
+  res.sendFile(utilsPath);
 });
 
 // We will create a namespace for each bot, on the client 
@@ -57,7 +69,7 @@ app.get('/', (req, res) => {
 //   const namespace = oc.character.name.toLowerCase();
 // then we use this in the set up for the socket connection:
 //   const socket = io(`http://127.0.0.1:4000/${namespace}`);
-const namespaces = io.of(/^\/\w+$/); // Create a Socket.IO namespace for each bot
+const namespaces = io.of(/^\/\w+$/); // Create a Socket.IO namespace for each character
 
 // Handle connections to each namespace
 namespaces.on('connection', (socket) => {
