@@ -79,6 +79,7 @@ You can also access and edit character data via `oc.character.propertyName`. Her
      * expectsReply - `true` (bot will reply to this message) or `false` (bot will not reply), or `undefined` (use default behavior - i.e. reply to user messages, but not own messages)
      * content
      * customData - message-specific custom data storage
+     * messageWrapper - css for the "message bubble" - note that you can include HTML within a message (tip: use `oc.messageRenderingPipeline` for visuals - see below)
      * scene - the most recent message that has a scene is the scene that is "active"
        * background
          * url - image or video url
