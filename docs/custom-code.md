@@ -55,45 +55,45 @@ Note that your `MessageAdded` handler can be `async`, and it'll be `await`ed so 
 
 You can also access and edit character data via `oc.character.propertyName`. Here's a full list of all the property names that you can access and edit on the `oc` object:
 
-  * character
-    * name
-    * avatar
-      * url - url to an image
-      * size - multiple of default size
-      * shape - `circle` or `square` or `portrait` 
-    * roleInstruction
-    * reminderMessage
-    * initialMessages
-    * customCode - yep, a character can edit its own custom code
-    * temperature
-    * topP
-    * frequencyPenalty
-    * presencePenalty
-    * stopSequences
-    * modelName
- * thread
-   * messages - an array of messages, where **each message** has:
-     * author
-     * name
-     * hiddenFrom - array that can contain "user" or "ai" or both or neither
-     * expectsReply - `true` (bot will reply to this message) or `false` (bot will not reply), or `undefined` (use default behavior - i.e. reply to user messages, but not own messages)
-     * content
-     * customData - message-specific custom data storage
-     * messageWrapper - css for the "message bubble" - note that you can include HTML within a message (tip: use `oc.messageRenderingPipeline` for visuals - see below)
-     * scene - the most recent message that has a scene is the scene that is "active"
-       * background
-         * url - image or video url
-         * filter - [css filter](https://developer.mozilla.org/en-US/docs/Web/CSS/filter) - e.g. `hue-rotate(90deg); blur(5px)`
-       * music
-         * url - audio url (also supports video urls)
-         * volume - between 0 and 1
-   * userCharacter
-     * name
-     * avatar
-       * url
-       * size
-       * shape
-   * customData - thread-specific custom data storage
+  * `character`
+    * `name`
+    * `avatar`
+      * `url` - url to an image
+      * `size` - multiple of default size
+      * `shape` - `circle` or `square` or `portrait` 
+    * `roleInstruction`
+    * `reminderMessage`
+    * `initialMessages`
+    * `customCode` - yep, a character can edit its own custom code
+    * `temperature`
+    * `topP`
+    * `frequencyPenalty`
+    * `presencePenalty`
+    * `stopSequences`
+    * `modelName`
+ * `thread`
+   * `messages` - an array of messages, where **each message** has:
+     * `author`
+     * `name`
+     * `hiddenFrom` - array that can contain "user" or "ai" or both or neither
+     * `expectsReply` - `true` (bot will reply to this message) or `false` (bot will not reply), or `undefined` (use default behavior - i.e. reply to user messages, but not own messages)
+     * `content`
+     * `customData` - message-specific custom data storage
+     * `messageWrapper` - css for the "message bubble" - note that you can include HTML within a message (tip: use `oc.messageRenderingPipeline` for visuals - see below)
+     * `scene` - the most recent message that has a scene is the scene that is "active"
+       * `background`
+         * `url` - image or video url
+         * `filter` - [css filter](https://developer.mozilla.org/en-US/docs/Web/CSS/filter) - e.g. `hue-rotate(90deg); blur(5px)`
+       * `music`
+         * `url` - audio url (also supports video urls)
+         * `volume` - between 0 and 1
+   * `userCharacter`
+     * `name`
+     * `avatar`
+       * `url`
+       * `size`
+       * `shape`
+   * `customData` - thread-specific custom data storage
 
 Note that many character properties aren't available in the character editor UI, so if you e.g. wanted to add a stop sequence for your character so it stops whenever it writes ":)" and also set presence pentalty to 1, then you could do it by adding this text to the custom code text box in the character editor:
 ```js
