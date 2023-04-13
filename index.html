@@ -4378,7 +4378,7 @@ OVERALL SUMMARY:
 
 
 
-            
+
             window.addEventListener("message", async function(e) {
               if(e.source !== window.parent || e.origin !== "${window.location.origin}") return;
 
@@ -5418,44 +5418,57 @@ OVERALL SUMMARY:
 
         if(!json) return "fail";
 
-        if(json.name === undefined && json.char_name === undefined) return "fail";
-
         if(options.keepExistingData === "no") {
           if(!confirm("You're importing an external character format, but you've requested that all existing data be deleted. This is not currently supported when importing external formats. Existing data will NOT be deleted.")) {
             return "finished";
           }
         }
 
-        let name = json.name ?? json.char_name;
-        let personality = json.personality ?? json.char_persona ?? null;
-        let description = json.description ?? null;
-        let firstAIMessage = json.char_greeting ?? json.first_mes ?? null;
-        let exampleDialogue = json.example_dialogue ?? json.mes_example ?? ""
-        let scenario = json.scenario ?? json.world_scenario ?? "";
-        let avatarUrl = json.avatar === undefined || json.avatar === "none" || json.avatar === "" ? "" : json.avatar;
-
-        let exampleDialogueChunks = [];
-        if(exampleDialogue) {
-          if(exampleDialogue.includes("<START>")) {
-            exampleDialogueChunks = exampleDialogue.split("<START>").map(c => c.trim()).filter(c => c);
-          } else {
-            exampleDialogueChunks = [exampleDialogue];
-          }
-        }
-
-        let systemMessageChunks = [];
-        if(description) systemMessageChunks.push(`# Description of {{char}}:\n${description}`);
-        if(personality) systemMessageChunks.push(`# {{char}}'s Personality:\n${personality}`);
-
         let character = {avatar:{}};
 
-        character.name = name;
-        character.avatar.url = avatarUrl;
-        character.systemMessage = systemMessageChunks.join("\n\n");
-        character.initialMessages = [];
-        if(exampleDialogueChunks.length > 0) character.initialMessages.push({author:"system", content:`### Example Dialogue:\n${exampleDialogueChunks.map(c => `---start example---\n${c}\n---end example---`).join("\n\n")}`, hiddenFrom:["user"]});
-        if(scenario) character.initialMessages.push({author:"system", content:"Scenario: "+scenario});
-        if(firstAIMessage) character.initialMessages.push({author:"ai", content:firstAIMessage});
+        // tavern/pyg/text-gen:
+        if(json.name || json.char_name) {
+          let name = json.name ?? json.char_name;
+          let personality = json.personality ?? json.char_persona ?? null;
+          let description = json.description ?? null;
+          let firstAIMessage = json.char_greeting ?? json.first_mes ?? null;
+          let exampleDialogue = json.example_dialogue ?? json.mes_example ?? ""
+          let scenario = json.scenario ?? json.world_scenario ?? "";
+          let avatarUrl = json.avatar === undefined || json.avatar === "none" || json.avatar === "" ? "" : json.avatar;
+        
+
+          let exampleDialogueChunks = [];
+          if(exampleDialogue) {
+            if(exampleDialogue.includes("<START>")) {
+              exampleDialogueChunks = exampleDialogue.split("<START>").map(c => c.trim()).filter(c => c);
+            } else {
+              exampleDialogueChunks = [exampleDialogue];
+            }
+          }
+
+          let systemMessageChunks = [];
+          if(description) systemMessageChunks.push(`# Description of {{char}}:\n${description}`);
+          if(personality) systemMessageChunks.push(`# {{char}}'s Personality:\n${personality}`);
+
+          character.name = name;
+          character.avatar.url = avatarUrl;
+          character.systemMessage = systemMessageChunks.join("\n\n");
+          character.initialMessages = [];
+          if(exampleDialogueChunks.length > 0) character.initialMessages.push({author:"system", content:`### Example Dialogue:\n${exampleDialogueChunks.map(c => `---start example---\n${c}\n---end example---`).join("\n\n")}`, hiddenFrom:["user"]});
+          if(scenario) character.initialMessages.push({author:"system", content:"Scenario: "+scenario});
+          if(firstAIMessage) character.initialMessages.push({author:"ai", content:firstAIMessage});
+        } else if(json.character?.name) {
+          character.name = json.character.name;
+          let systemMessageChunks = [];
+          if(json.character.title) systemMessageChunks.push(`# Title:\n${json.character.title}`);
+          if(json.character.description) systemMessageChunks.push(`# Description of ${character.name}:\n${json.character.description}`);
+          if(json.character.definition) systemMessageChunks.push(`# Character Definition:\n${json.character.definition}`);
+          character.systemMessage = systemMessageChunks.join("\n\n");
+          character.initialMessages = [{author:"ai", content:json.character.greeting}];
+          character.avatar.url = "https://characterai.io/i/400/static/avatars/"+json.character.avatar_file_name;
+        } else {
+          return "fail";
+        }
 
         let result = await characterDetailsPrompt(character);
         if(result) {
