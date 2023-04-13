@@ -9,6 +9,6 @@ So this page lists some "official" custom code "plugins" which you can enable by
 ## Text-to-Speech
 This causes your character to "speak" the text that it generates. To use it, just open the advanced character settings and paste this on a new line in the custom code box:
 ```js
-import "./plugins/tts/main.js";
+await import("./plugins/tts/main.js");
 ```
 I recommend using **Chrome** rather than Firefox because as of writing, Firefox's voices are super robotic. We may get [completely customizable voices](https://github.com/xenova/transformers.js/issues/59) within the next 6 months or so.
