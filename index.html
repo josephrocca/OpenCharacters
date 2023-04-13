@@ -422,6 +422,10 @@
         return false;
       }
 
+      if(!window.isSecureContext) {
+        alert("Hey, looks like you're trying to host this locally, but you have hosted it in an insecure context - i.e. you're serving it on HTTP instead of HTTPS. Unfortunately there are a bunch of features that are disabled on HTTP connections for modern browsers. localhost is treated as a secure context for development purposes, but if you want to server it on the internet, then I recommend using Cloudflare - you just switch your domain's nameservers to them and then it's basically a button click and you've got HTTPS. Much easier than setting up your own certificate stuff.");
+      }
+
       // polyfill for navigator.userActivation
       if(!navigator.userActivation) {
         navigator.userActivation = {hasBeenActive:false};
@@ -1009,6 +1013,10 @@
       let threadIdToMusicPermission = {}
       let updateThreadSceneCounter = 0;
       async function updateThreadScene() {
+        if($.messageFeed.offsetWidth === 0) {
+          console.warn("Tried to update thread scene but message feed was not visible.");
+          return;
+        }
         updateThreadSceneCounter++;
         let threadId = parseInt($.messageFeed.dataset.threadId);
         let thread = await db.threads.get(threadId);
@@ -4307,6 +4315,70 @@ OVERALL SUMMARY:
 
             window.oc = Object.freeze(window.oc);
 
+
+
+
+            function getCurrentData() {
+              // we need to ignore the Proxy trigger while we do this:
+              let origFlag = dataChangedByCustomCode;
+              let data = JSON.parse(JSON.stringify(oc));
+              dataChangedByCustomCode = origFlag;
+              return data;
+            }
+            function getChangedData() {
+              let origFlag = dataChangedByCustomCode;
+              let prevData = dataSnapshotWhenLastSentToMainThread;
+              let changedData = getCurrentData();
+              // delete any values of changedData that were the same as existing data so we only send back changes:
+              for(let key in prevData.thread) {
+                if(typeof prevData.thread[key] === "object") {
+                  // need to stringify to test sameness of arrays and other non-primitives:
+                  // TODO: maybe make this more efficient at some point - stringifying a huge thread could be sluggish
+                  // TODO: and it should really just send back a *delta*, rather than whole messages array
+                  if(JSON.stringify(prevData.thread[key]) === JSON.stringify(changedData.thread[key])) delete changedData.thread[key];
+                } else {
+                  if(prevData.thread[key] === changedData.thread[key]) delete changedData.thread[key];
+                }
+              }
+              for(let key in prevData.character) {
+                if(typeof prevData.character[key] === "object") {
+                  if(JSON.stringify(prevData.character[key]) === JSON.stringify(changedData.character[key])) delete changedData.character[key];
+                } else {
+                  if(prevData.character[key] === changedData.character[key]) delete changedData.character[key];
+                }
+              }
+              dataChangedByCustomCode = origFlag;
+              return changedData;
+            }
+            async function sendBackDataUpdatesIfNeeded() {
+              if(dataChangedByCustomCode) {
+                let changedData = getChangedData();
+                // if(changedData.thread.messages && new Set(changedData.thread.messages.map(m => m.content)).size < changedData.thread.messages.length) {
+                //   debugger;
+                // }
+                dataChangedByCustomCode = false;
+                dataSnapshotWhenLastSentToMainThread = getCurrentData();
+                console.log("Custom code changed character/thread data:", changedData);
+                await callParentWindow({type:"dataChanged", data:changedData})
+              }
+            }
+            (async function() {
+              while(1) {
+                try {
+                  // TODO: make this more efficient - polling is not ideal
+                  await new Promise(r => setTimeout(r, 50));
+                  if(dataChangedByCustomCode) {
+                    await sendBackDataUpdatesIfNeeded();
+                  }
+                } catch(e) {
+                  console.error(e);
+                }
+              }
+            })();
+
+
+
+            
             window.addEventListener("message", async function(e) {
               if(e.source !== window.parent || e.origin !== "${window.location.origin}") return;
 
@@ -4361,64 +4433,6 @@ OVERALL SUMMARY:
                 }
 
               }
-
-              function getCurrentData() {
-                // we need to ignore the Proxy trigger while we do this:
-                let origFlag = dataChangedByCustomCode;
-                let data = JSON.parse(JSON.stringify(oc));
-                dataChangedByCustomCode = origFlag;
-                return data;
-              }
-              function getChangedData() {
-                let origFlag = dataChangedByCustomCode;
-                let prevData = dataSnapshotWhenLastSentToMainThread;
-                let changedData = getCurrentData();
-                // delete any values of changedData that were the same as existing data so we only send back changes:
-                for(let key in prevData.thread) {
-                  if(typeof prevData.thread[key] === "object") {
-                    // need to stringify to test sameness of arrays and other non-primitives:
-                    // TODO: maybe make this more efficient at some point - stringifying a huge thread could be sluggish
-                    // TODO: and it should really just send back a *delta*, rather than whole messages array
-                    if(JSON.stringify(prevData.thread[key]) === JSON.stringify(changedData.thread[key])) delete changedData.thread[key];
-                  } else {
-                    if(prevData.thread[key] === changedData.thread[key]) delete changedData.thread[key];
-                  }
-                }
-                for(let key in prevData.character) {
-                  if(typeof prevData.character[key] === "object") {
-                    if(JSON.stringify(prevData.character[key]) === JSON.stringify(changedData.character[key])) delete changedData.character[key];
-                  } else {
-                    if(prevData.character[key] === changedData.character[key]) delete changedData.character[key];
-                  }
-                }
-                dataChangedByCustomCode = origFlag;
-                return changedData;
-              }
-              async function sendBackDataUpdatesIfNeeded() {
-                if(dataChangedByCustomCode) {
-                  let changedData = getChangedData();
-                  // if(changedData.thread.messages && new Set(changedData.thread.messages.map(m => m.content)).size < changedData.thread.messages.length) {
-                  //   debugger;
-                  // }
-                  dataChangedByCustomCode = false;
-                  dataSnapshotWhenLastSentToMainThread = getCurrentData();
-                  console.log("Custom code changed character/thread data:", changedData);
-                  await callParentWindow({type:"dataChanged", data:changedData})
-                }
-              }
-              (async function() {
-                while(1) {
-                  try {
-                    // TODO: make this more efficient - polling is not ideal
-                    await new Promise(r => setTimeout(r, 50));
-                    if(dataChangedByCustomCode) {
-                      await sendBackDataUpdatesIfNeeded();
-                    }
-                  } catch(e) {
-                    console.error(e);
-                  }
-                }
-              })();
 
               if(e.data.type === "init") {
 
