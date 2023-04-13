@@ -507,7 +507,7 @@
       }
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(34).stores({
+      db.version(35).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
