@@ -4046,7 +4046,7 @@ OVERALL SUMMARY:
         </head>
         <body>
         <script type="module">
-          window.___dataInitializationIsComplete_836283628 = false;
+          window.___dataInitializationFINISHED_836283628 = false;
 
           // Proxy fetch to remove CORS restrictions
           const proxyHandler = {
@@ -4423,14 +4423,23 @@ OVERALL SUMMARY:
                 //   oc.character[key] = data.character[key];
                 // }
                 applyObjectOverrides({object:oc.character, overrides:data.character});
-                window.___dataInitializationIsComplete_836283628 = true;
+                window.___dataInitializationFINISHED_836283628 = true;
                 dataChangedByCustomCode = false;
                 dataSnapshotWhenLastSentToMainThread = getCurrentData();
 
                 // it's important that we wait for custom code to finish loading before we indicate that init has finished.
+                let loopDelay = 5;
+                let waitedTime = 0;
                 while(1) {
-                  if(window.__customCodeInitializationIsComplete_846298638) break;
-                  await new Promise(r => setTimeout(r, 5));
+                  if(window.__customCodeInitializationIsComplete_846298638) {
+                    break;
+                  }
+                  if(waitedTime > 10 && !window.__customCodeInitializationSTARTED_846298638) {
+                    // it should *start* in milliseconds, so this almost certainly indicates they had a syntax error in their code which prevented the whole script tag from executing at all.
+                    break; // <-- break to prevent endless loading screen
+                  }
+                  await new Promise(r => setTimeout(r, loopDelay));
+                  waitedTime += loopDelay;
                 }
                 
                 window.parent.postMessage({_id:e.data._id, success:true, result:null}, "${window.location.origin}");
@@ -4447,14 +4456,23 @@ OVERALL SUMMARY:
 
         <!-- note: this must be a separate code block from above, because otherwise static imports are initialised before window.oc exists -->
         <script type="module">
+          window.__customCodeInitializationSTARTED_846298638 = true;
+
           // we need to wait for the oc data to load because they may immediately reference it in their custom code
           while(1) {
-            if(window.___dataInitializationIsComplete_836283628) break;
+            if(window.___dataInitializationFINISHED_836283628) break;
             await new Promise(r => setTimeout(r, 5));
           }
           console.log("Data initialization of sandboxed iframe is complete.");
-
-          {{customCode}}
+          try {
+            // currently the only reason this is wrapped in an async function is to throw an error if the user's code contains a static import, since static imports are pre-loaded and thus jump ahead of initialization
+            // oh and maybe we need it to be able to catch wrap this try/catch around it too?
+            await (async () => {
+              {{customCode}}
+            })();
+          } catch(e) {
+            console.error(e);
+          }
 
           // backwards-compat with old processMessages function:
           if(window.processMessages) {
