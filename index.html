@@ -1534,7 +1534,7 @@
       async function safelyDeleteThreadById(threadId) {
         // let thread = await db.threads.get(threadId);
         await db.threads.delete(threadId);
-        let messageIds = await db.messages.where("threadId").equals(threadId).toArray();
+        let messageIds = await db.messages.where("threadId").equals(threadId).toArray().then(arr => arr.map(m => m.id));
         await safelyDeleteMessagesByIds(messageIds);
         // delete messages, summaries, memories, and usagestats for this thread:
         await db.summaries.where("threadId").equals(threadId).delete();
