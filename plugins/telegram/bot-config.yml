@@ -1,0 +1,11 @@
+---
+testbot: # Character name from OpenCharacters
+  bot_name: dan_gpt_8d4f_bot # Telegram bot name
+  # ChatId - can be found by sending a message to the bot in Telegram the opening
+  #   https://api.telegram.org/bot<BOT_TOKEN>/getUpdates
+  # Currently the integration only supports a single chat
+  chat_id: '-904620196' 
+  # chatId: '1549238685'
+sally:
+  bot_name: 'sally_test_1111_bot'
+  chat_id: '1549238685'

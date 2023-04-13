@@ -2,7 +2,12 @@
   "dependencies": {
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
+    "fs": "^0.0.1-security",
+    "js": "^0.1.0",
+    "js-yaml": "^4.1.0",
     "socket.io": "^4.6.1",
-    "telegraf": "^4.12.2"
+    "telegraf": "^4.12.2",
+    "winston": "^3.8.2",
+    "yaml": "^2.2.1"
   }
 }
