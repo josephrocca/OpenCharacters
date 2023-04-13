@@ -3996,7 +3996,7 @@ OVERALL SUMMARY:
         stopSequences: "stopSequences",
         modelName: "modelName",
         // note: we DO NOT expose `character.userCharacter` - custom code instead edits thread.userCharacter, which is a copy of character.userCharacter that's created at the start of a new thread
-        scene: "scene",
+        // scene: "scene", // not exposing `scene` yet because I think it should probably be like userCharacter - i.e. instantiated as a thread property. but devs can edit scene by adding to messages anyway so no rush here.
         streamingResponse: "streamingResponse",
       };
 
