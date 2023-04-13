@@ -73,7 +73,7 @@ You can also access and edit character data via `oc.character.propertyName`. Her
     * `stopSequences`
     * `modelName`
  * `thread`
-   * `messages` - an array of messages, where **each message** has:
+   * `messages` - an **array** of messages, where **each message** has:
      * `author`
      * `name`
      * `hiddenFrom` - array that can contain "user" or "ai" or both or neither
