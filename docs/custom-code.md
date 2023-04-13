@@ -137,6 +137,15 @@ oc.thread.on("MessageAdded", async function () {
 });
 ```
 
+### Message "Rendering"
+Sometimes you may want to display different text to the user than what the AI sees. For that, you can use `oc.messageRenderingPipeline`. It's an array that you `.push()` a function into, and that function is used to process messages. Your function should use the `reader` parameter to determine who is "reading" the message (either `user` or `ai`), and then "render" the message `content` accordingly. Here's an example to get you started:
+```js
+oc.messageRenderingPipeline.push(function({message, reader}) {
+  if(reader === "user") message.content += "🌸"; // user will see all messages with a flower emoji appended
+  if(reader === "user") message.content = message.content.replaceAll("wow", "WOW"); // ai will see a version of the message with all instances of "wow" capitalized
+});
+```
+
 ### Visual Display and User Inputs
 
 Your custom code runs inside an iframe. You can visually display the iframe using `oc.window.show()` (and hide with `oc.window.hide()`). The user can drag the embed around on the page and resize it. All your custom code is running within the iframe embed whether it's currently displayed or not. You can display content in the embed by just executing custom code like `document.body.innerHTML = "hello world"`.
