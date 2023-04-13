@@ -2343,6 +2343,8 @@ OVERALL SUMMARY:
       async function renderMessagesForReader({messages, reader, threadId, onProgressMessage}) {
         // `reader` can be "ai" or "user"
 
+        if(messages.length === 0) return [];
+
         let thread = await db.threads.get(threadId);
         let aiCharacter = await db.characters.get(thread.characterId);
         let userCharacter = await getUserCharacterObj(threadId);
