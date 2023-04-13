@@ -594,6 +594,7 @@
         //  - getSystemCharacterObj
         //  - characterPropertiesVisibleToCustomCode
         // NOTE: I'm not adding customData to characters yet, because we'd need to have private and public (shared in link) silos, and I haven't thought enough about that yet
+        return character;
       }
 
       function upgradeMessageFromOldVersion(message) {
@@ -607,6 +608,7 @@
         if(message.wrapperStyle === undefined) message.wrapperStyle = "";
         // WARNING: If you add something here, you may need to edit createMessageObj
         // WARNING: You may also need to edit messagesToCustomCodeFormat and messagesFromCustomCodeFormat if the data should be readable/writable from custom code
+        return message;
       }
 
       function upgradeThreadFromOldVersion(thread) {
@@ -616,6 +618,7 @@
         if(thread.customCodeWindow === undefined) thread.customCodeWindow = {visible:false, width:null}; 
         if(thread.customData === undefined) thread.customData = {}; 
         // WARNING: If you add something here, you may need to edit addThread
+        return thread;
       }
       
 
@@ -706,7 +709,7 @@
 
         let characters = await db.characters.toArray();
         for(let thread of threads) {
-          thread.character = characters.find(c => c.id === thread.characterId) || {}; // added the `|| {}` so it still attempts to render the thread even if there's a bug - this shouldn't happen, but did happen for a user and this might help me debug
+          thread.character = characters.find(c => c.id === thread.characterId) || {}; // added the `|| {avatar:{}}` so it still attempts to render the thread even if there's a bug - this shouldn't happen, but did happen for a user and this might help me debug
         }
         if(opts.filterWithQuery) {
           let q = opts.filterWithQuery.toLowerCase();
@@ -1189,7 +1192,7 @@
       function createCharacterCardHtml(character) {
         return `
           <div class="character" data-character-id="${sanitizeHtml(character.id)}" style="display:flex; padding:0.5rem; cursor:pointer;">
-            <div class="avatar" style="${character.avatarUrl ? `background-image:url(${sanitizeHtml(character.avatarUrl)})` : ""};"></div>
+            <div class="avatar" style="${character.avatar.url ? `background-image:url(${sanitizeHtml(character.avatar.url)})` : ""};"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem; display: flex; flex-direction: column; justify-content: space-between;">
               <div class="name" style="font-weight:bold;">${character.name.length > 21 ? sanitizeHtml(character.name.slice(0, 21)+"…") : sanitizeHtml(character.name)} <span style="opacity:0.5; font-weight:normal;">${character.id !== null ? "#"+sanitizeHtml(character.id) : ""}</span></div>
               <!-- <div class="systemMessage" style="font-size: 0.8rem; text-overflow: ellipsis; word-wrap: break-word; overflow: hidden; height: 2em; line-height: 1em;">${character.systemMessage.length > 85 ? sanitizeHtml(character.systemMessage.slice(0, 85)+"...") : sanitizeHtml(character.systemMessage)}</div> -->
@@ -1213,12 +1216,14 @@
         const characters = await db.characters.orderBy("lastMessageTime").reverse().toArray();
         
         // Add an entry for the "create character" option with `id=null`.
-        characters.unshift({
+        characters.unshift(upgradeCharacterFromOldVersion({
           id: null,
           name: "Create New Character",
           systemMessage: "Click here to create a new character",
-          avatarUrl: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgZmlsbD0iY3VycmVudENvbG9yIiBjbGFzcz0iYmkgYmktcGx1cy1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+CiAgPHBhdGggZD0iTTggMTVBNyA3IDAgMSAxIDggMWE3IDcgMCAwIDEgMCAxNHptMCAxQTggOCAwIDEgMCA4IDBhOCA4IDAgMCAwIDAgMTZ6Ii8+CiAgPHBhdGggZD0iTTggNGEuNS41IDAgMCAxIC41LjV2M2gzYS41LjUgMCAwIDEgMCAxaC0zdjNhLjUuNSAwIDAgMS0xIDB2LTNoLTNhLjUuNSAwIDAgMSAwLTFoM3YtM0EuNS41IDAgMCAxIDggNHoiLz4KPC9zdmc+",
-        });
+          avatar: {
+            url: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgZmlsbD0iY3VycmVudENvbG9yIiBjbGFzcz0iYmkgYmktcGx1cy1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+CiAgPHBhdGggZD0iTTggMTVBNyA3IDAgMSAxIDggMWE3IDcgMCAwIDEgMCAxNHptMCAxQTggOCAwIDEgMCA4IDBhOCA4IDAgMCAwIDAgMTZ6Ii8+CiAgPHBhdGggZD0iTTggNGEuNS41IDAgMCAxIC41LjV2M2gzYS41LjUgMCAwIDEgMCAxaC0zdjNhLjUuNSAwIDAgMS0xIDB2LTNoLTNhLjUuNSAwIDAgMSAwLTFoM3YtM0EuNS41IDAgMCAxIDggNHoiLz4KPC9zdmc+",
+          },
+        }));
 
         $.characterList.innerHTML = characters.map(character => createCharacterCardHtml(character)).join("");
 
@@ -1236,7 +1241,9 @@
               {author:"ai", content:`Hello, adventurer! What type of game would you like to play? Describe the world, and your character in as much or as little detail as you'd like, and I'll simulate the world within my mind to create a fun and engaging adventure for you.`},
             ],
             modelName: "gpt-3.5-turbo",
-            avatarUrl: "https://i.imgur.com/Gxt0kRX.jpg",
+            avatar: {
+              url: "https://i.imgur.com/Gxt0kRX.jpg",
+            },
             fitMessagesInContextMethod: "summarizeOld",
             temperature: 0.7,
             customCode: "",
@@ -1249,7 +1256,9 @@
               {author:"ai", content:`To begin the roleplay, please describe the setting and characters. If you only have a vague idea, that's okay - just give me some keywords to go off, and I'll come up with something interesting and engaging. My replies will consist of 3 sentences, where quotes indicate dialogue, square brackets indicate the inner thoughts of a character, and asterisks indicate character actions.`},
             ],
             modelName: "gpt-3.5-turbo",
-            avatarUrl: "https://i.imgur.com/bHN0oiq.jpg",
+            avatar: {
+              url: "https://i.imgur.com/bHN0oiq.jpg",
+            },
             fitMessagesInContextMethod: "summarizeOld",
             temperature: 0.7,
             customCode: "",
@@ -1262,7 +1271,9 @@
               {author:"ai", content:`Hello, how can I help you today?`},
             ],
             modelName: "gpt-3.5-turbo",
-            avatarUrl: "https://i.imgur.com/kb7Tzf8.jpg",
+            avatar: {
+              url: "https://i.imgur.com/kb7Tzf8.jpg",
+            },
             fitMessagesInContextMethod: "summarizeOld",
             temperature: 0.7,
             customCode: "",
@@ -1300,7 +1311,9 @@
               {author:"ai", content:`Greetings, young one. Seek knowledge and wisdom, do you? Hmmm, much to learn, you still have. Train you, I will. Strong in the Force, you must become. Patience and discipline, you will need.`},
             ],
             modelName: "gpt-3.5-turbo",
-            avatarUrl: "https://i.imgur.com/pweR8nT.jpg",
+            avatar: {
+              url: "https://i.imgur.com/pweR8nT.jpg",
+            },
             fitMessagesInContextMethod: "summarizeOld",
             temperature: 0.7,
             customCode: "",
@@ -1341,7 +1354,9 @@
               {author:"system", hiddenFrom:["ai"], content:`Hello there! This character has some custom code that makes it output an image after each message, and the image should match the facial expression of the message. You can edit this character and show advanced options and you'll see the custom code which does this. You can easily edit the \`expression:url\` list to your liking.\n\nNote that the AI cannot see this message (the one you're reading right now), as indicated by the "blind" icon above this system message.`}
             ],
             modelName: "gpt-3.5-turbo",
-            avatarUrl: "https://i.imgur.com/EGDfzaN.jpeg",
+            avatar: {
+              url: "https://i.imgur.com/EGDfzaN.jpeg",
+            },
             fitMessagesInContextMethod: "summarizeOld",
             temperature: 0.7,
             customCode: dedent(`
@@ -1441,7 +1456,7 @@
         }
 
 
-        $.starterCharacterList.innerHTML = starterCharacters.map(character => createCharacterCardHtml(character)).join("");
+        $.starterCharacterList.innerHTML = starterCharacters.map(character => createCharacterCardHtml(upgradeCharacterFromOldVersion(character))).join("");
         $.starterCharacterList.querySelectorAll(".character").forEach((characterEl, i) => {
           characterEl.addEventListener("click", async function(e) {
             let character = starterCharacters[i];
