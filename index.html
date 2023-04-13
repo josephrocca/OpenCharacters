@@ -3709,9 +3709,6 @@ OVERALL SUMMARY:
         let thread = await db.threads.get(threadId);
         applyObjectOverrides({object:chararcterObj, overrides:thread.userCharacter});
 
-        // ### TODO:
-        // - check that memories and _relevanceScore stuff works with message deletion
-        // - import a bunch of old dumps and make sure they work
         return chararcterObj;
       }
       async function getSystemCharacterObj() {
