@@ -193,11 +193,21 @@
         white-space: nowrap;
         flex-grow: 1;
       }
-      #chatThreads .thread .avatar, #characterSelection  .character .avatar, #messageFeed .message .avatar {
+      #chatThreads .thread .avatar, #characterSelection  .character .avatar {
         width:50px;
         height:50px;
-        border-radius:50%;
+        border-radius: var(--border-radius);
         min-width:50px;
+        background-position: center;
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-color: var(--avatar-bg);
+      }
+      #messageFeed .message .avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: var(--border-radius);
+        min-width: 50px;
         background-position: center;
         background-size: cover;
         background-repeat: no-repeat;
@@ -220,11 +230,23 @@
         display: none;  /* Safari and Chrome */
       }
 
+      /* hide message feed scrollbar */
+      #messageFeed {
+        -ms-overflow-style: none;  /* Internet Explorer 10+ */
+        scrollbar-width: none;  /* Firefox */
+      }
+      #messageFeed::-webkit-scrollbar { 
+        display: none;  /* Safari and Chrome */
+      }
+
       #builtInChatInterfaceWrapper {
         display: flex;
         flex-grow: 1;
         flex-direction: column;
         height: 100%;
+        position:relative;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
       }
 
       #messageFeed .message .bottomButtons {
@@ -295,23 +317,13 @@
         user-select:none;
       }
 
-      .loadingModalCtn {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0,0,0,0.5);
-        z-index: 100;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+      #customCodeIframeHorizontalResizeBar {
+        width:5px;
+        background:var(--button-bg);
+        cursor:ew-resize;
       }
-      .loadingModalContent {
-        background-color: var(--bg-color);
-        border-radius: var(--border-radius);
-        padding: 1rem;
-        text-align: center;
+      #customCodeIframeHorizontalResizeBar:hover {
+        background:var(--button-bg-hover);
       }
 
       /* typing indicator from https://codepen.io/arthak/pen/rmqvgo */
@@ -327,7 +339,7 @@
     </div>
 
     <div id="main" style="display:flex; position:fixed; top:0; right:0; left:0; bottom:0;">
-      <div id="leftColumn" style="display:flex; flex-direction:column; width:270px; min-width:270px; padding:0.5rem; padding-right:0; ">
+      <div id="leftColumn" style="display:flex; flex-direction:column; width:270px; min-width:270px; padding:0.5rem; ">
         <div>
           <button id="newThreadButton" style="width:100%; cursor:pointer; min-height:2rem;">💬 new chat</button>
         </div>
@@ -345,7 +357,7 @@
         </div>
       </div>
 
-      <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; padding-left:0.5rem; ">
+      <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden;">
         <button id="leftColumnToggleButton" data-state="open" style="position:absolute; top:0.25rem; left:0.25rem; z-index:500; padding:0.25rem; display:none;">menu</button>
         <div id="characterSelection" class="middleColumnScreen" style="flex-grow:1; display:none; overflow: auto;">
           <div><h2 style="text-align:center;">Your Characters</h2></div>
@@ -357,10 +369,11 @@
         <div id="chatInterface" class="middleColumnScreen" style="display:flex; flex-grow:1; flex-direction:column; height:100%;">
           <div id="customCodeChatInterfaceWrapper" style="display:none;"></div>
           <div id="builtInChatInterfaceWrapper">
+            <div id="chatBackgroundCtn" style="pointer-events:none; position:absolute; top:0; left:0; right:0; bottom:0; z-index:-10;"></div>
             <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem;">Type a message to begin the chat.</div>
             <div id="messageFeed" style="flex-grow:1; overflow-y:auto;"></div>
             <div id="statusNotifier" style="text-align: center; display: none; height: 0; position: relative; top: -0.4rem; display: flex; align-items: center; justify-content: center;"></div>
-            <div id="inputWrapper" style="display:flex; padding:0.5rem; padding-left:0; flex-direction:column;">
+            <div id="inputWrapper" style="display:flex; padding:0.5rem; padding-left:0; padding-right:0; flex-direction:column;">
               <!-- <div style="display:flex;margin-bottom: 0.25rem;">
                 <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
               </div> -->
@@ -376,15 +389,30 @@
         </div>
       </div>
 
-      <div id="rightColumn" style="width:0px;">
+      <div id="rightColumn" style="width:min-content;">
+        <div id="customCodeColumn" style="width:min-content; display:flex; height:100%;">
+          <div id="customCodeIframeHorizontalResizeBar"></div>
+          <div id="customCodeIframeCtn" style="height:100%; flex-grow:1; min-width:30px;"></div>
+        </div>
       </div>
     </div>
 
+    <audio id="musicPlayer" style="display:none;"></audio>
+
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal } from "./utils.js?v=22";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement } from "./utils.js?v=23";
 
       // TODO: allow <style> when you work out how to scope it to the current message only - maybe just use a CSS parser and add .messageText prefix to selectors - https://github.com/jotform/css.js
-      let domPurifyOptions = {FORBID_TAGS: ['style']};
+      let domPurifyOptions = {
+        FORBID_TAGS: ['style'],
+        ADD_ATTR: ['onclick'], // WARNING: I'm using a hook (below) to make this safe. Be careful when editing this stuff.
+      };
+      DOMPurify.addHook('uponSanitizeAttribute', function (node, data) {
+        if(data.attrName === "onclick") {
+          node.dataset.onClickCode = data.attrValue;
+          data.attrValue = "window.runCodeInCustomCodeIframe(this.dataset.onClickCode)";
+        }
+      });
 
       window.onerror = function(errorMsg, url, lineNumber, columnNumber, errorObj) {
         alert(`Please report this error on the Discord or Github:\n\n${errorMsg}\n\nstack: ${errorObj?.stack}\n\nline: ${lineNumber}`);
@@ -393,6 +421,20 @@
         }
         return false;
       }
+
+      // polyfill for navigator.userActivation
+      if(!navigator.userActivation) {
+        navigator.userActivation = {hasBeenActive:false};
+        let pageActivationClickHandler = (e) => {
+          if(e.isTrusted) {
+            navigator.userActivation.hasBeenActive = true;
+            window.removeEventListener("click", pageActivationClickHandler);
+          }
+        }
+        window.addEventListener("click", pageActivationClickHandler);
+      }
+
+      const sceneBackground = addBackgroundToElement($.chatBackgroundCtn);
 
       // dragula([$.messageFeed], {
       //   moves: function (el, source, handle, sibling) {
@@ -410,7 +452,7 @@
         borderColor: "var(--border-color)",
       };
 
-      let summariesWindow = createFloatingWindow({header:"Summaries"});
+      let summariesWindow = createFloatingWindow({header:"Logs"});
       summariesWindow.hide();
       function addToSummaryLog(html) {
         let ctn = document.createElement("div");
@@ -435,25 +477,26 @@
       const isMobile = window.innerWidth < 700; // TODO: improve this heuristic. this isn't just about screen width - it's also about touch screens (no pointer hover events).
 
       // add menu open/close button for narrow screens
+      showEl($.leftColumnToggleButton);
+      $.leftColumnToggleButton.dataset.state = "closed";
+      $.leftColumnToggleButton.addEventListener("click", function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if($.leftColumnToggleButton.dataset.state === "closed") {
+          $.leftColumnToggleButton.dataset.state = "open";
+          // $.leftColumnToggleButton.innerHTML = "menu ⬅️";
+          showEl($.leftColumn);
+        } else {
+          $.leftColumnToggleButton.dataset.state = "closed";
+          // $.leftColumnToggleButton.innerHTML = "menu ➡️";
+          hideEl($.leftColumn);
+        }
+      });
+
       if(isMobile) {
         document.body.classList.add("isMobile"); // to use in CSS selectors
-
+        // hide the left column by default on mobile:
         hideEl($.leftColumn);
-        showEl($.leftColumnToggleButton);
-        $.leftColumnToggleButton.dataset.state = "closed";
-        $.leftColumnToggleButton.addEventListener("click", function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          if($.leftColumnToggleButton.dataset.state === "closed") {
-            $.leftColumnToggleButton.dataset.state = "open";
-            // $.leftColumnToggleButton.innerHTML = "menu ⬅️";
-            showEl($.leftColumn);
-          } else {
-            $.leftColumnToggleButton.dataset.state = "closed";
-            // $.leftColumnToggleButton.innerHTML = "menu ➡️";
-            hideEl($.leftColumn);
-          }
-        });
         // if they click anywhere in the middle column, close the menu
         $.middleColumn.addEventListener("click", function() {
           if($.leftColumnToggleButton.dataset.state === "open") {
@@ -464,7 +507,7 @@
       }
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(27).stores({
+      db.version(34).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -541,19 +584,38 @@
         if(character.associativeMemoryEmbeddingModelName === undefined) {
           character.associativeMemoryEmbeddingModelName = "text-embedding-ada-002";
         }
+        if(character.userCharacter === undefined) character.userCharacter = {};
+        if(character.avatar === undefined) character.avatar = {url:character.avatarUrl, size:1, shape:"square"};
+        if(character.scene === undefined) character.scene = {background:{}, music:{}};
+        if(character.streamingResponse === undefined) character.streamingResponse = true;
+        // WARNING: If you add something here, you'll likely have to edit:
+        //  - characterDetailsPrompt (characterDetailsPrompt should return a valid character object - addCharacter only adds creationTime and lastMessageTime, so characterDetailsPrompt should fill in everything else, even if it's not visible in the editor)
+        //  - getUserCharacterObj
+        //  - getSystemCharacterObj
+        //  - characterPropertiesVisibleToCustomCode
+        // NOTE: I'm not adding customData to characters yet, because we'd need to have private and public (shared in link) silos, and I haven't thought enough about that yet
       }
 
       function upgradeMessageFromOldVersion(message) {
         if(!message.variants) message.variants = [null]; // null is the placeholder for the currently-chosen variant (stored in `message.message`)
         if(!message.hasOwnProperty("expectsReply")) message.expectsReply = undefined;
         if(!message.hasOwnProperty("summaryHashUsed")) message.summaryHashUsed = undefined; // undefined means that we don't know whether a summary was used because the message was created before this 'summaryUsed' feature was added
-        if(!message.hasOwnProperty("memoryIdBatchesUsed")) message.memoryIdBatchesUsed = [];
+        if(message.memoryIdBatchesUsed === undefined) message.memoryIdBatchesUsed = [];
+        if(message.scene === undefined) message.scene = null;
+        if(message.avatar === undefined) message.avatar = {};
+        if(message.customData === undefined) message.customData = {};
+        if(message.wrapperStyle === undefined) message.wrapperStyle = "";
+        // WARNING: If you add something here, you may need to edit createMessageObj
+        // WARNING: You may also need to edit messagesToCustomCodeFormat and messagesFromCustomCodeFormat if the data should be readable/writable from custom code
       }
 
       function upgradeThreadFromOldVersion(thread) {
         if(thread.isFav === undefined) thread.isFav = false;
         if(thread.userCharacter === undefined) thread.userCharacter = {}; // this overrides the default user character object (for this specific thread)
-        if(thread.lastViewTime === undefined) thread.lastViewTime = thread.lastMessageTime; // this overrides the default user character object (for this specific thread)
+        if(thread.lastViewTime === undefined) thread.lastViewTime = thread.lastMessageTime;
+        if(thread.customCodeWindow === undefined) thread.customCodeWindow = {visible:false, width:null}; 
+        if(thread.customData === undefined) thread.customData = {}; 
+        // WARNING: If you add something here, you may need to edit addThread
       }
       
 
@@ -682,7 +744,7 @@
         $.chatThreads.innerHTML = threads.map(thread => `
           <div class="thread" data-thread-id="${sanitizeHtml(thread.id)}">
             <span class="favStar" data-is-fav="${thread.isFav}">⭐</span>
-            <div class="avatar" style="${thread.character.avatarUrl ? `background-image:url(${sanitizeHtml(thread.character.avatarUrl)})` : ""}; border:1px solid var(--border-color);"></div>
+            <div class="avatar" style="${thread.character.avatar.url ? `background-image:url(${sanitizeHtml(thread.character.avatar.url)})` : ""}; border:1px solid var(--border-color);"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem;">
               <div class="nameWrapper" style="font-weight:bold; font-size:0.9rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
               <div class="characterName" style="font-size:0.8rem;">${thread.character.name.length > 21 ? sanitizeHtml(thread.character.name.slice(0, 21)+"…") : sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span> <span class="characterEditButton">✏️</span></div>
@@ -766,12 +828,7 @@
             e.stopPropagation();
             if(confirm("Are you sure you want to delete this thread?")) {
               const threadId = parseInt(btn.closest(".thread").dataset.threadId);
-              await db.threads.delete(threadId);
-              // delete messages, summaries, memories, and usagestats for this thread:
-              await db.messages.where("threadId").equals(threadId).delete();
-              await db.summaries.where("threadId").equals(threadId).delete();
-              await db.memories.where("threadId").equals(threadId).delete();
-              await db.usageStats.where("threadId").equals(threadId).delete();
+              await safelyDeleteThreadById(threadId);
               await renderThreadList();
               // switch to character selection area
               await renderCharacterList();
@@ -865,21 +922,26 @@
         const thread = (await db.threads.where("id").equals(threadId).toArray())[0];
         const messages = await db.messages.where("threadId").equals(threadId).toArray();
         const character = (await db.characters.where("id").equals(thread.characterId).toArray())[0];
+        let userCharacter = await getUserCharacterObj(threadId);
+        let systemCharacter = await getSystemCharacterObj();
 
         let displayedMessages = messages.slice(-numMessagesPerDisplayBatch);
 
+        displayedMessages = await renderMessagesForReader({messages:displayedMessages, reader:"user", threadId});
+
         for(let message of displayedMessages) {
           if(message.characterId === -1) {
-            message.character = await getUserCharacterObj(threadId);
+            message.character = userCharacter;
           } else if(message.characterId === -2) {
-            message.character = await getSystemCharacterObj();
+            message.character = systemCharacter;
           } else {
             message.character = character;
           }
         }
+
         $.messageFeed.dataset.characterId = character.id;
         $.messageFeed.innerHTML = "";
-        let messageEls = displayedMessages.map(m => createMessageElement(m));
+        let messageEls = await Promise.all(displayedMessages.map(m => createMessageElement(m)));
         for(let el of messageEls) {
           $.messageFeed.appendChild(el);
         }
@@ -930,7 +992,65 @@
 
         await updateInlineReminderMessage();
 
+        await updateThreadScene();
+
         doBotReplyIfNeeded(); // we shouldn't `await` this because thread is already rendered.
+      }
+      
+      let threadIdToMusicPermission = {}
+      let updateThreadSceneCounter = 0;
+      async function updateThreadScene() {
+        updateThreadSceneCounter++;
+        let threadId = parseInt($.messageFeed.dataset.threadId);
+        let thread = await db.threads.get(threadId);
+        let character = await db.characters.get(thread.characterId);
+        let messages = await db.messages.where("threadId").equals(threadId).toArray();
+        let scene = character.scene || {}; // character scene is always used as a "base", latest message scene overrides it.
+        let lastMessageWithScene = messages.findLast(m => m.scene);
+        if(lastMessageWithScene) {
+          applyObjectOverrides({object:scene, overrides:lastMessageWithScene.scene});
+        }
+        // note that dev can fully override scene with an 'empty' scene by just adding a scene with background.url=null, etc.
+        // if they just add message.scene={} then it will just use the character's scene.
+
+        if(scene.background?.url) {
+          if(sceneBackground.currentUrl !== scene.background.url) {
+            sceneBackground.change(scene.background.url);
+          }
+          if(scene.background.filter) {
+            sceneBackground.filter(scene.background.filter);
+          } else {
+            sceneBackground.filter(null);
+          }
+        } else {
+          sceneBackground.change(null);
+        }
+
+        if(scene.music?.url) {
+          if($.musicPlayer.src !== scene.music.url) {
+            $.musicPlayer.src = scene.music.url;
+          }
+          if(threadIdToMusicPermission[threadId] === undefined) {
+            threadIdToMusicPermission[threadId] = confirm("Allow this thread to play background music?");
+          }
+          if(threadIdToMusicPermission[threadId] && $.musicPlayer.paused) {
+            (async function(sceneUpdateI) {
+              // wait for page to be activated, but then only go ahead and play it if we're still on the same scene update:
+              while(!navigator.userActivation.hasBeenActive) {
+                await delay(1000);
+                console.log("Waiting for page to be activated before playing sound...");
+              }
+              if(sceneUpdateI === updateThreadSceneCounter && $.musicPlayer.paused) $.musicPlayer.play();
+            })(updateThreadSceneCounter);
+          }
+        } else {
+          $.musicPlayer.src = "";
+          $.musicPlayer.pause();
+        }
+
+        // note: we don't need lots of extra customization here (e.g. exposing play/pause/seek api), because devs can do whatever they want in custom code - this is just for *end-users* to easily add music to their characters/stories in the character editor
+        $.musicPlayer.volume = scene.music.volume === undefined ? 1 : scene.music.volume;
+        $.musicPlayer.loop = scene.music.loop === undefined ? true : scene.music.loop;
       }
 
       async function prependEarlierMessagesToFeed() {
@@ -962,7 +1082,7 @@
         // get scroll distance from top element
         let scrollDistanceFromTopEl = topEl.getBoundingClientRect().top - $.messageFeed.getBoundingClientRect().top;
 
-        let messageEls = displayedMessages.map(m => createMessageElement(m));
+        let messageEls = await Promise.all(displayedMessages.map(m => createMessageElement(m)));
         messageEls.reverse();
         for(let el of messageEls) {
           $.messageFeed.prepend(el);
@@ -1249,7 +1369,7 @@
               worried, scared: https://i.imgur.com/5rp01eP.jpeg
               concerned: https://i.imgur.com/V4Y3jUh.jpeg
               disbelief: https://i.imgur.com/D05qdJ5.jpeg
-              happy, optimistic: https://i.imgur.com/B6tWeLV.jpeg
+              shocked, but trying to hide it with a smile: https://i.imgur.com/B6tWeLV.jpeg
               very surprised, frozen, stunned: https://i.imgur.com/Ra5Pb4c.jpeg
               caught red handed: https://i.imgur.com/fvfw0Lc.jpeg
               cool, dismissive: https://i.imgur.com/Z38xuvY.jpeg
@@ -1377,15 +1497,8 @@
             characterEl.querySelector(".delete").addEventListener("click", async function(e) {
               e.stopPropagation();
               const characterId = parseInt(characterEl.dataset.characterId);
-              const character = (await db.characters.where("id").equals(characterId).toArray())[0];
               if(confirm(`Are you sure you want to delete this character? This will delete ALL THREADS associated with this character.`)) {
-                await db.characters.delete(characterId);
-                // delete all threads and messages associated with this character
-                const threads = await db.threads.where("characterId").equals(characterId).toArray();
-                for(let thread of threads) {
-                  await db.threads.delete(thread.id);
-                  await db.messages.where("threadId").equals(thread.id).delete();
-                }
+                await safelyDeleteCharacterById(characterId);
                 await renderCharacterList();
                 await renderThreadList();
               }
@@ -1409,6 +1522,53 @@
         });
       }
 
+      async function safelyDeleteCharacterById(characterId) {
+        // let character = await db.characters.get(characterId);
+        await db.characters.delete(characterId);
+        // delete all threads and messages associated with this character
+        const threads = await db.threads.where("characterId").equals(characterId).toArray();
+        for(let thread of threads) {
+          await safelyDeleteThread(thread.id)
+        }
+      }
+
+      async function safelyDeleteThreadById(threadId) {
+        // let thread = await db.threads.get(threadId);
+        await db.threads.delete(threadId);
+        let messageIds = await db.messages.where("threadId").equals(threadId).toArray();
+        await safelyDeleteMessagesByIds(messageIds);
+        // delete messages, summaries, memories, and usagestats for this thread:
+        await db.summaries.where("threadId").equals(threadId).delete();
+        await db.memories.where("threadId").equals(threadId).delete();
+        await db.usageStats.where("threadId").equals(threadId).delete();
+      }
+
+      // this function deletes and "cleans up references" to messages - e.g. ids in `message.memoryIdBatchesUsed`
+      async function safelyDeleteMessagesByIds(ids) {
+        if(ids.length === 0) return;
+        // get thread id:
+        let threadId = await db.messages.get(ids[0]).then(m => m.threadId);
+        // delete messages:
+        await db.messages.where("id").anyOf(ids).delete();
+        // clean up references to the deleted messages:
+        let remainingMessages = await db.messages.where("threadId").equals(threadId).toArray();
+        for(let m of remainingMessages) {
+          let changed = false;
+          for(let i = 0; i < m.memoryIdBatchesUsed.length; i++) {
+            let batchIds = m.memoryIdBatchesUsed[i];
+            let newBatchIds = batchIds.filter(id => !ids.includes(id));
+            if(newBatchIds.length !== batchIds.length) {
+              m.memoryIdBatchesUsed[i] = newBatchIds;
+              changed = true;
+            }
+          }
+          if(changed) {
+            m.memoryIdBatchesUsed = m.memoryIdBatchesUsed.filter(batch => batch.length > 0);
+            await db.messages.put(m);
+          }
+        }
+      }
+
       async function editCharacterById(characterId) {
         const character = await db.characters.get(characterId);
         const result = await characterDetailsPrompt(character);
@@ -1421,9 +1581,7 @@
           const threads = await db.threads.where("characterId").equals(characterId).toArray();
           for(let thread of threads) {
             if(customCodeIframes[thread.id]) {
-              customCodeFloatingWindows[thread.id].ctn.remove();
               delete customCodeIframes[thread.id];
-              delete customCodeFloatingWindows[thread.id];
             }
           }
           // create new iframe for currently-active thread, if there is one
@@ -1431,6 +1589,7 @@
           if(threadId !== null) {
             await createNewCustomCodeIframeForThread(threadId);
           }
+          await updateThreadScene();
         }
 
         let memories = await db.memories.where({characterId:characterId}).toArray();
@@ -1526,6 +1685,10 @@
       }
 
       async function showThread(threadId) {
+
+        $.musicPlayer.pause();
+
+        let loadingModal = createLoadingModal("Loading...");
         
         document.querySelectorAll("#chatThreads .thread").forEach(el => el.classList.remove("selected"));
         const threadEl = $.chatThreads.querySelector(`.thread[data-thread-id="${threadId}"]`);
@@ -1534,16 +1697,21 @@
         document.querySelectorAll("#middleColumn > .middleColumnScreen").forEach(el => hideEl(el));
         showEl($.chatInterface);
 
-        await renderMessageFeed(threadId);
-
         let thread = await db.threads.get(threadId);
         let characterObj = await db.characters.get(thread.characterId);
 
-        await db.threads.where({id:threadId}).modify({lastViewTime:Date.now()});
-
+        // thus must come before rendering the message feed because we may need to render the messages with `oc.messageRenderingPipeline`
         if(!customCodeIframes[threadId] && characterObj.customCode) {
           await createNewCustomCodeIframeForThread(threadId); // this adds iframe as here: customCodeIframes[threadId]
         }
+
+        await renderMessageFeed(threadId);
+
+        await db.threads.where({id:threadId}).modify({lastViewTime:Date.now()});
+
+        await updateCustomCodeIframeVisibility();
+
+        loadingModal.delete();
       }
 
       // NOTE: spaces aren't actually allowed by OpenAI - I replace them with underscores in prepareMessagesForBot
@@ -1551,6 +1719,7 @@
       const characterNameValidationPattern = "^[A-Za-z0-9_\\- ]{1,64}$"; // needed due to OpenAI API limitations
 
       async function characterDetailsPrompt(defaultValues={}) {
+        defaultValues = JSON.parse(JSON.stringify(defaultValues));
         
         let initialMessagesText;
         if(defaultValues.initialMessages) initialMessagesText = generateTextFormatFromMessages(defaultValues.initialMessages);
@@ -1562,12 +1731,18 @@
           reminderMessage: { label: "Reminder message - an invisible system message that is placed before every AI response (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message is inserted as a reminder at the end of the chat right before each AI response. This will always be the last/most-recent message that the AI sees when writing its response. If you later decide to edit this, all existing and new threads will be immediately updated. This message is not seen/summarized by the summarization algorithm - it will always be present as the final message.", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
           initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md" target='blank'>here</a>.`, infoTooltip:"During the initialization of every new thread with this character, these messages will be created and placed at the start of the thread. Note that the summarization algorithm will eventually summarize these messages - so they won't stay around forever (unlike the instruction and reminder messages, which *do* stay around forever). Also note that if you edit the initial messages, only *new* threads will have the updated initial messages. In other words, once a chat thread has been created, the initial messages that are added to a thread during init 'belong' to that thread, not to the character.", type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatarUrl || "" },
+          avatarSize: { hidden:true, label: "Avatar size, as a multiple of the default size.", type:"textLine", defaultValue: defaultValues.avatar?.size ?? "1" },
+          avatarShape: { hidden:true, label: "Avatar shape.", type:"select", options:[{value:"square"}, {value:"circle"}, {value:"portrait"}], defaultValue: defaultValues.avatar?.shape ?? "square" },
+          sceneBackgroundUrl: { hidden:true, label: "Chat background image/video URL (jpg, webp, webm, mp4, etc.)", type:"textLine", defaultValue: defaultValues.scene?.background?.url ?? "" },
+          sceneMusicUrl: { hidden:true, label: "Chat background music/audio URL (mp3, webm, mp4, etc.)", infoTooltip:"Permission is always requested from the user before playing audio - i.e. music will not autoplay because that could annoy some users. You can use a video file for audio - the visuals will obviously not be shown.", type:"textLine", defaultValue: defaultValues.scene?.music?.url ?? "" },
+          userCharacterName: { hidden:true, label: "User's name. This overrides the user's default username when chatting to this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.name || "" },
+          userCharacterAvatarUrl: { hidden:true, label: "User's avatar. This overrides the user's default avatar when chatting to this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.avatar?.url || "" },
           modelName: { hidden:true, label: "Model name. The text-davinci-003 model is a bit more creative, but 10x more expensive.", infoTooltip:"If use gpt-3.5-turbo and set the 'temperature' option (see advanced settings) to 1, then apparently (according to community members) it's pretty close to davinci in terms of creativity.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}, {content:"gpt-4 (only works if you have waitlist access)", value:"gpt-4"}], defaultValue: defaultValues.modelName || "gpt-3.5-turbo" },
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
           associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Persistent, 'infinite' character memory:", infoTooltip:"This increases the cost by up to 2x and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. Please request cross-thread memory in the Discord server if you want it.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod ?? "none" },
           associativeMemoryEmbeddingModelName: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Memory embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory (text) into a list of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[{value:"text-embedding-ada-002", content:"text-embedding-ada-002"}], defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "text-embedding-ada-002" },
           // initialThreadMemories: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Initial thread-specific memories. The character will create memories based on the chat, but you can add some starter memories/lore here.", infoTooltip:"Manually-written memories can be used as 'dynamic' instruction/role/reminders that engage when relevant. This saves you from having to pack too much text into your instruction/reminder, which will 'eat up' your context, which means the AI will be able to see fewer recent messages, and summarization will have to be done more often.", type:"text", defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "" },
-          temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.85 },
+          temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", infoTooltip:"People seem to get good results between 0.7 and 1.2 - higher values may sacrifice some 'correctness' but should result in more 'imagination'.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.85 },
           customCode: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
         }, {submitButtonText: "Save Character", showHiddenInputsText: "Show advanced options"});
         
@@ -1588,10 +1763,40 @@
           result.initialMessages = [];
         }
         delete result.initialMessagesText;
+
+        result.avatar = {
+          url: result.avatarUrl,
+          size: Number(result.avatarSize),
+          shape: result.avatarShape,
+        };
+        delete result.avatarUrl;
+        delete result.avatarSize;
+        delete result.avatarShape;
+
+        result.scene = {
+          background: {
+            url: result.sceneBackgroundUrl,
+          },
+          music: {
+            url: result.sceneMusicUrl,
+          },
+        };
+        delete result.sceneBackgroundUrl;
+        delete result.sceneMusicUrl;
         
         result.temperature = Number(result.temperature);
 
-        if(isNaN(result.temperature)) result.temperature = 0.7;
+        if(isNaN(result.temperature)) result.temperature = 0.8;
+
+        // user character object overrides:
+        result.userCharacter = {avatar:{}};
+        if(result.userCharacterName.trim()) result.userCharacter.name = result.userCharacterName;
+        delete result.userCharacterName;
+        if(result.userCharacterAvatarUrl.trim()) result.userCharacter.avatar.url = result.userCharacterAvatarUrl;
+        delete result.userCharacterAvatarUrl;
+
+        // this is not editable in the UI, but it's needed for a valid character obj
+        result.streamingResponse = true;
 
         // If it contains [AI], [SYSTEM], or [USER], but doesn't *start* with one of those, warn them that it's being treated as one big system message
         if(/(^|\s)\[(AI|SYSTEM|USER)\]:/.test(result.reminderMessage) && !/^\[(AI|SYSTEM|USER)\]:/.test(result.reminderMessage.trim())) {
@@ -1686,18 +1891,22 @@
       }
 
 
-      function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime, expectsReply}) {
-        if(!hiddenFrom || !Array.isArray(hiddenFrom)) hiddenFrom = [];
+      function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime, expectsReply, memoryIdBatchesUsed, summaryHashUsed, scene, avatar, customData, wrapperStyle}) {
+        if(threadId === undefined || message === undefined || characterId === undefined) throw new Error(`createMessageObj: threadId, message, and characterId are required: ${threadId}, ${message}, ${characterId}`);
         return {
           threadId,
           message,
           characterId,
-          hiddenFrom,
+          hiddenFrom: Array.isArray(hiddenFrom) ? hiddenFrom : [],
+          expectsReply: expectsReply ?? undefined,
           creationTime: creationTime ?? Date.now(),
           variants: [null], // null is the placeholder for the currently-selected variant (i.e. the one in the `message` property)
-          expectsReply,
-          memoryIdBatchesUsed: [],
-          summaryHashUsed: null,
+          memoryIdBatchesUsed: memoryIdBatchesUsed ?? [],
+          summaryHashUsed: summaryHashUsed ?? null,
+          scene: scene ?? null,
+          avatar: avatar ?? {},
+          customData: customData ?? {},
+          wrapperStyle: wrapperStyle ?? "",
         };
       }
 
@@ -1719,14 +1928,30 @@
       }
 
       async function addThread(name, characterId) {
+        
         const threadObj = {
           name,
           characterId,
           creationTime: Date.now(),
           lastMessageTime: Date.now(),
           lastViewTime: Date.now(),
-          userCharacter: {},
+          userCharacter: {
+            name: (await db.misc.get("userName"))?.value || defaultUserName,
+            avatar: {
+              url: (await db.misc.get("userAvatarUrl"))?.value || "",
+              shape: null, // null => default to character shape
+              size: null,
+            },
+          },
+          customCodeWindow: {visible:false, width:null},
+          customData: {},
         };
+
+        let aiCharacter = await db.characters.get(characterId);
+
+        // when a thread is first created, we copy across the character's userCharacter as a starting point for the `thread.userCharacter` - after that, the `aiCharacter.userCharacter` is not relevant to the thread (i.e. thread's userCharacter can diverge from the character's 'template' userCharacter)
+        applyObjectOverrides({object:threadObj.userCharacter, overrides:aiCharacter.userCharacter});
+
         await db.threads.add(threadObj);
         return threadObj;
       }
@@ -1841,7 +2066,7 @@
         if(upToMessageId === undefined) upToMessageId = originalMessages.at(-1).id;
         originalMessages = originalMessages.slice(0, originalMessages.findIndex(m => m.id === upToMessageId)+1);
 
-        let remainingMessages = prepareMessagesForBot(originalMessages, aiCharacter, userCharacter);
+        let remainingMessages = await prepareMessagesForBot({messages:originalMessages, aiCharacter, userCharacter, onProgressMessage});
 
         const tokenLimitForSummaryAndMessages = getTokenLimitForSummaryAndMessages(aiCharacter);
 
@@ -2077,17 +2302,24 @@ OVERALL SUMMARY:
 
 
 
-      function prepareMessagesForBot(messages, aiCharacter, userCharacter) {
+      async function prepareMessagesForBot({messages, aiCharacter, userCharacter, onProgressMessage}) {
+        // note that we don't need to handle {{user}}/{{char}} stuff in this function because that's just for instruction, reminder, and initial messages. Initial messages have already had {{char}} stuff "rendered" when they were added to the thread.
+
+        if(messages.length === 0) return [];
+
+        let threadId = messages[0].threadId;
+
+        for(let m of messages) {
+          m.message = m.message.replace(/<!--hidden-from-ai-start-->.+?<!--hidden-from-ai-end-->/gs, "");
+        }
+        
+        messages = await renderMessagesForReader({messages, reader:"ai", threadId, onProgressMessage});
 
         // TODO: not sure that this will work as expected for the "reply with..." function, since the in-place-of-user bot will see the hidden-from-ai messages (like the user would - do we want that?)
         messages = JSON.parse(JSON.stringify(messages)).filter(m => {
           if(m.hiddenFrom && m.hiddenFrom.includes("ai")) return false;
           return true;
         });
-
-        for(let m of messages) {
-          m.message = m.message.replace(/<!--hidden-from-ai-start-->.+?<!--hidden-from-ai-end-->/gs, "");
-        }
 
         messages = messages.map(m => {
           let role;
@@ -2105,6 +2337,137 @@ OVERALL SUMMARY:
           return { role, content: m.message+"", name, id: m.id }; // id is used for summary upToMessageId stuff, and tracking the messages that were used in each summary and memory
         });
 
+        return messages;
+      }
+
+      async function renderMessagesForReader({messages, reader, threadId, onProgressMessage}) {
+        // `reader` can be "ai" or "user"
+
+        let thread = await db.threads.get(threadId);
+        let aiCharacter = await db.characters.get(thread.characterId);
+        let userCharacter = await getUserCharacterObj(threadId);
+
+        if(!aiCharacter.customCode) return messages;
+
+        if(onProgressMessage) onProgressMessage({message:"waiting for custom code iframe..."});
+        while(!customCodeIframes[threadId]) {
+          await delay(100);
+        }
+        if(onProgressMessage) onProgressMessage({message:"rendering messages..."});
+        let functionText = `async function({messages}) {
+          let messagePromises = [];
+          // we process messages in parallel, but process handlers for each message in series
+          for(let message of messages) {
+            messagePromises.push((async function() {
+              for(let fn of oc.messageRenderingPipeline) {
+                await fn({message, reader:"${reader}"});
+              }
+            })());
+          }
+          await Promise.all(messagePromises);
+          return messages;
+        }`;
+
+        let functionArg = {messages:messagesToCustomCodeFormat({messages, aiCharacter, userCharacter})};
+        let renderedMessagesInCustomCodeFormat = await sendCustomCodeIframeMessage(threadId, {type:"function", functionText, functionArg});
+
+        let renderedMessages = messagesFromCustomCodeFormat({messages:renderedMessagesInCustomCodeFormat, originalMessages:messages, aiCharacter, threadId});
+
+        if(!renderedMessages[0].variants) {
+          throw new Error("reader message rendering shouldn't be stripping properties from messages");
+        }
+
+        return renderedMessages;
+      }
+
+      function messagesToCustomCodeFormat({messages, aiCharacter, userCharacter}) {
+        messages = JSON.parse(JSON.stringify(messages));
+        messages = messages.map((m, i) => {
+          let author, name;
+          if(m.characterId == aiCharacter.id) { author = "ai"; name = aiCharacter.name; }
+          if(m.characterId == -1) { author = "user"; name = userCharacter.name; }
+          if(m.characterId == -2) { author = "system"; name = "System"; }
+          let hiddenFrom = m.hiddenFrom || [];
+          // note: we need to pass `id` to custom code because it's used in stuff like renderMessagesForReader - we could map the ids to "public" ones, but it's probably not necessary
+          return {id:m.id, author, content:m.message, hiddenFrom, expectsReply:m.expectsReply, name, scene:m.scene, avatar:m.avatar, customData:m.customData, wrapperStyle:m.wrapperStyle};
+        });
+        return messages;
+      }
+
+      function messagesFromCustomCodeFormat({messages, originalMessages, aiCharacter, threadId}) {
+        messages = JSON.parse(JSON.stringify(messages));
+        
+        // NOTE: originalMessages is needed to "hydrate" the messages with any missing data, assuming that `messages` have `id`s (which they might not, since custom code can completely overwrite messages)
+        let allOriginalMessageKeys = [...new Set(originalMessages.map(m => Object.keys(m)).flat())];
+        let idToOriginalMessage = {};
+        for(let m of originalMessages) {
+          idToOriginalMessage[m.id] = m;
+        }
+
+        let doneSceneWarning = false;
+        let doneAvatarWarning = false;
+
+        messages = messages.map(m => {
+          m.characterId = -2; // default to 'system'
+          if(m.author == "ai") m.characterId = aiCharacter.id;
+          if(m.author == "user") m.characterId = -1;
+          delete m.author;
+
+          if(!Array.isArray(m.hiddenFrom)) {
+            m.hiddenFrom = [];
+          }
+          m.hiddenFrom = m.hiddenFrom.filter(h => h==="ai" || h==="user");
+          
+          if(![true, false, undefined].includes(m.expectsReply)) {
+            m.expectsReply = undefined;
+          }
+          
+          if(m.scene) {
+            let exampleStructure = {background:{url:"", filter:""}, music:{url:"", volume:0}};
+            let matches = objectKeysAndTypesAreValid(m.scene, exampleStructure);
+            if(!matches) {
+              if(!doneSceneWarning) alert(`Invalid scene object produced by custom code. Please ensure structure and types are valid. Here's your object:\n\n${JSON.stringify(m.scene, null, 2)}\n\nAnd here's an example structure with valid types:\n\n${JSON.stringify(exampleStructure, null, 2)}\n\nYou don't need to include all properties - you just need to make sure that you don't include invalid ones, and that the types of the ones you include are valid.`);
+              doneSceneWarning = true;
+              m.scene = null;
+            }
+          } else {
+            m.scene = null;
+          }
+
+          if(m.avatar) {
+            let exampleStructure = {url:"", shape:"", size:0};
+            let matches = objectKeysAndTypesAreValid(m.avatar, exampleStructure);
+            if(!matches) {
+              if(!doneAvatarWarning) alert(`Invalid avatar object produced by custom code. Please ensure structure and types are valid. Here's your object:\n\n${JSON.stringify(m.avatar, null, 2)}\n\nAnd here's an example structure with valid types:\n\n${JSON.stringify(exampleStructure, null, 2)}\n\nYou don't need to include all properties - you just need to make sure that you don't include invalid ones, and that the types of the ones you include are valid.`);
+              doneAvatarWarning = true;
+              m.avatar = {};
+            }
+          } else {
+            m.avatar = {};
+          }
+
+          // note: it's possible for m.id to be undefined, since custom code can completely replace messages
+          // but if it does exist, then we 'rehydrate' it with private data based on the `id`
+          if(m.id) {
+            let originalMessage = idToOriginalMessage[m.id];
+            if(!originalMessage) throw new Error("The custom code produced a message with an id that doesn't exist in the original messages.");
+            for(let key of allOriginalMessageKeys) {
+              // if original message had it, and new one doesn't, then we add it to the new one
+              if(originalMessage.hasOwnProperty(key) && !m.hasOwnProperty(key)) {
+                m[key] = originalMessage[key];
+              }
+            }
+          }
+
+          m.threadId = threadId;
+          m.message = m.content+"";
+          delete m.content;
+          m.wrapperStyle = (m.wrapperStyle ?? "")+"";
+
+          let obj = createMessageObj(m);
+          obj.id = m.id; // see messagesToCustomCodeFormat for why we need ids
+          return obj;
+        });
         return messages;
       }
 
@@ -2131,7 +2494,7 @@ OVERALL SUMMARY:
       async function getBotReply({messages, threadId, aiCharacter, userCharacter, replyInstruction, onStreamingReplyChunk, onProgressMessage, signals}) {
         if(!signals) signals = {};
 
-        let fullMessagesArr = prepareMessagesForBot(messages, aiCharacter, userCharacter);
+        let fullMessagesArr = await prepareMessagesForBot({messages, aiCharacter, userCharacter, onProgressMessage});
 
         onProgressMessage({message:"starting..."});
         
@@ -2185,7 +2548,6 @@ OVERALL SUMMARY:
         if(signals.stop === true) {
           return undefined;
         }
-        
 
         const authorToRoleMap = {
           ai: "assistant",
@@ -2430,48 +2792,68 @@ OVERALL SUMMARY:
           let result = "";
           let chunkI = 0;
           let prevText = null;
+          let textBuffer = "";
           const streamId = (await sha256Text(Math.random().toString()+Math.random().toString())).slice(0, 16);
+
+          function processLine(line) {
+            if(!line.trim()) return;
+            if(line.startsWith("data: ")) line = line.slice(6);
+            if(line === "[DONE]") return;
+
+            let json;
+            try {
+              json = JSON.parse(line);
+            } catch(e) {
+              alert(`The streaming API response had some invalid JSON:\n\n${line}\n\n---\n\n${textBuffer}`);
+              console.error(e, line, textBuffer);
+            }
+            let text;
+
+            if(json.choices[0].text) { // this indicates that we're streaming from a 'general' (non-chat) model
+              text = json.choices[0].text;
+              if(chunkI===0) text = text.trimStart(); // trimStart due to the way we prompt 'general' models (we show messages with a space after `[name]:`)
+            } else {
+              if(json.choices[0].delta.role) return; // first response always starts with a role=assistant delta to indicate that the assistant is the one talking
+              if(!json.choices[0].delta.content) return; // final response alway has empty delta object
+              text = json.choices[0].delta.content;
+            }
+            
+            result += text;
+            onStreamingReplyChunk({text, isFirst:chunkI===0});
+
+            // we keep the StreamingMessageChunk events "one step behind" so that we can set last:true on the last chunk
+            if(prevText === null) {
+              prevText = text;
+            } else {
+              triggerStreamingMessageChunkCustomCodeEvent(threadId, {text:prevText, index:chunkI-1, last:false, streamId});
+              prevText = text;
+            }
+
+            chunkI++;
+          }
+
           while(true) {
             const res = await reader?.read();
-            if(res?.done) break;
-            if(res?.value.trim().startsWith("{")) { // errors don't start with 'data'
-              let json = JSON.parse(res.value);
-              alert("Error:\n\n"+JSON.stringify(json.error, null, 2));
+            if(res?.done) {
+              // process all remaining lines:
+              for(let line of textBuffer.split("\n")) {
+                processLine(line);
+              }
               break;
-            } else if(res?.value.trim().startsWith("data:")) {
-              // can be multiple 'data: {...}' lines in a single response
-              for(let line of res.value.split("\n").filter(l => l.trim()).map(l => l.trim().slice(6))) {
-                if(line === "[DONE]") break;
-                let json;
-                try {
-                  json = JSON.parse(line);
-                } catch(e) {
-                  console.error(e);
-                  alert(`The streaming API response had some invalid JSON:\n\n${line}\n\n---\n\n${res?.value}`);
-                }
-                let text;
+            }
+            if(chunkI === 0 && res?.value.trim().startsWith("{")) { // errors don't start with 'data'
+              let json = JSON.parse(res.value);
+              alert("Error streaming message:\n\n"+JSON.stringify(json.error, null, 2));
+              break;
+            } else {
+              textBuffer += res.value;
 
-                if(json.choices[0].text) { // this indicates that we're streaming from a 'general' (non-chat) model
-                  text = json.choices[0].text;
-                  if(chunkI===0) text = text.trimStart(); // trimStart due to the way we prompt 'general' models (we show messages with a space after `[name]:`)
-                } else {
-                  if(json.choices[0].delta.role) continue; // first response always starts with a role=assistant delta to indicate that the assistant is the one talking
-                  if(!json.choices[0].delta.content) continue; // final response alway has empty delta object
-                  text = json.choices[0].delta.content;
-                }
-                
-                result += text;
-                onStreamingReplyChunk({text, isFirst:chunkI===0});
-
-                // we keep the StreamingMessageChunk events "one step behind" so that we can set last:true on the last chunk
-                if(prevText === null) {
-                  prevText = text;
-                } else {
-                  triggerStreamingMessageChunkCustomCodeEvent(threadId, {text:prevText, index:chunkI-1, last:false, streamId});
-                  prevText = text;
-                }
-
-                chunkI++;
+              // keep consuming up to first new line while a newline exists:
+              while(textBuffer.indexOf("\n") !== -1) {
+                let newLineIndex = textBuffer.indexOf("\n");
+                let line = textBuffer.slice(0, newLineIndex);
+                textBuffer = textBuffer.slice(newLineIndex+1);
+                processLine(line);
               }
             }
           }
@@ -2481,7 +2863,7 @@ OVERALL SUMMARY:
 
 
         let modelType = modelNameToModelType[modelName];
-        let getStreamingResponse = true;
+        let getStreamingResponse = aiCharacter.streamingResponse;
 
         let result;
         let apiTokenUsage;
@@ -2892,7 +3274,7 @@ OVERALL SUMMARY:
           let messageObj = createMessageObj({threadId, message:"...", characterId});
           messageObj.character = character;
           
-          let messageEl = await appendMessageToFeed(messageObj);
+          let messageEl = await addMessageToFeed(messageObj, {skipReaderRendering:true});
           messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
           messageEl.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
 
@@ -2927,12 +3309,12 @@ OVERALL SUMMARY:
           } else {
             messageObj.message = message;
 
+            messageObj.id = await addMessageToDb(messageObj);
+
             let shouldScrollDown = messageFeedIsNearBottom();
-            updateMessageContent(messageEl, messageObj);
+            await addMessageToFeed(messageObj, {inPlaceOf:messageEl})
             if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
             
-            let id = await addMessageToDb(messageObj);
-            messageEl.dataset.id = id;
             messageEl.dataset.canDelete = "true";
             await triggerMessageAddedCustomCodeEvent(threadId);
           }
@@ -2977,16 +3359,16 @@ OVERALL SUMMARY:
           messageObj.message = message;
 
           let shouldScrollDown = messageFeedIsNearBottom();
-          updateMessageContent(messageEl, messageObj);
+          let newMessageEl = await addMessageToFeed(messageObj, {inPlaceOf:messageEl});
           if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
-          let currentVariantNumber = messageObj.variants.findIndex(v => v===null) + 1;
-          messageEl.querySelector(".currentVariantNumber").innerHTML = `${currentVariantNumber}<span style="opacity:0.5">/${messageObj.variants.length}</span>`;
+          let currentVariantNumber = renderedMessageObj.variants.findIndex(v => v===null) + 1;
+          newMessageEl.querySelector(".currentVariantNumber").innerHTML = `${currentVariantNumber}<span style="opacity:0.5">/${renderedMessageObj.variants.length}</span>`;
           
-          if(isMobile) showEl(messageEl.querySelector(".messageVariantsCtn"));
+          if(isMobile) showEl(newMessageEl.querySelector(".messageVariantsCtn"));
 
           // update db with bot's reply
-          await db.messages.put(messageObj);
+          await db.messages.put(renderedMessageObj);
           // update thread's lastMessageTime
           await db.threads.update(threadId, { lastMessageTime: Date.now() });
           // if this isn't at the top of the thread list, re-render the thread list
@@ -3011,26 +3393,42 @@ OVERALL SUMMARY:
         return $.messageFeed.scrollHeight - $.messageFeed.scrollTop - $.messageFeed.offsetHeight < 50;
       }
 
-      async function appendMessageToFeed(messageObj) {
+      async function addMessageToFeed(originalMessageObj, opts={}) {
+        let threadId = parseInt($.messageFeed.dataset.threadId);
+        let thread = await db.threads.get(threadId);
+
+        let messageObj;
+        if(opts.skipReaderRendering) {
+          messageObj = originalMessageObj;
+        } else {
+          [ messageObj ] = await renderMessagesForReader({messages:[originalMessageObj], reader:"user", threadId});
+        }
+        
+        let userCharacter = await getUserCharacterObj(threadId);
         if(!messageObj.character) {
-          if(messageObj.characterId === -1) messageObj.character = await getUserCharacterObj(messageObj.threadId);
+          if(messageObj.characterId === -1) messageObj.character = userCharacter;
           else if(messageObj.characterId === -2) messageObj.character = await getSystemCharacterObj();
           else messageObj.character = await db.characters.get(messageObj.characterId);
         }
-        let el = createMessageElement(messageObj);
+        let el = await createMessageElement(messageObj);
         
-        let shouldScrollDown = messageFeedIsNearBottom();
-        $.messageFeed.appendChild(el);
-        if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
-
-        let messageEl = $.messageFeed.lastElementChild;
+        if(opts.inPlaceOf) {
+          opts.inPlaceOf.replaceWith(el);
+        } else {
+          // otherwise we append:
+          let shouldScrollDown = messageFeedIsNearBottom();
+          $.messageFeed.appendChild(el);
+          if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+        }
 
         hideEl($.noMessagesNotice);
-        attachEventHandlersToMessageEl(messageEl);
+        attachEventHandlersToMessageEl(el);
         
         await updateInlineReminderMessage();
 
-        return messageEl;
+        await updateThreadScene();
+
+        return el;
       }
 
       function attachEventHandlersToMessageEl(messageEl) {
@@ -3050,8 +3448,8 @@ OVERALL SUMMARY:
           message.message = message.variants[currentIndex-1];
           message.variants[currentIndex-1] = null;
           await db.messages.put(message);
-          updateMessageContent(messageEl, message);
-          messageEl.querySelector(".currentVariantNumber").innerHTML = `${(currentIndex-1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
+          let newMessageEl = await addMessageToFeed(message, {inPlaceOf:messageEl});
+          newMessageEl.querySelector(".currentVariantNumber").innerHTML = `${(currentIndex-1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
         });
         messageEl.querySelector(".nextMessageVariantButton").addEventListener("click", async function() {
           let message = await db.messages.get(parseInt(messageEl.dataset.id));
@@ -3061,8 +3459,8 @@ OVERALL SUMMARY:
           message.message = message.variants[currentIndex+1];
           message.variants[currentIndex+1] = null;
           await db.messages.put(message);
-          updateMessageContent(messageEl, message);
-          messageEl.querySelector(".currentVariantNumber").innerHTML = `${(currentIndex+1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
+          let newMessageEl = await addMessageToFeed(message, {inPlaceOf:messageEl});
+          newMessageEl.querySelector(".currentVariantNumber").innerHTML = `${(currentIndex+1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
         });
 
         if(!isMobile) { // on mobile the variants container is always visible after user has created at least 1 variant
@@ -3139,7 +3537,14 @@ OVERALL SUMMARY:
         messageEl.classList.remove("hiddenFromUser");
       }
 
-      function createMessageElement(messageObj) {
+      async function createMessageElement(messageObj) {
+
+        // sometimes the message comes "hydrated" with a character for performance reasons (i.e. get characters from db *once*, add reference to all messages)
+        // but we don'te require it because that's just a performance optimisation, so we grab it here if needed:
+        if(!messageObj.character) {
+          messageObj.character = await db.characters.get(messageObj.characterId);
+        }
+
         let tmp = document.createElement("div");
         let currentVariantNumber = messageObj.variants.findIndex(v => v === null) + 1;
 
@@ -3156,14 +3561,48 @@ OVERALL SUMMARY:
           variantCtnCss = "display:none; position:fixed; padding: 0.125rem;";
         }
 
+        let avatarUrl = messageObj.character.avatar.url;
+        if(messageObj.avatar?.url) avatarUrl = messageObj.avatar.url;
+
+        let avatarShape = messageObj.character.avatar.shape;
+        if(messageObj.avatar?.shape) avatarShape = messageObj.avatar.shape;
+
+        let avatarSize = messageObj.character.avatar.size;
+        if(messageObj.avatar?.size !== undefined) avatarSize = messageObj.avatar.size;
+
+        let wrapperStyle = messageObj.wrapperStyle ?? "";
+
+        // fall back to ai character's settings where appropriate:
+        if(messageObj.character.id < 0) {
+          let thread = await db.threads.get(messageObj.threadId);
+          let aiCharacter = await db.characters.get(thread.characterId);
+
+          if(avatarSize === null || avatarSize === undefined) {
+            avatarSize = aiCharacter.avatar.size;
+          }
+          if(avatarShape === null || avatarShape === undefined) {
+            avatarShape = aiCharacter.avatar.shape;
+          }
+        }
+
+        let avatarWidth = 50 * (avatarSize ?? 1);
+        let avatarHeight = 50 * (avatarSize ?? 1);
+        let avatarBorderRadius = "var(--border-radius)";
+        if(avatarShape === "circle") {
+          avatarBorderRadius = "50%";
+        }
+        if(avatarShape === "portrait") {
+          avatarHeight *= 1.5;
+        }
+
         tmp.innerHTML = `
-          <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" style="padding:0.5rem; padding-left:0; position:relative;">
+          <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" style="${sanitizeHtml(wrapperStyle)}; margin-top:0.5rem; margin-bottom:0.5rem; position:relative;">
             <div style="text-align:center;"><button class="showHiddenMessageButton" style="cursor:pointer; font-size:0.65rem;">Show hidden message</button></div>
             <div class="bottomButtons">
               ${messageObj.characterId >= 0 ? `<div class="brainButton emojiButton">🧠</div>` : ""}
             </div>
             <div class="messageWrap">
-              <div class="avatar" style="${messageObj.character.avatarUrl ? `background-image:url(${sanitizeHtml(messageObj.character.avatarUrl)})` : ""};"></div>
+              <div class="avatar" style="${avatarUrl ? `background-image:url(${sanitizeHtml(avatarUrl)})` : ""};width:${sanitizeHtml(avatarWidth)}px; min-width:${sanitizeHtml(avatarWidth)}px; height:${sanitizeHtml(avatarHeight)}px; border-radius:${sanitizeHtml(avatarBorderRadius)};"></div>
               <div style="padding-left:0.5rem; min-width: 0; width:100%;">
                 <div class="info" style="flex-grow:1; display:flex; font-size:80%;">
                   <div class="characterName" style="font-weight:bold;">${sanitizeHtml(messageObj.character.name)}</div>
@@ -3171,9 +3610,9 @@ OVERALL SUMMARY:
                   <div class="editButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
                   <div class="deleteButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
                   <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: ${messageObj.character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
-                  <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); ${variantCtnCss}">
+                  <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); ${sanitizeHtml(variantCtnCss)}">
                     <span class="prevMessageVariantButton emojiButton">◄</span>
-                    <span class="currentVariantNumber">${currentVariantNumber}<span style="opacity:0.5">/${messageObj.variants.length}</span></span>
+                    <span class="currentVariantNumber">${sanitizeHtml(currentVariantNumber)}<span style="opacity:0.5">/${sanitizeHtml(messageObj.variants.length)}</span></span>
                     <span class="nextMessageVariantButton emojiButton">►</span>
                   </div>
                   ${messageObj.hiddenFrom?.includes("ai") ? `<div class="hiddenFromAiIcon" onclick="alert('This icon indicates that this message is hidden from the AI.')" title="The AI cannot see this message." style="font-size:0.8rem; margin-left:1rem; display:flex; align-items: center; cursor:pointer;">🙈</div>` : ""}
@@ -3185,7 +3624,29 @@ OVERALL SUMMARY:
           </div>
         `;
         let el = tmp.firstElementChild;
-        updateMessageContent(el, messageObj); // this adds the actual message with rendered markdown, adds code block copy comments, etc.
+        el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(messageObj.message), domPurifyOptions);
+        el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+
+        // add 'copy' button to code blocks
+        el.querySelectorAll('.messageText pre').forEach(pre => {
+          const wrapper = document.createElement('div');
+          const button = document.createElement('button');
+          button.innerText = 'copy';
+          button.style.cssText = 'font-size:80%; position:absolute; top:0.25rem; right:0.25rem;';
+          wrapper.style.position = 'relative';
+          pre.parentNode.insertBefore(wrapper, pre);
+          wrapper.appendChild(pre);
+          wrapper.appendChild(button);
+
+          button.addEventListener('click', async () => {
+            let text = pre.innerText.trim(); // trim removes trailing newlines from bash commands which is a very good idea
+            await navigator.clipboard.writeText(text);
+            button.innerText = 'copied!';
+            setTimeout(() => {
+              button.innerText = 'copy';
+            }, 2000);
+          });
+        });
         return el;
       }
 
@@ -3202,12 +3663,11 @@ OVERALL SUMMARY:
         result.hiddenFrom = result.hiddenFrom.split(",").filter(x => x);
         await db.messages.update(messageId, result);
 
-        for(let key in result) {
-          originalMessage[key] = result[key];
-        }
+        let newMessage = await db.messages.get(messageId);
 
         let shouldScrollDown = messageFeedIsNearBottom();
-        updateMessageContent(this.closest(".message"), originalMessage);
+        let messageEl = this.closest(".message");
+        await addMessageToFeed(newMessage, {inPlaceOf:messageEl});
         if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
       }
 
@@ -3216,7 +3676,7 @@ OVERALL SUMMARY:
         e.preventDefault();
         e.stopPropagation();
         const messageId = parseInt(this.closest(".message").dataset.id);
-        await db.messages.delete(messageId);
+        await safelyDeleteMessagesByIds([messageId]);
         this.closest(".message").remove();
         if(!$.messageFeed.querySelector(".message")) {
           showEl($.noMessagesNotice);
@@ -3224,33 +3684,48 @@ OVERALL SUMMARY:
         await updateInlineReminderMessage();
       }
 
+      const defaultUserName = "Anon";
+
       async function getUserCharacterObj(threadId) {
         // set defaults:
         let chararcterObj = {
           id: -1,
-          name: (await db.misc.get("userName"))?.value || "Anon",
-          avatarUrl: (await db.misc.get("userAvatarUrl"))?.value || "",
+          name: (await db.misc.get("userName"))?.value || defaultUserName,
+          // avatarUrl: (await db.misc.get("userAvatarUrl"))?.value || "",
           systemMessage: "",
           reminderMessage: "",
           initialMessage: [],
           customCode: "",
           fitMessagesInContextMethod: "dropOld",
+          avatar: {
+            url: (await db.misc.get("userAvatarUrl"))?.value || "",
+            shape: null, // null => default to character shape
+            size: null,
+          },
+          streamingResponse: true,
         };
-        // override with thread-specific settings:
+        // override with character and then thread-specific settings:
         let thread = await db.threads.get(threadId);
-        for(let key in thread.userCharacter) {
-          chararcterObj[key] = thread.userCharacter[key];
-        }
+        applyObjectOverrides({object:chararcterObj, overrides:thread.userCharacter});
+
+        // ### TODO:
+        // - check that memories and _relevanceScore stuff works with message deletion
+        // - import a bunch of old dumps and make sure they work
         return chararcterObj;
       }
       async function getSystemCharacterObj() {
         return {
           id: -2,
           name: "System",
+          avatar: {
+            url: null,
+            shape: null, // null => default to character setting
+            size: null,
+          },
         };
       }
 
-      let instructionForNextBotReply = null; // this is a convenient global alternative to passing replyInstruction to doBotReplyIfNeeded, because that is triggered in various places so it's hard to "thread" the instruction through the various functions that end up calling it (e.g. triggerMessageAddedCustomCodeEvent --> renderMessageThread --> doBotReplyIfNeeded)
+      let instructionForNextBotReply = null; // this is a mildly hacky but convenient global alternative to passing replyInstruction to doBotReplyIfNeeded, because that is triggered in various places so it's hard to "thread" the instruction through the various functions that end up calling it (e.g. triggerMessageAddedCustomCodeEvent --> renderMessageThread --> doBotReplyIfNeeded)
 
       async function sendButtonClickHandler() {
         $.sendButton.disabled = true;
@@ -3274,7 +3749,7 @@ OVERALL SUMMARY:
               // let messageObj = createMessageObj({threadId, message, characterId});
               // messageObj.character = character;
               // messageObj.id = await addMessageToDb(messageObj);
-              // let el = await appendMessageToFeed(messageObj);
+              // let el = await addMessageToFeed(messageObj);
             }
 
           } else if(message.trim().startsWith("/user")) {
@@ -3284,7 +3759,7 @@ OVERALL SUMMARY:
             let threadCharacter = await db.characters.get(parseInt($.messageFeed.dataset.characterId));
             characterToReplyWith.modelName = threadCharacter.modelName; // use whatever model the thread character is using
             if(instruction) {
-              characterToReplyWith.reminderMessage = `(The next message will be written by '${characterToReplyWith.name}' and WILL conform to this instruction: ${instruction})`;
+              characterToReplyWith.reminderMessage = `(The next message will be written from the perspective of '${characterToReplyWith.name}' and will conform to this user-provided instruction: "${instruction}")`;
             }
             await doBotReplyInPlaceOfUser(characterToReplyWith);
             await doBotReplyIfNeeded();
@@ -3329,7 +3804,7 @@ OVERALL SUMMARY:
                   }
                   let messageObj = createMessageObj({threadId, message:message.content, characterId:messageCharacterId, hiddenFrom:message.hiddenFrom || []});
                   messageObj.id = await addMessageToDb(messageObj);
-                  let el = await appendMessageToFeed(messageObj);
+                  let el = await addMessageToFeed(messageObj);
                 }
                 break;
               }
@@ -3400,6 +3875,7 @@ OVERALL SUMMARY:
                   newManualMemories.push({threadId, characterId, summaryHash:null, text, embedding, type:"user-written", status:"current", previousMemoryId:-1, nextMemoryId:-1, triggers:[]});
                 }
                 await db.transaction('rw', db.memories, async () => {
+                  // note: it's safe to delete user-written memories like this - they don't have any incoming or outgoing references.
                   await db.memories.where({threadId, type:"user-written"}).delete();
                   await db.memories.bulkAdd(newManualMemories);
                 });
@@ -3480,7 +3956,7 @@ OVERALL SUMMARY:
             if(messageObj.characterId === -1) messageObj.character = await getUserCharacterObj(threadId);
             if(messageObj.characterId === -2) messageObj.character = await getSystemCharacterObj();
 
-            await appendMessageToFeed(messageObj);
+            await addMessageToFeed(messageObj);
             
             $.messageInput.value = "";
             $.messageInput.style.height = "";
@@ -3506,7 +3982,7 @@ OVERALL SUMMARY:
       // db naming --> public custom code API naming
       const characterPropertiesVisibleToCustomCode = {
         name: "name",
-        avatarUrl: "avatarUrl",
+        avatar: "avatar",
         systemMessage: "roleInstruction",
         reminderMessage: "reminderMessage",
         initialMessages: "initialMessages",
@@ -3519,11 +3995,13 @@ OVERALL SUMMARY:
         // maxTokens: "maxTokens",
         stopSequences: "stopSequences",
         modelName: "modelName",
+        // note: we DO NOT expose `character.userCharacter` - custom code instead edits thread.userCharacter, which is a copy of character.userCharacter that's created at the start of a new thread
+        scene: "scene",
+        streamingResponse: "streamingResponse",
       };
 
       
       const customCodeIframes = {}; // threadId -> iframe
-      const customCodeFloatingWindows = {}; // threadId -> createFloatingWindow obj
       async function createNewCustomCodeIframeForThread(threadId) {
 
         let thread = await db.threads.get(threadId);
@@ -3531,9 +4009,7 @@ OVERALL SUMMARY:
         let customCode = (await db.characters.get(thread.characterId)).customCode || "";
 
         if(customCodeIframes[threadId]) {
-          customCodeFloatingWindows[threadId].ctn.remove();
           delete customCodeIframes[threadId];
-          delete customCodeFloatingWindows[threadId];
         }
 
         let iframe = document.createElement("iframe");
@@ -3550,16 +4026,24 @@ OVERALL SUMMARY:
         });
 
         iframe.setAttribute("sandbox", "allow-scripts");
-        iframe.style.cssText = "border:0; width:100%; height:100%; display:block;";
+        iframe.style.cssText = "border:0; width:100%; height:100%; display:none;";
+        iframe.dataset.threadId = threadId;
         
-        let floatingWindow = createFloatingWindow({header:character.name, closeButtonAction:"hide"});
-        floatingWindow.bodyEl.appendChild(iframe);
-        floatingWindow.hide();
-        
-        customCodeFloatingWindows[threadId] = floatingWindow;
+        // let floatingWindow = createFloatingWindow({header:character.name, closeButtonAction:"hide"});
+        // floatingWindow.bodyEl.appendChild(iframe);
+        // floatingWindow.hide();
+
+        $.customCodeIframeCtn.appendChild(iframe);
         customCodeIframes[threadId] = iframe;
 
         let srcDoc = dedent(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width">
+        </head>
+        <body>
         <script type="module">
           window.___dataInitializationIsComplete_836283628 = false;
 
@@ -3608,6 +4092,15 @@ OVERALL SUMMARY:
             window.oc = {
               thread: Object.seal({
                 messages: [],
+                userCharacter: Object.seal({
+                  name: null,
+                  avatar: Object.seal({
+                    url: null,
+                    size: null,
+                    shape: null,
+                  }),
+                }),
+                customData: null,
                 on: function(eventName, callback) {
                   userHandlers[eventName.toLowerCase()].push(callback);
                 },
@@ -3627,13 +4120,14 @@ OVERALL SUMMARY:
               ${Object.values(characterPropertiesVisibleToCustomCode).map(prop => `
                 ${prop}: null,
               `).join("\n")}
+                avatarUrl: null, // for backwards-compat
               }),
               window: Object.seal({
-                show: function() {
-                  window.parent.postMessage({type:"showWindow", threadId:${threadId}}, "*");
+                show: function(args={}) {
+                  window.parent.postMessage({type:"showWindow", threadId:${threadId}, args}, "*");
                 },
-                hide: function() {
-                  window.parent.postMessage({type:"hideWindow", threadId:${threadId}}, "*");
+                hide: function(args={}) {
+                  window.parent.postMessage({type:"hideWindow", threadId:${threadId}, args}, "*");
                 },
               }),
               //getCompletion: async function(options) {
@@ -3644,6 +4138,7 @@ OVERALL SUMMARY:
                 let data = {type:"getChatCompletion", options};
                 return callParentWindow(data);
               },
+              messageRenderingPipeline: [],
             };
 
 
@@ -3782,17 +4277,17 @@ OVERALL SUMMARY:
 
 
             window.oc.character = createDeepOnChangeProxy(window.oc.character, function() {
-              console.log("Custom code changed character data.", oc.character);
               dataChangedByCustomCode = true;
             });
             window.oc.thread = createDeepOnChangeProxy(window.oc.thread, function() {
-              console.log("Custom code changed thread data.", oc.thread);
               dataChangedByCustomCode = true;
             });
 
             window.oc = Object.freeze(window.oc);
 
             window.addEventListener("message", async function(e) {
+              if(e.source !== window.parent || e.origin !== "${window.location.origin}") return;
+
               if(e.data.eventName?.toLowerCase() !== "streamingmessagechunk") {
                 console.log("customCode iframe received message (note: streamingmessagechunk messages are not logged):", e.data);
               }
@@ -3806,8 +4301,8 @@ OVERALL SUMMARY:
 
               if(e.data.type === "function") {
                 try {
-                  let fn = new Function("return "+e.data.functionBody)();
-                  let output = await fn(...e.data.functionArgs);
+                  let fn = new Function(\`return (\${e.data.functionText})\`)();
+                  let output = await fn(e.data.functionArg);
                   window.parent.postMessage({_id:e.data._id, success:true, result:output}, "${window.location.origin}");
                 } catch(err) {
                   console.error(err);
@@ -3880,11 +4375,12 @@ OVERALL SUMMARY:
               async function sendBackDataUpdatesIfNeeded() {
                 if(dataChangedByCustomCode) {
                   let changedData = getChangedData();
-                  if(changedData.thread.messages && new Set(changedData.thread.messages.map(m => m.content)).size < changedData.thread.messages.length) {
-                    debugger;
-                  }
+                  // if(changedData.thread.messages && new Set(changedData.thread.messages.map(m => m.content)).size < changedData.thread.messages.length) {
+                  //   debugger;
+                  // }
                   dataChangedByCustomCode = false;
                   dataSnapshotWhenLastSentToMainThread = getCurrentData();
+                  console.log("Custom code changed character/thread data:", changedData);
                   await callParentWindow({type:"dataChanged", data:changedData})
                 }
               }
@@ -3903,18 +4399,40 @@ OVERALL SUMMARY:
               })();
 
               if(e.data.type === "init") {
+
+                function applyObjectOverrides({object, overrides}) {
+                  for (let key in overrides) {
+                    if (typeof overrides[key] === "object" && overrides[key] !== null) {
+                      if (!object.hasOwnProperty(key) || typeof object[key] !== "object" || object[key] === null) {
+                        object[key] = {};
+                      }
+                      applyObjectOverrides({object:object[key], overrides:overrides[key]});
+                    } else {
+                      object[key] = overrides[key];
+                    }
+                  }
+                }
+
                 let data = e.data.initialData;
-                for(let key in data.thread) {
-                  oc.thread[key] = data.thread[key];
-                }
-                for(let key in data.character) {
-                  oc.character[key] = data.character[key];
-                }
+                // for(let key in data.thread) {
+                //   oc.thread[key] = data.thread[key];
+                // }
+                applyObjectOverrides({object:oc.thread, overrides:data.thread});
+                // for(let key in data.character) {
+                //   oc.character[key] = data.character[key];
+                // }
+                applyObjectOverrides({object:oc.character, overrides:data.character});
                 window.___dataInitializationIsComplete_836283628 = true;
-                
-                window.parent.postMessage({_id:e.data._id, success:true, result:null}, "${window.location.origin}");
                 dataChangedByCustomCode = false;
                 dataSnapshotWhenLastSentToMainThread = getCurrentData();
+
+                // it's important that we wait for custom code to finish loading before we indicate that init has finished.
+                while(1) {
+                  if(window.__customCodeInitializationIsComplete_846298638) break;
+                  await new Promise(r => setTimeout(r, 5));
+                }
+                
+                window.parent.postMessage({_id:e.data._id, success:true, result:null}, "${window.location.origin}");
               }
             });
           })();
@@ -3931,9 +4449,9 @@ OVERALL SUMMARY:
           // we need to wait for the oc data to load because they may immediately reference it in their custom code
           while(1) {
             if(window.___dataInitializationIsComplete_836283628) break;
-            await new Promise(r => setTimeout(r, 3));
+            await new Promise(r => setTimeout(r, 5));
           }
-          console.log("data initialization of sandboxed iframe is complete");
+          console.log("Data initialization of sandboxed iframe is complete.");
 
           {{customCode}}
 
@@ -3943,7 +4461,10 @@ OVERALL SUMMARY:
               await window.processMessages(window.oc.thread.messages);
             });
           }
-        <\/script>`); // <-- need to escape the script tag so it doesn't close the script tag that this code is within
+          window.__customCodeInitializationIsComplete_846298638 = true;
+        <\/script>
+        </body>
+        </html>`); // need to escape the closing script tag so it doesn't close the script tag that this code is within
         
         // using template+split+join so dedent works properly
         iframe.srcdoc = srcDoc.split("{{customCode}}").join(customCode);
@@ -3969,24 +4490,70 @@ OVERALL SUMMARY:
         }
       });
 
-      window.addEventListener("message", function(e) {
+      window.addEventListener("message", async function(e) {
         let threadId = e.data.threadId;
+        let args = e.data.args;
         let types = ["showWindow", "hideWindow"];
-        if(types.includes(e.data?.type) && customCodeFloatingWindows[threadId] && customCodeIframes[threadId].contentWindow === e.source) {
-          let w = customCodeFloatingWindows[threadId];
-          if(e.data.type === "showWindow") w.show();
-          if(e.data.type === "hideWindow") w.hide();
+        if(types.includes(e.data?.type) && customCodeIframes[threadId]?.contentWindow === e.source) {
+          let visible = null;
+          if(e.data.type === "showWindow") visible = true;
+          if(e.data.type === "hideWindow") visible = false;
+          let thread = await db.threads.get(threadId);
+          thread.customCodeWindow.visible = visible;
+          if(args.width !== undefined && typeof args.width === "number" || typeof args.width === "string") {
+            thread.customCodeWindow.width = args.width;
+          }
+          await db.threads.put(thread);
+          await updateCustomCodeIframeVisibility();
         }
       });
 
-      window.addEventListener("message", function(e) {
-        let threadId = e.data.threadId;
-        let types = ["showWindow", "hideWindow"];
-        if(types.includes(e.data?.type) && customCodeFloatingWindows[threadId] && customCodeIframes[threadId].contentWindow === e.source) {
-          let w = customCodeFloatingWindows[threadId];
-          if(e.data.type === "showWindow") w.show();
-          if(e.data.type === "hideWindow") w.hide();
+
+      async function updateCustomCodeIframeVisibility() {
+        let visibleThreadId = null;
+        if($.messageFeed.offsetWidth > 0) visibleThreadId = parseInt($.messageFeed.dataset.threadId);
+        let visibleThread = null;
+        if(visibleThreadId !== null) visibleThread = await db.threads.get(visibleThreadId);
+
+        $.customCodeIframeCtn.querySelectorAll(`iframe`).forEach(iframe => iframe.style.display = "none");
+        $.customCodeColumn.style.display = "none";
+
+        if(visibleThread !== null && visibleThread.customCodeWindow.visible === true) {
+          customCodeIframes[visibleThreadId].style.display = "block";
+          let width = visibleThread.customCodeWindow.width ?? "300px";
+          if(typeof width === "number") width = width+"px";
+          $.customCodeIframeCtn.style.width = width;
+          $.customCodeColumn.style.display = "flex";
         }
+      }
+
+      $.customCodeIframeHorizontalResizeBar.addEventListener("mousedown", function(e) {
+        e.preventDefault();
+
+        // display an element that covers the entire screen, so that the user can drag the mouse over the iframe without losing mouse events:
+        let cover = document.createElement("div");
+        cover.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;z-index:99";
+        document.body.appendChild(cover);
+        cover.addEventListener("mouseup", function() {
+          cover.remove();
+        });
+
+        let startX = e.clientX;
+        let startWidth = $.customCodeIframeCtn.offsetWidth;
+        let mousemove = function(e) {
+          let newWidth = startWidth - (e.clientX - startX);
+          $.customCodeIframeCtn.style.width = newWidth+"px";
+        };
+        let mouseup = async function(e) {
+          window.removeEventListener("mousemove", mousemove);
+          window.removeEventListener("mouseup", mouseup);
+          let visibleThreadId = parseInt($.messageFeed.dataset.threadId);
+          let visibleThread = await db.threads.get(visibleThreadId);
+          visibleThread.customCodeWindow.width = $.customCodeIframeCtn.offsetWidth;
+          await db.threads.put(visibleThread);
+        };
+        window.addEventListener("mousemove", mousemove);
+        window.addEventListener("mouseup", mouseup);
       });
 
 
@@ -4003,7 +4570,7 @@ OVERALL SUMMARY:
         let threadId = e.data.threadId;
         let types = ["getChatCompletion", "dataChanged"];
         const data = e.data.data;
-        if(data && types.includes(data.type) && customCodeFloatingWindows[threadId] && customCodeIframes[threadId].contentWindow === e.source) {
+        if(data && types.includes(data.type) && customCodeIframes[threadId]?.contentWindow === e.source) {
           let thread = await db.threads.get(threadId);
           let character = await db.characters.get(thread.characterId);
           
@@ -4062,9 +4629,9 @@ OVERALL SUMMARY:
 
           if(data.type === "dataChanged") {
             let changedData = data.data;
-            if(changedData.thread.messages && new Set(changedData.thread.messages.map(m => m.content)).size < changedData.thread.messages.length) {
-              debugger;
-            }
+            // if(changedData.thread.messages && new Set(changedData.thread.messages.map(m => m.content)).size < changedData.thread.messages.length) {
+            //   debugger;
+            // }
             if(botIsCurrentlyReplyingPromise) {
               await botIsCurrentlyReplyingPromise; // otherwise we'll render the feed and thus delete the "typing indicator" placeholder or the streaming response
             }
@@ -4086,6 +4653,15 @@ OVERALL SUMMARY:
         });
       }
 
+      // this is for onclick handlers in messages
+      window.runCodeInCustomCodeIframe = function(code) {
+        let threadId = parseInt($.messageFeed.dataset.threadId);
+        let functionText = `function() {
+          ${code}
+        }`;
+        sendCustomCodeIframeMessage(threadId, {type:"function", functionText, functionArg:undefined});
+      };
+
       async function getDataForCustomCode(threadId) {
         let thread = await db.threads.get(threadId);
         let threadCharacter = await db.characters.get(thread.characterId);
@@ -4095,23 +4671,22 @@ OVERALL SUMMARY:
         if(!threadCharacter.customCode?.trim()) return;
 
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
-        let formattedMessages = messages.map((m, i) => {
-          let author, name;
-          if(m.characterId == threadCharacter.id) { author = "ai"; name = threadCharacter.name; }
-          if(m.characterId == -1) { author = "user"; name = userCharacter.name; }
-          if(m.characterId == -2) { author = "system"; name = "System"; }
-          let hiddenFrom = m.hiddenFrom || [];
-          return {author, content:m.message, hiddenFrom, expectsReply:m.expectsReply, name};
-        });
+        let formattedMessages = messagesToCustomCodeFormat({messages, aiCharacter:threadCharacter, userCharacter});
         let data = {
           thread: {
             messages: formattedMessages,
+            userCharacter: thread.userCharacter,
+            customData: thread.customData,
           },
           character: {},
         };
         for(let key in characterPropertiesVisibleToCustomCode) {
           data.character[characterPropertiesVisibleToCustomCode[key]] = threadCharacter[key];
         }
+
+        // backwards-compat properties:
+        data.character.avatarUrl = threadCharacter.avatar.url;
+
         return data;
       }
 
@@ -4131,10 +4706,8 @@ OVERALL SUMMARY:
         showEl($.statusNotifier);
 
         let data = await getDataForCustomCode(threadId);
-
         let returnedData = await sendCustomCodeIframeMessage(threadId, {type:"event", eventName:"messageadded", data});
         if(returnedData) await updateDbWithNewDataFromCustomCode(threadId, returnedData);
-
         $.statusNotifier.innerHTML = "";
         hideEl($.statusNotifier);
 
@@ -4151,31 +4724,35 @@ OVERALL SUMMARY:
 
       // let alreadyCurrentlyUpdatingDbWithNewDataFromCustomCode = false;
       async function updateDbWithNewDataFromCustomCode(threadId, data) {
-        // while(!alreadyCurrentlyUpdatingDbWithNewDataFromCustomCode) {
-        //   await delay(1);
-        // }
-        // alreadyCurrentlyUpdatingDbWithNewDataFromCustomCode = true;
+
+        // backwards-compat:
+        if(data.character?.avatarUrl) {
+          if(!data.character?.avatar?.url?.trim()) {
+            if(!data.character.avatar) data.character.avatar = {};
+            data.character.avatar.url = data.character.avatarUrl;
+          }
+          delete data.character.avatarUrl;
+        }
 
         let thread = await db.threads.get(threadId);
         let threadCharacter = await db.characters.get(thread.characterId);
 
         // THREAD updates:
         if(data.thread?.messages) {
-          let outputMessageObjs = data.thread.messages.map(m => {
-            let characterId = -2; // default to 'system'
-            if(m.author=="ai") characterId = threadCharacter.id;
-            if(m.author=="user") characterId = -1;
-            let hiddenFrom = [];
-            if(m.hiddenFrom) {
-              if(m.hiddenFrom.includes("user")) hiddenFrom.push("user");
-              if(m.hiddenFrom.includes("ai")) hiddenFrom.push("ai");
-            }
-            let expectsReply = undefined;
-            if([true, false].includes(m.expectsReply)) {
-              expectsReply = m.expectsReply;
-            }
-            return createMessageObj({threadId, message:m.content+"", characterId, hiddenFrom, expectsReply});
-          });
+          let originalMessages = await db.messages.where("threadId").equals(threadId).toArray();
+          let outputMessageObjs = messagesFromCustomCodeFormat({messages:data.thread.messages, originalMessages, aiCharacter:threadCharacter, threadId});
+
+          let originalMessageIds = originalMessages.map(m => m.id);
+          let outputMessageIds = outputMessageObjs.map(m => m.id ?? null).filter(id => id !== null);
+          
+          let messageIdsToDelete = originalMessageIds.filter(id => !outputMessageIds.includes(id));
+          await safelyDeleteMessagesByIds(messageIdsToDelete);
+
+          // delete all ids from the output messages, otherwise if custom code re-ordered messages, they would not be re-ordered in the db
+          // TODO: maybe change message ordering in renderMessageFeed so that it uses something other than the id? can't really use creationTime though because our `messagesFromCustomCodeFormat` code will re-add that to the outputMessageObjs.
+          for(let messageObj of outputMessageObjs) {
+            delete messageObj.id;
+          }
 
           // TODO: add some obvious optimisations here - e.g. go through messages until first change, then only update that one and all following (remember that messages can be completely re-ordered/removed/etc.)
           // replace messages in the database with the new messages
@@ -4190,15 +4767,27 @@ OVERALL SUMMARY:
           // we need to make sure that no other db.messages code runs between .delete and .bulkAdd, so we use a transaction that gets a read-write lock on the messages table.
           // otherwise e.g. another call to updateDbWithNewDataFromCustomCode could run between them, and that would cause `db.messages.where("threadId").equals(threadId).toArray()` to incorrectly return zero messages.
           await db.transaction('rw', db.messages, async () => {
-            await db.messages.where("threadId").equals(threadId).delete();
+            let existingMessageIds = await db.messages.where("threadId").equals(threadId).toArray().then(arr => arr.map(m => m.id));
+            await safelyDeleteMessagesByIds(existingMessageIds);
+
             await db.messages.bulkAdd(outputMessageObjs).catch(e => {
               downloadText(JSON.stringify(originalThreadJSON), "data.json");
               console.error(e);
               alert("There was an error during custom code handling. The original thread has been downloaded so you can import it in case of data loss.\n\n"+e.stack);
             });
           });
-
         }
+        if(data.thread?.userCharacter) {
+          let thread = await db.threads.get(threadId);
+          applyObjectOverrides({object:thread.userCharacter, overrides:data.thread.userCharacter});
+          await db.threads.put(thread);
+        }
+        if(data.thread?.customData) {
+          let thread = await db.threads.get(threadId);
+          thread.customData = data.thread.customData;
+          await db.threads.put(thread);
+        }
+
 
         // CHARACTER updates:
         let characterKeysChanged = Object.keys(data.character);
@@ -4214,7 +4803,6 @@ OVERALL SUMMARY:
         }
         await db.characters.put(threadCharacter);
 
-        // alreadyCurrentlyUpdatingDbWithNewDataFromCustomCode = false;
       }
 
 
@@ -4227,7 +4815,7 @@ OVERALL SUMMARY:
         let messageObj = createMessageObj({threadId, message:"...", characterId:-1});
         messageObj.character = await getUserCharacterObj(threadId); // <-- this is the 'user character', not the characterToReplyWith because the character is "typing the reply", but it's as if the user wrote it. Might change this later when I allow multiple characters per thread.
         
-        let messageEl = await appendMessageToFeed(messageObj);
+        let messageEl = await addMessageToFeed(messageObj, {skipReaderRendering:true});
         messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
         
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
@@ -4255,12 +4843,12 @@ OVERALL SUMMARY:
         } else {
           messageObj.message = message;
 
+          messageObj.id = await addMessageToDb(messageObj);
+
           let shouldScrollDown = messageFeedIsNearBottom();
-          updateMessageContent(messageEl, messageObj);
+          await addMessageToFeed(messageObj, {inPlaceOf:messageEl});
           if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
-          let id = await addMessageToDb(messageObj);
-          messageEl.dataset.id = id;
           await triggerMessageAddedCustomCodeEvent(threadId);
         }
         return true;
@@ -4360,40 +4948,10 @@ OVERALL SUMMARY:
         $.sendButton.disabled = false;
       });
 
-      function updateMessageContent(el, messageObj) {
-        if(messageObj.hiddenFrom?.includes("user")) el.classList.add("hiddenFromUser");
-        else el.classList.remove("hiddenFromUser");
-
-        let message = messageObj.message;
-
-        el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(message), domPurifyOptions);
-        el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
-
-        // add 'copy' button to code blocks
-        el.querySelectorAll('.messageText pre').forEach(pre => {
-          const wrapper = document.createElement('div');
-          const button = document.createElement('button');
-          button.innerText = 'copy';
-          button.style.cssText = 'font-size:80%; position:absolute; top:0.25rem; right:0.25rem;';
-          wrapper.style.position = 'relative';
-          pre.parentNode.insertBefore(wrapper, pre);
-          wrapper.appendChild(pre);
-          wrapper.appendChild(button);
-
-          button.addEventListener('click', async () => {
-            let text = pre.innerText.trim(); // trim removes trailing newlines from bash commands which is a very good idea
-            await navigator.clipboard.writeText(text);
-            button.innerText = 'copied!';
-            setTimeout(() => {
-              button.innerText = 'copy';
-            }, 2000);
-          });
-        });
-      }
-
       $.newThreadButton.addEventListener("click", async function() {
         document.querySelectorAll("#middleColumn > .middleColumnScreen").forEach(el => hideEl(el));
         showEl($.characterSelection);
+        await updateCustomCodeIframeVisibility();
         // deselect selected thread
         document.querySelectorAll("#chatThreads .thread").forEach(el => el.classList.remove("selected"));
         await renderCharacterList();
@@ -4451,9 +5009,12 @@ OVERALL SUMMARY:
         resizeMessageInputTextAreaToFitContent();
       });
 
-      // clear the database if the user clicks the clear data button.
       $.clearDataButton.addEventListener("click", async function() {
         if(!confirm("🚨 Are you sure you want to DELETE ALL DATA? This cannot be undone. 🚨")) {
+          return;
+        }
+        await delay(1000);
+        if(!confirm("🚨 Click OK again to confirm FULL DELETION of all your data. 🚨")) {
           return;
         }
         await db.delete();
@@ -4657,7 +5218,9 @@ OVERALL SUMMARY:
 
             // re-number message.memoryIdBatchesUsed
             for(let message of importedMessages) {
-              message.memoryIdBatchesUsed = message.memoryIdBatchesUsed.map(b => b.map(id => memoryIdMap[id]));
+              if(message.memoryIdBatchesUsed) { // <-- old exports won't have this
+                message.memoryIdBatchesUsed = message.memoryIdBatchesUsed.map(b => b.map(id => memoryIdMap[id]));
+              }
             }
             // (note: we don't need to do the same as above for summaryHashUsed since it obviously uses a hash instead of an id)
 
@@ -4933,17 +5496,17 @@ OVERALL SUMMARY:
       checkForHashCommand();
 
       try {
-        await navigator.storage.persist().then(async (persistent) => {
-          if(persistent) {
-            console.log("Storage will not be cleared except by explicit user action");
-          } else {
-            console.warn("Storage may be cleared by the browser under storage pressure.");
-            let messageCount = await db.messages.count();
-            if(messageCount > 500) {
+        let messageCount = await db.messages.count();
+        if(messageCount > 100) {
+          await navigator.storage.persist().then(async (persistent) => {
+            if(persistent) {
+              console.log("Storage will not be cleared except by explicit user action.");
+            } else {
+              console.warn("Storage may be cleared by the browser under storage pressure.");
               alert("Your browser is not allowing OpenCharacters to store data in a way that is 100% permanent. Your browser may clear your OpenCharacters data if your hard drive is nearly full. The browser will eventually grant permission once it recognises that you are a regular user of this site (i.e. once you demonstrate that you trust this site), but until then, please be sure to backup/export your data often. If you're a regular user of OpenCharacters and you're still seeing this message, please submit a bug report on our Discord server.");
             }
-          }
-        });
+          });
+        }
       } catch(e) {
         console.error(e);
       }
