@@ -5123,199 +5123,200 @@ OVERALL SUMMARY:
 
           if(options.keepExistingData === "no") {
             await db.delete();
-            db = await Dexie.import(file);
-          } else {
-            let json = JSON.parse(await new Blob([file]).text());
-
-            if(!json.data || !json.data.data) return "fail";
-
-            // TODO: I should probably convert IDs to UUIDs so I don't need to do this sort of thing, but this is fine for now. Note: If you do this, you need to update the export modal because it currently uses comma-separated IDs
-            
-            // we need to re-number all ids in the imported data to be higher than the current max ids.
-
-            // get current maximum id for each table
-            let maxThreadId = (await db.threads.orderBy("id").last())?.id ?? -1;
-            let maxMessageId = (await db.messages.orderBy("id").last())?.id ?? -1;
-            let maxCharacterId = (await db.characters.orderBy("id").last())?.id ?? -1;
-            let maxMemoryId = (await db.memories.orderBy("id").last())?.id ?? -1;
-            // note: summaries don't have an id (we index by hash), so we don't need to re-number their ids (but note that we do need to renumber their thread ids to match the new thread ids)
-
-            let importedCharacters = json.data.data.find(d => d.tableName === "characters").rows;
-            let importedThreads = json.data.data.find(d => d.tableName === "threads").rows;
-            let importedMessages = json.data.data.find(d => d.tableName === "messages").rows;
-            let importedSummaries = json.data.data.find(d => d.tableName === "summaries")?.rows;
-            let importedUsageStats = json.data.data.find(d => d.tableName === "usageStats")?.rows;
-            let importedMemories = json.data.data.find(d => d.tableName === "memories")?.rows;
-            
-            const existingCharacters = await db.characters.toArray();
-
-            // hash existing characters, and new characters, so we can map ids of new characters to ones that may already exist
-            let existingCharacterHashToId = {};
-            let newCharacterIdToHash = {};
-            for(let character of existingCharacters) {
-              let hash = await getCharacterHash(character);
-              existingCharacterHashToId[hash] = character.id;
-            }
-            for(let character of importedCharacters) {
-              let hash = await getCharacterHash(character);
-              newCharacterIdToHash[character.id] = hash;
-            }
-
-            // old id -> new id maps
-            let characterIdMap = {};
-            let threadIdMap = {};
-            let messageIdMap = {};
-            let summaryIdMap = {};
-            let memoryIdMap = {};
-
-            let charactersThatWeAlreadyHave = [];
-
-            // re-number character ids
-            for(let character of importedCharacters) {
-              let existingCharacterId = existingCharacterHashToId[newCharacterIdToHash[character.id]];
-              if(existingCharacterId !== undefined) {
-                characterIdMap[character.id] = existingCharacterId;
-                charactersThatWeAlreadyHave.push(character);
-                continue;
-              }
-              // no existing character with this hash, so we need to create a new entry:
-              maxCharacterId++;
-              characterIdMap[character.id] = maxCharacterId;
-              character.id = maxCharacterId;
-            }
-
-            // remove all the `charactersThatWeAlreadyHave` characters from the `importedCharacters`, since we don't need to import them:
-            importedCharacters = importedCharacters.filter(c => !charactersThatWeAlreadyHave.includes(c));
-
-            // re-number thread ids
-            for(let thread of importedThreads) {
-              maxThreadId++;
-              threadIdMap[thread.id] = maxThreadId;
-              thread.id = maxThreadId;
-              // re-number character id of each thread
-              thread.characterId = characterIdMap[thread.characterId];
-            }
-
-            // re-number message ids
-            for(let message of importedMessages) {
-              maxMessageId++;
-              messageIdMap[message.id] = maxMessageId;
-              message.id = maxMessageId;
-              // re-number thread id of each message
-              message.threadId = threadIdMap[message.threadId];
-              // re-number author/character id of each message
-              if(message.characterId >= 0) { // remember, user messages have characterId = -1, and system messages have characterId = -2
-                message.characterId = characterIdMap[message.characterId];
-              }
-            }
-
-            // re-number memory ids
-            if(importedMemories) {
-              for(let memory of importedMemories) {
-                maxMemoryId++;
-                memoryIdMap[memory.id] = maxMemoryId;
-                memory.id = maxMemoryId;
-              }
-            }
-
-            // re-number message.memoryIdBatchesUsed
-            for(let message of importedMessages) {
-              if(message.memoryIdBatchesUsed) { // <-- old exports won't have this
-                message.memoryIdBatchesUsed = message.memoryIdBatchesUsed.map(b => b.map(id => memoryIdMap[id]));
-              }
-            }
-            // (note: we don't need to do the same as above for summaryHashUsed since it obviously uses a hash instead of an id)
-
-            if(importedSummaries) {
-              // delete summaries that don't have messageIds (from an old version of the app)
-              importedSummaries = importedSummaries.filter(s => s.messageIds !== undefined);
-
-              // convert old summary thread/message ids to new ones
-              for(let summary of importedSummaries) {
-                summary.threadId = threadIdMap[summary.threadId];
-                summary.messageIds = summary.messageIds.map(id => messageIdMap[id]);
-              }
-              // get existing summary hashes from db
-              let existingSummaryHashes = new Set((await db.summaries.toArray()).map(s => s.hash));
-              // remove summaries we already have
-              importedSummaries = importedSummaries.filter(s => !existingSummaryHashes.has(s.hash));
-            }
-
-            if(importedUsageStats) {
-              // convert old usageStats thread and character ids to new ones
-              for(let entry of importedUsageStats) {
-                entry.threadId = threadIdMap[entry.threadId];
-                entry.characterId = characterIdMap[entry.characterId];
-              }
-            }
-
-            if(importedMemories) {
-              for(let memory of importedMemories) {
-                memory.threadId = threadIdMap[memory.threadId];
-                memory.characterId = characterIdMap[memory.characterId];
-                if(memory.previousMemoryId !== -1) memory.previousMemoryId = memoryIdMap[memory.previousMemoryId];
-                if(memory.nextMemoryId !== -1) memory.nextMemoryId = memoryIdMap[memory.nextMemoryId];
-              }
-            }
-
-            // if there's just one thread, then we assume it was from a single-thread export
-            // and in that case we probably don't want isFav to persist, and we also probably
-            // want that thread to be at the top - i.e. lastViewTime = now
-            if(importedThreads.length === 1) {
-              importedThreads[0].isFav = false;
-              importedThreads[0].lastViewTime = Date.now();
-              singleThreadImportId = importedThreads[0].id;
-            }
-
-
-            // UPGRADES:
-            // TODO: shouldn't dexie's .upgrade function handle this? doesn't seem to be doing it. check again - I could be wrong.
-            for(let character of importedCharacters) {
-              upgradeCharacterFromOldVersion(character);
-            }
-            for(let thread of importedThreads) {
-              upgradeThreadFromOldVersion(thread);
-            }
-            for(let message of importedMessages) {
-              upgradeMessageFromOldVersion(message);
-            }
-            if(importedUsageStats) {
-              importedUsageStats = importedUsageStats.filter(entry => entry.threadId !== undefined);
-            }
-            if(importedSummaries) {
-              importedSummaries = importedSummaries.filter(entry => entry.messageIds !== undefined);
-            }
-            
-
-
-            json.data.data.find(d => d.tableName === "characters").rows = importedCharacters;
-            json.data.data.find(d => d.tableName === "threads").rows = importedThreads;
-            json.data.data.find(d => d.tableName === "messages").rows = importedMessages;
-            if(importedSummaries) {
-              json.data.data.find(d => d.tableName === "summaries").rows = importedSummaries;
-            }
-            if(importedUsageStats) {
-              json.data.data.find(d => d.tableName === "usageStats").rows = importedUsageStats;
-            }
-            if(importedMemories) {
-              json.data.data.find(d => d.tableName === "memories").rows = importedMemories;
-            }
-
-            // delete old apiUsage table/data
-            json.data.data = json.data.data.filter(d => d.tableName !== "apiUsage");
-            json.data.tables = json.data.tables.filter(d => d.name !== "apiUsage");
-
-            // check which misc keys user already has, and remove them from the misc table that we're importing:
-            let existingMiscKeys = (await db.misc.toArray()).map(m => m.key);
-            let miscData = json.data.data.find(d => d.tableName === "misc");
-            miscData.rows = miscData.rows.filter(m => !existingMiscKeys.includes(m.key));
-
-            // convert json back to blob and import
-            let blob = new Blob([JSON.stringify(json)], {type: "application/json"});
-            await db.import(blob, {acceptVersionDiff:true, acceptMissingTables:true});
-
-            // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
+            await db.open();
+            // db = await Dexie.import(file); // this wasn't doing a version upgrade, and I'm not sure how to trigger it, so I'm just using the code below which was written for partial imports (but also works for full imports), and does the version upgrade manually
           }
+
+          let json = JSON.parse(await new Blob([file]).text());
+
+          if(!json.data || !json.data.data) return "fail";
+
+          // TODO: I should probably convert IDs to UUIDs so I don't need to do this sort of thing, but this is fine for now. Note: If you do this, you need to update the export modal because it currently uses comma-separated IDs
+          
+          // we need to re-number all ids in the imported data to be higher than the current max ids.
+
+          // get current maximum id for each table
+          let maxThreadId = (await db.threads.orderBy("id").last())?.id ?? -1;
+          let maxMessageId = (await db.messages.orderBy("id").last())?.id ?? -1;
+          let maxCharacterId = (await db.characters.orderBy("id").last())?.id ?? -1;
+          let maxMemoryId = (await db.memories.orderBy("id").last())?.id ?? -1;
+          // note: summaries don't have an id (we index by hash), so we don't need to re-number their ids (but note that we do need to renumber their thread ids to match the new thread ids)
+
+          let importedCharacters = json.data.data.find(d => d.tableName === "characters").rows;
+          let importedThreads = json.data.data.find(d => d.tableName === "threads").rows;
+          let importedMessages = json.data.data.find(d => d.tableName === "messages").rows;
+          let importedSummaries = json.data.data.find(d => d.tableName === "summaries")?.rows;
+          let importedUsageStats = json.data.data.find(d => d.tableName === "usageStats")?.rows;
+          let importedMemories = json.data.data.find(d => d.tableName === "memories")?.rows;
+          
+          const existingCharacters = await db.characters.toArray();
+
+          // hash existing characters, and new characters, so we can map ids of new characters to ones that may already exist
+          let existingCharacterHashToId = {};
+          let newCharacterIdToHash = {};
+          for(let character of existingCharacters) {
+            let hash = await getCharacterHash(character);
+            existingCharacterHashToId[hash] = character.id;
+          }
+          for(let character of importedCharacters) {
+            let hash = await getCharacterHash(character);
+            newCharacterIdToHash[character.id] = hash;
+          }
+
+          // old id -> new id maps
+          let characterIdMap = {};
+          let threadIdMap = {};
+          let messageIdMap = {};
+          let summaryIdMap = {};
+          let memoryIdMap = {};
+
+          let charactersThatWeAlreadyHave = [];
+
+          // re-number character ids
+          for(let character of importedCharacters) {
+            let existingCharacterId = existingCharacterHashToId[newCharacterIdToHash[character.id]];
+            if(existingCharacterId !== undefined) {
+              characterIdMap[character.id] = existingCharacterId;
+              charactersThatWeAlreadyHave.push(character);
+              continue;
+            }
+            // no existing character with this hash, so we need to create a new entry:
+            maxCharacterId++;
+            characterIdMap[character.id] = maxCharacterId;
+            character.id = maxCharacterId;
+          }
+
+          // remove all the `charactersThatWeAlreadyHave` characters from the `importedCharacters`, since we don't need to import them:
+          importedCharacters = importedCharacters.filter(c => !charactersThatWeAlreadyHave.includes(c));
+
+          // re-number thread ids
+          for(let thread of importedThreads) {
+            maxThreadId++;
+            threadIdMap[thread.id] = maxThreadId;
+            thread.id = maxThreadId;
+            // re-number character id of each thread
+            thread.characterId = characterIdMap[thread.characterId];
+          }
+
+          // re-number message ids
+          for(let message of importedMessages) {
+            maxMessageId++;
+            messageIdMap[message.id] = maxMessageId;
+            message.id = maxMessageId;
+            // re-number thread id of each message
+            message.threadId = threadIdMap[message.threadId];
+            // re-number author/character id of each message
+            if(message.characterId >= 0) { // remember, user messages have characterId = -1, and system messages have characterId = -2
+              message.characterId = characterIdMap[message.characterId];
+            }
+          }
+
+          // re-number memory ids
+          if(importedMemories) {
+            for(let memory of importedMemories) {
+              maxMemoryId++;
+              memoryIdMap[memory.id] = maxMemoryId;
+              memory.id = maxMemoryId;
+            }
+          }
+
+          // re-number message.memoryIdBatchesUsed
+          for(let message of importedMessages) {
+            if(message.memoryIdBatchesUsed) { // <-- old exports won't have this
+              message.memoryIdBatchesUsed = message.memoryIdBatchesUsed.map(b => b.map(id => memoryIdMap[id]));
+            }
+          }
+          // (note: we don't need to do the same as above for summaryHashUsed since it obviously uses a hash instead of an id)
+
+          if(importedSummaries) {
+            // delete summaries that don't have messageIds (from an old version of the app)
+            importedSummaries = importedSummaries.filter(s => s.messageIds !== undefined);
+
+            // convert old summary thread/message ids to new ones
+            for(let summary of importedSummaries) {
+              summary.threadId = threadIdMap[summary.threadId];
+              summary.messageIds = summary.messageIds.map(id => messageIdMap[id]);
+            }
+            // get existing summary hashes from db
+            let existingSummaryHashes = new Set((await db.summaries.toArray()).map(s => s.hash));
+            // remove summaries we already have
+            importedSummaries = importedSummaries.filter(s => !existingSummaryHashes.has(s.hash));
+          }
+
+          if(importedUsageStats) {
+            // convert old usageStats thread and character ids to new ones
+            for(let entry of importedUsageStats) {
+              entry.threadId = threadIdMap[entry.threadId];
+              entry.characterId = characterIdMap[entry.characterId];
+            }
+          }
+
+          if(importedMemories) {
+            for(let memory of importedMemories) {
+              memory.threadId = threadIdMap[memory.threadId];
+              memory.characterId = characterIdMap[memory.characterId];
+              if(memory.previousMemoryId !== -1) memory.previousMemoryId = memoryIdMap[memory.previousMemoryId];
+              if(memory.nextMemoryId !== -1) memory.nextMemoryId = memoryIdMap[memory.nextMemoryId];
+            }
+          }
+
+          // if there's just one thread, then we assume it was from a single-thread export
+          // and in that case we probably don't want isFav to persist, and we also probably
+          // want that thread to be at the top - i.e. lastViewTime = now
+          if(importedThreads.length === 1) {
+            importedThreads[0].isFav = false;
+            importedThreads[0].lastViewTime = Date.now();
+            singleThreadImportId = importedThreads[0].id;
+          }
+
+
+          // UPGRADES:
+          // TODO: shouldn't dexie's .upgrade function handle this? doesn't seem to be doing it. check again - I could be wrong.
+          for(let character of importedCharacters) {
+            upgradeCharacterFromOldVersion(character);
+          }
+          for(let thread of importedThreads) {
+            upgradeThreadFromOldVersion(thread);
+          }
+          for(let message of importedMessages) {
+            upgradeMessageFromOldVersion(message);
+          }
+          if(importedUsageStats) {
+            importedUsageStats = importedUsageStats.filter(entry => entry.threadId !== undefined);
+          }
+          if(importedSummaries) {
+            importedSummaries = importedSummaries.filter(entry => entry.messageIds !== undefined);
+          }
+          
+
+
+          json.data.data.find(d => d.tableName === "characters").rows = importedCharacters;
+          json.data.data.find(d => d.tableName === "threads").rows = importedThreads;
+          json.data.data.find(d => d.tableName === "messages").rows = importedMessages;
+          if(importedSummaries) {
+            json.data.data.find(d => d.tableName === "summaries").rows = importedSummaries;
+          }
+          if(importedUsageStats) {
+            json.data.data.find(d => d.tableName === "usageStats").rows = importedUsageStats;
+          }
+          if(importedMemories) {
+            json.data.data.find(d => d.tableName === "memories").rows = importedMemories;
+          }
+
+          // delete old apiUsage table/data
+          json.data.data = json.data.data.filter(d => d.tableName !== "apiUsage");
+          json.data.tables = json.data.tables.filter(d => d.name !== "apiUsage");
+
+          // check which misc keys user already has, and remove them from the misc table that we're importing:
+          let existingMiscKeys = (await db.misc.toArray()).map(m => m.key);
+          let miscData = json.data.data.find(d => d.tableName === "misc");
+          miscData.rows = miscData.rows.filter(m => !existingMiscKeys.includes(m.key));
+
+          // convert json back to blob and import
+          let blob = new Blob([JSON.stringify(json)], {type: "application/json"});
+          await db.import(blob, {acceptVersionDiff:true, acceptMissingTables:true});
+
+          // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
 
         } catch(e) {
           console.error(e);
