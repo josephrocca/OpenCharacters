@@ -359,8 +359,9 @@
 
     <div id="main" style="display:flex; position:fixed; top:0; right:0; left:0; bottom:0;">
       <div id="leftColumn" style="display:flex; flex-direction:column; width:270px; min-width:270px; padding:0.5rem; ">
-        <div>
+        <div style="display:flex;">
           <button id="newThreadButton" style="width:100%; cursor:pointer; min-height:2rem;">💬 new chat</button>
+          <button id="closeLeftColumnButton" style="cursor:pointer;min-height:2rem;margin-left: 0.25rem;min-width: 2rem;">☰</button>
         </div>
         <div id="threadSearchCtn" style="display:flex; width:100%; margin-top:0.5rem;">
           <input id="threadSearchInput" style="height: 100%; flex-grow: 1; min-width: 0; padding-left: 0.5rem;" type="text" placeholder="search threads...">
@@ -377,7 +378,7 @@
       </div>
 
       <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden;">
-        <button id="leftColumnToggleButton" data-state="open" style="position:absolute; top:0.25rem; left:0.25rem; z-index:500; padding:0.25rem; display:none;">menu</button>
+        <button id="openLeftColumnButton" style="display:none; position: absolute;top:0.25rem;left:0.25rem;z-index: 500;padding: 0.25rem;min-width: 2rem;min-height: 2rem;">☰</button>
         <div id="characterSelection" class="middleColumnScreen" style="flex-grow:1; display:none; overflow: auto;">
           <div><h2 style="text-align:center;">Your Characters</h2></div>
           <div id="characterList" style=""></div>
@@ -511,36 +512,31 @@
       }
 
       const isMobile = window.innerWidth < 700; // TODO: improve this heuristic. this isn't just about screen width - it's also about touch screens (no pointer hover events).
-
-      // add menu open/close button for narrow screens
-      showEl($.leftColumnToggleButton);
-      $.leftColumnToggleButton.addEventListener("click", function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        if($.leftColumnToggleButton.dataset.state === "closed") {
-          $.leftColumnToggleButton.dataset.state = "open";
-          // $.leftColumnToggleButton.innerHTML = "menu ⬅️";
-          showEl($.leftColumn);
-        } else {
-          $.leftColumnToggleButton.dataset.state = "closed";
-          // $.leftColumnToggleButton.innerHTML = "menu ➡️";
-          hideEl($.leftColumn);
-        }
-      });
-
       if(isMobile) {
         document.body.classList.add("isMobile"); // to use in CSS selectors
-        // hide the left column by default on mobile:
-        hideEl($.leftColumn);
-        $.leftColumnToggleButton.dataset.state = "closed";
-        // if they click anywhere in the middle column, close the menu
-        $.middleColumn.addEventListener("click", function() {
-          if($.leftColumnToggleButton.dataset.state === "open") {
-            $.leftColumnToggleButton.dataset.state = "closed";
-            hideEl($.leftColumn);
-          }
-        });
       }
+
+      
+      {
+        function openLeftColumn() {
+          showEl($.leftColumn);
+          hideEl($.openLeftColumnButton);
+          showEl($.closeLeftColumnButton);
+        }
+        function closeLeftColumn() {
+          hideEl($.leftColumn);
+          showEl($.openLeftColumnButton);
+          hideEl($.closeLeftColumnButton);
+        }
+        $.closeLeftColumnButton.addEventListener("click", closeLeftColumn);
+        $.openLeftColumnButton.addEventListener("click", openLeftColumn);
+        if(isMobile) {
+          closeLeftColumn();
+          // if they click anywhere in the middle column, close the menu
+          $.middleColumn.addEventListener("click", closeLeftColumn);
+        }
+      }
+
       
       let db = new Dexie("chatbot-ui-v1");
       db.version(37).stores({
@@ -1043,7 +1039,7 @@
           observer.observe(triggerEl);
         }
 
-        await updateInlineReminderMessage();
+        await updateInlineReminderMessage({aiCharacter:character});
         await updateThreadScene();
 
         doBotReplyIfNeeded(); // we shouldn't `await` this because thread is already rendered.
@@ -1215,10 +1211,17 @@
         return el;
       }
 
-      async function updateInlineReminderMessage() {
+      async function updateInlineReminderMessage(opts={}) {
+        // note: opts.aiCharacter can be passed for performance reasons if the caller already has the aiCharacter object
+
         // place reminder element before the most recent bot message
         let characterId = parseInt($.messageFeed.dataset.characterId);
-        let reminderMessage = await db.characters.get(characterId).then(c => c.reminderMessage || "");
+        let reminderMessage
+        if(!opts.aiCharacter){
+          reminderMessage = await db.characters.get(characterId).then(c => c.reminderMessage || "");
+        } else {
+          reminderMessage = opts.aiCharacter.reminderMessage || "";
+        }
         let botMessages = [...$.messageFeed.querySelectorAll(`.message[data-character-id='${characterId}']`)];
 
         // remove existing inline reminder messages (important to do this after the async db call above to be sure that if updateInlineReminderMessage is for some reason called twice very close together, we won't get too inline reminders)
@@ -5130,8 +5133,8 @@ OVERALL SUMMARY:
         document.querySelectorAll("#chatThreads .thread").forEach(el => el.classList.remove("selected"));
         await renderCharacterList();
         // close the side menu if menu button is visible (i.e. they're on mobile) and it's open:
-        if($.leftColumnToggleButton.offsetHeight > 0 && $.leftColumnToggleButton.dataset.state === "open") {
-          $.leftColumnToggleButton.dataset.state = "closed";
+        if($.floatingLeftColumnToggleButton.offsetHeight > 0 && $.leftColumn.dataset.visibilityState === "open") {
+          $.leftColumn.dataset.visibilityState = "closed";
           hideEl($.leftColumn);
         }
       });
