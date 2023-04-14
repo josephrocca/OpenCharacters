@@ -715,9 +715,11 @@
         let characters = await db.characters.toArray();
         for(let thread of threads) {
           thread.character = characters.find(c => c.id === thread.characterId) || null;
-          if(thread.character === null) {
-            alert(`You have a thread with id=${thread.id} that is referencing a character (id=${thread.characterId}) that doesn't exist. This is a bug. Please report it on Github or Discord.`);
-          }
+        }
+
+        let threadsWithoutCharacter = threads.filter(t => !t.character);
+        if(threadsWithoutCharacter.length > 0) {
+          alert(`You have one or more threads (with ids=${threadsWithoutCharacter.map(t => t.id).join(",")}) that are referencing character(s) that don't exist. This is a bug. Please report it on Github or Discord.`);
         }
 
         threads = threads.filter(t => t.character);
