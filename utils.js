@@ -431,10 +431,12 @@ export function createLoadingModal(initialContent) {
 
 // this function crawls deeply through the overrides object and applies values to `obj` in the same "position" within the object - either overriding existing values, or creating new key/value pairs if they don't exist
 export function applyObjectOverrides({object, overrides}) {
-  for (let key in overrides) {
-    if (typeof overrides[key] === "object" && overrides[key] !== null) {
+  for(let key in overrides) {
+    if(Array.isArray(overrides[key])) {
+      object[key] = structuredClone(overrides[key]); // arrays are treated as "final" values - we don't go "into" them
+    } else if(typeof overrides[key] === "object" && overrides[key] !== null) {
       if (!object.hasOwnProperty(key) || typeof object[key] !== "object" || object[key] === null) {
-        object[key] = Array.isArray(overrides[key]) ? [] : {};
+        object[key] = {};
       }
       applyObjectOverrides({object:object[key], overrides:overrides[key]});
     } else {
