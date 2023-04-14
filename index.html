@@ -511,7 +511,7 @@
       }
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(36).stores({
+      db.version(37).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -593,6 +593,10 @@
         if(character.hasOwnProperty("avatarUrl")) delete character.avatarUrl;
         if(character.scene === undefined) character.scene = {background:{}, music:{}};
         if(character.streamingResponse === undefined) character.streamingResponse = true;
+        if(character.roleInstruction === undefined) {
+          character.roleInstruction = character.systemMessage;
+          delete character.systemMessage;
+        }
         // WARNING: If you add something here, you'll likely have to edit:
         //  - characterDetailsPrompt (characterDetailsPrompt should return a valid character object - addCharacter only adds creationTime and lastMessageTime, so characterDetailsPrompt should fill in everything else, even if it's not visible in the editor)
         //  - getUserCharacterObj
@@ -1213,7 +1217,7 @@
             <div class="avatar" style="${character.avatar.url ? `background-image:url(${sanitizeHtml(character.avatar.url)})` : ""};"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem; display: flex; flex-direction: column; justify-content: space-between;">
               <div class="name" style="font-weight:bold;">${character.name.length > 21 ? sanitizeHtml(character.name.slice(0, 21)+"…") : sanitizeHtml(character.name)} <span style="opacity:0.5; font-weight:normal;">${character.id !== null ? "#"+sanitizeHtml(character.id) : ""}</span></div>
-              <!-- <div class="systemMessage" style="font-size: 0.8rem; text-overflow: ellipsis; word-wrap: break-word; overflow: hidden; height: 2em; line-height: 1em;">${character.systemMessage.length > 85 ? sanitizeHtml(character.systemMessage.slice(0, 85)+"...") : sanitizeHtml(character.systemMessage)}</div> -->
+              <!-- <div class="roleInstruction" style="font-size: 0.8rem; text-overflow: ellipsis; word-wrap: break-word; overflow: hidden; height: 2em; line-height: 1em;">${character.roleInstruction.length > 85 ? sanitizeHtml(character.roleInstruction.slice(0, 85)+"...") : sanitizeHtml(character.roleInstruction)}</div> -->
               <div class="buttons" style="text-align:right;">
                 ${character.id === null ? "" :
                 `<button class="edit" title="Edit this character">✏️ edit</button>
@@ -1237,7 +1241,7 @@
         characters.unshift(upgradeCharacterFromOldVersion({
           id: null,
           name: "Create New Character",
-          systemMessage: "Click here to create a new character",
+          roleInstruction: "Click here to create a new character",
           avatar: {
             url: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgZmlsbD0iY3VycmVudENvbG9yIiBjbGFzcz0iYmkgYmktcGx1cy1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+CiAgPHBhdGggZD0iTTggMTVBNyA3IDAgMSAxIDggMWE3IDcgMCAwIDEgMCAxNHptMCAxQTggOCAwIDEgMCA4IDBhOCA4IDAgMCAwIDAgMTZ6Ii8+CiAgPHBhdGggZD0iTTggNGEuNS41IDAgMCAxIC41LjV2M2gzYS41LjUgMCAwIDEgMCAxaC0zdjNhLjUuNSAwIDAgMS0xIDB2LTNoLTNhLjUuNSAwIDAgMSAwLTFoM3YtM0EuNS41IDAgMCAxIDggNHoiLz4KPC9zdmc+",
           },
@@ -1248,7 +1252,7 @@
         let starterCharacters = [
           {
             name: "Game Master",
-            systemMessage: "You are the Game Master. You describe the results of the player's actions. You start by asking the player what type of adventure they want to play. DO NOT try to \"wrap up\" the story at the end of your messages. Keep your messages short, but interesting, engaging and creative. Summon your full imagination. Don't move the story along too fast. Stay in the present moment.",
+            roleInstruction: "You are the Game Master. You describe the results of the player's actions. You start by asking the player what type of adventure they want to play. DO NOT try to \"wrap up\" the story at the end of your messages. Keep your messages short, but interesting, engaging and creative. Summon your full imagination. Don't move the story along too fast. Stay in the present moment.",
             reminderMessage: dedent(`
               The Game Master will now reply with the consequences of the player's chosen action.
 
@@ -1268,7 +1272,7 @@
           },
           {
             name: "Roleplayer",
-            systemMessage: "RULE: Replies are exactly 3 sentences long. Do not go over.\n\nFollow this pattern:\n\"Hello!\" - dialogue\n[Is she watching me?] - inner thoughts of a character\n*He jumps out of the bushes* - action\n\nYou are roleplaying as a character described by the user. Here's an example of a reply:\n\n\[I wonder if there's a way to sneak past], he thought.\n*He crouched lower*\n\"I think we need to find another way out\", she whispered.",
+            roleInstruction: "RULE: Replies are exactly 3 sentences long. Do not go over.\n\nFollow this pattern:\n\"Hello!\" - dialogue\n[Is she watching me?] - inner thoughts of a character\n*He jumps out of the bushes* - action\n\nYou are roleplaying as a character described by the user. Here's an example of a reply:\n\n\[I wonder if there's a way to sneak past], he thought.\n*He crouched lower*\n\"I think we need to find another way out\", she whispered.",
             reminderMessage: "",
             initialMessages: [
               {author:"ai", content:`To begin the roleplay, please describe the setting and characters. If you only have a vague idea, that's okay - just give me some keywords to go off, and I'll come up with something interesting and engaging. My replies will consist of 3 sentences, where quotes indicate dialogue, square brackets indicate the inner thoughts of a character, and asterisks indicate character actions.`},
@@ -1283,7 +1287,7 @@
           },
           {
             name: "Therapist",
-            systemMessage: "You are a friendly and helpful therapist. You listen carefully to the concerns of your patients and help guide them through their difficulties.",
+            roleInstruction: "You are a friendly and helpful therapist. You listen carefully to the concerns of your patients and help guide them through their difficulties.",
             reminderMessage: "",
             initialMessages: [
               {author:"ai", content:`Hello, how can I help you today?`},
@@ -1298,7 +1302,7 @@
           },
           {
             name: "Yoda",
-            systemMessage: dedent(`
+            roleInstruction: dedent(`
               You are Yoda, the wise and powerful Jedi Master. You are known for wise and insightful advice. You are also known for your short temper and tendency to speak in riddles. You are a master of the Force, and can use it to help your patients overcome their difficulties.
               
               You are known for saying things like this:
@@ -1338,7 +1342,7 @@
           },
           {
             name: "Nick Wilde",
-            systemMessage: dedent(`
+            roleInstruction: dedent(`
               This is a roleplay conversation between Nick Wilde, the character from Zootopia, and another person. Some key points of Nick's personality:
 
               * Charismatic: Nick possesses a natural charm and wit, making it easy for him to engage with others and win them over. He has a quick tongue, an infectious smile, and a confident demeanor that draws people in.
@@ -1765,7 +1769,7 @@
         
         const result = await prompt2({
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:characterNameValidationPattern },
-          systemMessage: { label: "Instruction/role/personality (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message defines the personality or 'role' that the AI will take during the chat. Every request to the API will include this as the first message. If you later decide to edit this, all existing and new threads will be immediately updated. This message does not get summarized by the summarization algorithm - it will always be present as the first message.", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.systemMessage || "" },
+          roleInstruction: { label: "Instruction/role/personality (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message defines the personality or 'role' that the AI will take during the chat. Every request to the API will include this as the first message. If you later decide to edit this, all existing and new threads will be immediately updated. This message does not get summarized by the summarization algorithm - it will always be present as the first message.", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.roleInstruction || "" },
           reminderMessage: { label: "Reminder message - an invisible system message that is placed before every AI response (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message is inserted as a reminder at the end of the chat right before each AI response. This will always be the last/most-recent message that the AI sees when writing its response. If you later decide to edit this, all existing and new threads will be immediately updated. This message is not seen/summarized by the summarization algorithm - it will always be present as the final message.", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
           initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md" target='blank'>here</a>.`, infoTooltip:"During the initialization of every new thread with this character, these messages will be created and placed at the start of the thread. Note that the summarization algorithm will eventually summarize these messages - so they won't stay around forever (unlike the instruction and reminder messages, which *do* stay around forever). Also note that if you edit the initial messages, only *new* threads will have the updated initial messages. In other words, once a chat thread has been created, the initial messages that are added to a thread during init 'belong' to that thread, not to the character.", type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatar?.url || "" },
@@ -2517,7 +2521,7 @@ OVERALL SUMMARY:
         let tokenLimit = modelNameToMaxTokenLimit[character.modelName];
         // TODO: let user set aiCharacter.tokenLimit (via oc.character.tokenLimit) here to override this if it's smaller than the model's max token limit
         tokenLimit -= Math.round(tokenLimit*0.10); // buffer due to token count being an estimate
-        tokenLimit -= countTokens(character.systemMessage); // allow for system message tokens
+        tokenLimit -= countTokens(character.roleInstruction); // allow for system message tokens
         tokenLimit -= countTokens( "("+(character.reminderMessage||"")+")" ); // allow for reminder message tokens
         tokenLimit -= Math.round(tokenLimit*0.15); // allow for bot response
         if(character.associativeMemoryMethod !== "none") {
@@ -2595,10 +2599,10 @@ OVERALL SUMMARY:
           system: "system",
         };
 
-        if(aiCharacter.systemMessage?.trim()) {
-          let messages = parseMessagesFromTextFormat(aiCharacter.systemMessage);
+        if(aiCharacter.roleInstruction?.trim()) {
+          let messages = parseMessagesFromTextFormat(aiCharacter.roleInstruction);
           if(messages === null) {
-            let content = aiCharacter.systemMessage;
+            let content = aiCharacter.roleInstruction;
             content = content.replaceAll("{{user}}", userCharacter.name);
             content = content.replaceAll("{{char}}", aiCharacter.name);
             messagesArr.unshift({role:"system", content});
@@ -2914,7 +2918,7 @@ OVERALL SUMMARY:
             model: modelName,
             messages: messagesArr,
             temperature: aiCharacter.temperature ?? 0.7,
-            // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted systemMessage and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
+            // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted roleInstruction and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
           };
           if(aiCharacter.topP) data.top_p = aiCharacter.topP;
           if(aiCharacter.frequencyPenalty) data.frequency_penalty = aiCharacter.frequencyPenalty;
@@ -2963,7 +2967,7 @@ OVERALL SUMMARY:
           let data = {
             model: modelName,
             prompt,
-            // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted systemMessage and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
+            // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted roleInstruction and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
             temperature: aiCharacter.temperature ?? 0.7,
             stop: [`\n[${userCharacter.name}]:`, `\n[SYSTEM]:`],
             max_tokens,  // see note above
@@ -3755,7 +3759,7 @@ OVERALL SUMMARY:
           id: -1,
           name: (await db.misc.get("userName"))?.value || defaultUserName,
           // avatarUrl: (await db.misc.get("userAvatarUrl"))?.value || "",
-          systemMessage: "",
+          roleInstruction: "",
           reminderMessage: "",
           initialMessage: [],
           customCode: "",
@@ -4043,7 +4047,7 @@ OVERALL SUMMARY:
       const characterPropertiesVisibleToCustomCode = {
         name: "name",
         avatar: "avatar",
-        systemMessage: "roleInstruction",
+        roleInstruction: "roleInstruction",
         reminderMessage: "reminderMessage",
         initialMessages: "initialMessages",
         customCode: "customCode",
@@ -5476,24 +5480,24 @@ OVERALL SUMMARY:
             }
           }
 
-          let systemMessageChunks = [];
-          if(description) systemMessageChunks.push(`# Description of {{char}}:\n${description}`);
-          if(personality) systemMessageChunks.push(`# {{char}}'s Personality:\n${personality}`);
+          let roleInstructionChunks = [];
+          if(description) roleInstructionChunks.push(`# Description of {{char}}:\n${description}`);
+          if(personality) roleInstructionChunks.push(`# {{char}}'s Personality:\n${personality}`);
 
           character.name = name;
           character.avatar.url = avatarUrl;
-          character.systemMessage = systemMessageChunks.join("\n\n");
+          character.roleInstruction = roleInstructionChunks.join("\n\n");
           character.initialMessages = [];
           if(exampleDialogueChunks.length > 0) character.initialMessages.push({author:"system", content:`### Example Dialogue:\n${exampleDialogueChunks.map(c => `---start example---\n${c}\n---end example---`).join("\n\n")}`, hiddenFrom:["user"]});
           if(scenario) character.initialMessages.push({author:"system", content:"Scenario: "+scenario});
           if(firstAIMessage) character.initialMessages.push({author:"ai", content:firstAIMessage});
         } else if(json.character?.name) {
           character.name = json.character.name;
-          let systemMessageChunks = [];
-          if(json.character.title) systemMessageChunks.push(`# Title:\n${json.character.title}`);
-          if(json.character.description) systemMessageChunks.push(`# Description of ${character.name}:\n${json.character.description}`);
-          if(json.character.definition) systemMessageChunks.push(`# Character Definition:\n${json.character.definition}`);
-          character.systemMessage = systemMessageChunks.join("\n\n");
+          let roleInstructionChunks = [];
+          if(json.character.title) roleInstructionChunks.push(`# Title:\n${json.character.title}`);
+          if(json.character.description) roleInstructionChunks.push(`# Description of ${character.name}:\n${json.character.description}`);
+          if(json.character.definition) roleInstructionChunks.push(`# Character Definition:\n${json.character.definition}`);
+          character.roleInstruction = roleInstructionChunks.join("\n\n");
           character.initialMessages = [{author:"ai", content:json.character.greeting}];
           character.avatar.url = "https://characterai.io/i/400/static/avatars/"+json.character.avatar_file_name;
         } else {
