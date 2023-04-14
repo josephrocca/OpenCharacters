@@ -517,24 +517,25 @@
       }
 
       
-      {
-        function openLeftColumn() {
-          showEl($.leftColumn);
-          hideEl($.openLeftColumnButton);
-          showEl($.closeLeftColumnButton);
-        }
-        function closeLeftColumn() {
-          hideEl($.leftColumn);
-          showEl($.openLeftColumnButton);
-          hideEl($.closeLeftColumnButton);
-        }
-        $.closeLeftColumnButton.addEventListener("click", closeLeftColumn);
-        $.openLeftColumnButton.addEventListener("click", openLeftColumn);
-        if(isMobile) {
-          closeLeftColumn();
-          // if they click anywhere in the middle column, close the menu
-          $.middleColumn.addEventListener("click", closeLeftColumn);
-        }
+      function openLeftColumn() {
+        showEl($.leftColumn);
+        hideEl($.openLeftColumnButton);
+        showEl($.closeLeftColumnButton);
+      }
+      function closeLeftColumn() {
+        hideEl($.leftColumn);
+        showEl($.openLeftColumnButton);
+        hideEl($.closeLeftColumnButton);
+      }
+      $.closeLeftColumnButton.addEventListener("click", closeLeftColumn);
+      $.openLeftColumnButton.addEventListener("click", (e) => {
+        e.stopPropagation(); // <-- since this hovers over middle column, and on mobile we close left column when they tap middle column
+        openLeftColumn();
+      });
+      if(isMobile) {
+        closeLeftColumn();
+        // if they click anywhere in the middle column, close the menu
+        $.middleColumn.addEventListener("click", closeLeftColumn);
       }
 
       
@@ -5132,10 +5133,9 @@ OVERALL SUMMARY:
         // deselect selected thread
         document.querySelectorAll("#chatThreads .thread").forEach(el => el.classList.remove("selected"));
         await renderCharacterList();
-        // close the side menu if menu button is visible (i.e. they're on mobile) and it's open:
-        if($.floatingLeftColumnToggleButton.offsetHeight > 0 && $.leftColumn.dataset.visibilityState === "open") {
-          $.leftColumn.dataset.visibilityState = "closed";
-          hideEl($.leftColumn);
+        
+        if(isMobile) {
+          closeLeftColumn();
         }
       });
 
