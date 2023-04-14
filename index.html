@@ -4473,10 +4473,9 @@ OVERALL SUMMARY:
                   // MessageAdded event is special in that it sends data back immediately afterwards,
                   // so to prevent any weirdness, we wait for it to finish:
                   while(currentlyProcessingMessageAddedHandlers) {
-                    await new Promise(r => setTimeout(r, 2000));
+                    await new Promise(r => setTimeout(r, 100));
                   }
 
-                  console.log("CHECKING IF DATA CHANGED");
                   if(dataChangedByCustomCode) {
                     await sendBackDataUpdatesIfNeeded();
                   }
