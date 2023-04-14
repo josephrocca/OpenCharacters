@@ -4564,7 +4564,8 @@ OVERALL SUMMARY:
                     break;
                   }
                   if(waitedTime > 10 && !window.__customCodeInitializationSTARTED_846298638) {
-                    // it should *start* in milliseconds, so this almost certainly indicates they had a syntax error in their code which prevented the whole script tag from executing at all.
+                    // it should at least *START* in milliseconds, so this almost certainly indicates they had a syntax error in their code which prevented the whole script tag from executing at all.
+                    // note: *non-syntax* errors are caught by a try/catch loop. this is just for syntax errors.
                     break; // <-- break to prevent endless loading screen
                   }
                   await new Promise(r => setTimeout(r, loopDelay));
@@ -4583,8 +4584,23 @@ OVERALL SUMMARY:
 
         <\/script>
 
-        <!-- note: this must be a separate code block from above, because otherwise static imports are initialised before window.oc exists -->
+        <!-- some code for helping devs with custom code bugs/problems: -->
         <script type="module">
+          await new Promise(r => setTimeout(r, 1000));
+
+          let customCodeScriptElementText = document.querySelector(".customCodeScriptElement").textContent;
+
+          console.log("window.__customCodeInitializationSTARTED_846298638", window.__customCodeInitializationSTARTED_846298638);
+          if(!window.__customCodeInitializationSTARTED_846298638) { // if it hasn't *started* after 1 second, it's almost certainly a parsing bug
+            let staticImportRegex = ${/(^|\s)import(\s+(\*\s+as\s+\w+|{[^}]*})?\s+from)?\s*['"][^'"]+\.js['"]\s*;?/.toString()};
+            if(staticImportRegex.test(customCodeScriptElementText)) {
+              console.warn("It looks like your character's custom code may have static import statements like:\\n\\nimport 'foo.js';  or  import { abc } from 'foo.js';\\n\\nIf so, please change them to dynamic imports like this:\\n\\nawait import('foo.js');  or  let { abc } = await import('foo.js');\\n\\nFor technical reasons, static imports are not supported in custom code.");
+            }
+          }
+        <\/script>
+
+        <!-- note: this must be a separate code block from above, because otherwise static imports are initialised before window.oc exists -->
+        <script type="module" class="customCodeScriptElement">
           window.__customCodeInitializationSTARTED_846298638 = true;
 
           // we need to wait for the oc data to load because they may immediately reference it in their custom code
