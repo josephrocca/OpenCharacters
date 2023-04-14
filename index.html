@@ -71,7 +71,7 @@
         color: blue;
       }
 
-      .messageText pre {
+      .messageText pre[data-markdown-codeblock] {
         font-family: monospace;
         background: rgb(35 35 35);
         padding: 0.5rem;
@@ -79,7 +79,7 @@
         border-radius: var(--border-radius);
         overflow-x: auto;
       }
-      .messageText code {
+      .messageText p code {
         font-family: monospace;
         background: rgb(35 35 35);
         padding: 0.125rem;
@@ -242,6 +242,7 @@
       /* custom scrollbar */
       ::-webkit-scrollbar {
         width: 10px;
+        height: 10px;
       }
       ::-webkit-scrollbar-track {
         background-color: transparent;
@@ -418,7 +419,7 @@
     <audio id="musicPlayer" style="display:none;"></audio>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement } from "./utils.js?v=23";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=24";
 
       // TODO: allow <style> when you work out how to scope it to the current message only - maybe just use a CSS parser and add .messageText prefix to selectors - https://github.com/jotform/css.js
       let domPurifyOptions = {
@@ -430,6 +431,19 @@
           node.dataset.onClickCode = data.attrValue;
           data.attrValue = "window.runCodeInCustomCodeIframe(this.dataset.onClickCode)";
         }
+      });
+
+      const markedRenderer = new marked.Renderer();
+      markedRenderer.code = (source, lang) => {
+        const escapedSource = sanitizeHtml(source);
+        if(lang) {
+          return `<pre data-markdown-codeblock="${sanitizeHtml(lang)}">${escapedSource}</pre>`;
+        } else {
+          return `<pre data-markdown-codeblock>${escapedSource}</pre>`;
+        }
+      };
+      marked.setOptions({
+        renderer: markedRenderer,
       });
 
       window.onerror = function(errorMsg, url, lineNumber, columnNumber, errorObj) {
@@ -3259,6 +3273,30 @@ OVERALL SUMMARY:
         return result;
       }
 
+      let hljs = null;
+      let initiatedHighlightJsLoad = false;
+      async function highlightCodeBlocks(el) {
+        // if(el.innerHTML.includes("Your New Name")) debugger;
+        if(el.querySelectorAll("pre").length === 0) return;
+        if(!initiatedHighlightJsLoad) {
+          initiatedHighlightJsLoad = true;
+          // importStylesheet("https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.7.0/build/styles/default.min.css");
+          importStylesheet("https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-dark.css");
+          hljs = await import("https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/es/highlight.min.js").then(m => m.default);
+        }
+        while(!hljs) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+        // i was originally checking el.isConnected as an optimisation, but it sometimes returns false (not exactly sure why) so I'm not checking it anymore
+        el.querySelectorAll("pre[data-markdown-codeblock]").forEach(pre => {
+          let language = pre.dataset.markdownCodeblock;
+          if(language && hljs.getLanguage(language)) {
+            hljs.highlightElement(pre, { language });
+          } else {
+            hljs.highlightElement(pre); // auto-detect language
+          }
+        });
+      }
 
       function handleStreamingReplyChunk(chunk, messageEl) {
         let messageTextEl = messageEl.querySelector(".messageText");
@@ -3274,7 +3312,9 @@ OVERALL SUMMARY:
         }
 
         messageTextEl.innerHTML = DOMPurify.sanitize(marked.parse(streamedMessageText), domPurifyOptions);
-        messageTextEl.querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+        // messageTextEl.querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+        
+        highlightCodeBlocks(messageTextEl);
 
         if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
       }
@@ -3573,7 +3613,7 @@ OVERALL SUMMARY:
 
         messageEl.querySelector(".deleteButton").addEventListener("click", messageDeleteButtonClickHandler);
         messageEl.querySelector(".showHiddenMessageButton").addEventListener("click", showHiddenMessageClickHandler);
-        messageEl.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+        // messageEl.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
         messageEl.querySelector(".statusMessage").addEventListener("click", () => summariesWindow.show());
 
         messageEl.querySelector(".brainButton")?.addEventListener("click", async function() {
@@ -3709,7 +3749,9 @@ OVERALL SUMMARY:
         `;
         let el = tmp.firstElementChild;
         el.querySelector(".messageText").innerHTML = DOMPurify.sanitize(marked.parse(messageObj.message), domPurifyOptions);
-        el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+        // el.querySelector(".messageText").querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
+        
+        highlightCodeBlocks(el.querySelector(".messageText"));
 
         // add 'copy' button to code blocks
         el.querySelectorAll('.messageText pre').forEach(pre => {
