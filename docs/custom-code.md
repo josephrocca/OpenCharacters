@@ -74,13 +74,14 @@ You can also access and edit character data via `oc.character.propertyName`. Her
     * `modelName`
  * `thread`
    * `messages` - an **array** of messages, where **each message** has:
+     * `content` - the message text - it can include HTML, and is rendered as [markdown](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax) by default (see `oc.messageRenderingPipeline`)
      * `author`
      * `name`
      * `hiddenFrom` - array that can contain "user" or "ai" or both or neither
      * `expectsReply` - `true` (bot will reply to this message) or `false` (bot will not reply), or `undefined` (use default behavior - i.e. reply to user messages, but not own messages)
-     * `content`
      * `customData` - message-specific custom data storage
-     * `messageWrapper` - css for the "message bubble" - note that you can include HTML within a message (tip: use `oc.messageRenderingPipeline` for visuals - see below)
+     * `messageWrapper` - css for the "message bubble" - e.g. "background:white; border-radius:10px; color:grey;"
+       * note that you can include HTML within the `content` of message (but you should use `oc.messageRenderingPipeline` for visuals where possible - see below)
      * `scene` - the most recent message that has a scene is the scene that is "active"
        * `background`
          * `url` - image or video url
@@ -95,6 +96,7 @@ You can also access and edit character data via `oc.character.propertyName`. Her
        * `size`
        * `shape`
    * `customData` - thread-specific custom data storage
+ * messageRenderingPipeline - an array of processing functions that get applied to messages before they are seen by the user and/or the ai (see "Message Rendering" section below)
 
 Note that many character properties aren't available in the character editor UI, so if you e.g. wanted to add a stop sequence for your character so it stops whenever it writes ":)" and also set presence pentalty to 1, then you could do it by adding this text to the custom code text box in the character editor:
 ```js
@@ -138,7 +140,7 @@ oc.thread.on("MessageAdded", async function () {
 });
 ```
 
-### Message "Rendering"
+### Message Rendering
 Sometimes you may want to display different text to the user than what the AI sees. For that, you can use `oc.messageRenderingPipeline`. It's an array that you `.push()` a function into, and that function is used to process messages. Your function should use the `reader` parameter to determine who is "reading" the message (either `user` or `ai`), and then "render" the message `content` accordingly. Here's an example to get you started:
 ```js
 oc.messageRenderingPipeline.push(function({message, reader}) {
