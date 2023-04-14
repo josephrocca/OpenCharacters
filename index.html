@@ -410,9 +410,9 @@
       </div>
 
       <div id="rightColumn" style="width:min-content;">
-        <div id="customCodeColumn" style="width:min-content; display:flex; height:100%;">
+        <div id="customCodeColumn" style="width:min-content; display:none; height:100%;">
           <div id="customCodeIframeHorizontalResizeBar"></div>
-          <div id="customCodeIframeCtn" style="height:100%; flex-grow:1; min-width:30px;"></div>
+          <div id="customCodeIframeCtn" style="height:100%; flex-grow:1;"></div>
         </div>
       </div>
     </div>
@@ -1766,7 +1766,12 @@
 
         $.musicPlayer.pause();
 
-        let loadingModal = createLoadingModal("Loading...");
+        let loadingModal;
+        
+        // to prevent flash for fast-loading threads:
+        let loadingModalCreationTimeout = setTimeout(() => {
+          loadingModal = createLoadingModal("Loading...", $.middleColumn);
+        }, 1200);
         
         document.querySelectorAll("#chatThreads .thread").forEach(el => el.classList.remove("selected"));
         const threadEl = $.chatThreads.querySelector(`.thread[data-thread-id="${threadId}"]`);
@@ -1789,7 +1794,8 @@
 
         await updateCustomCodeIframeVisibility();
 
-        loadingModal.delete();
+        clearTimeout(loadingModalCreationTimeout);
+        if(loadingModal) loadingModal.delete();
       }
 
       // NOTE: spaces aren't actually allowed by OpenAI - I replace them with underscores in prepareMessagesForBot
@@ -3981,7 +3987,7 @@ OVERALL SUMMARY:
                 continue;
               }
 
-              let loadingModal = createLoadingModal("Computing memory embeddings. Please wait...");
+              let loadingModal = createLoadingModal("Computing memory embeddings. Please wait...", $.middleColumn);
 
               let embeddingModelName = threadCharacter.associativeMemoryEmbeddingModelName;
               let newTexts = [];
