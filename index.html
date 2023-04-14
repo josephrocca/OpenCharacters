@@ -1561,7 +1561,7 @@
         }
       }
 
-      async function safelyDeleteThreadById(threadId) {
+      window.safelyDeleteThreadById = async function safelyDeleteThreadById(threadId) {
         // let thread = await db.threads.get(threadId);
         await db.threads.delete(threadId);
         let messageIds = await db.messages.where("threadId").equals(threadId).toArray().then(arr => arr.map(m => m.id));
