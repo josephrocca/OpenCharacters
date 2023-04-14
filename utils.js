@@ -434,7 +434,7 @@ export function applyObjectOverrides({object, overrides}) {
   for (let key in overrides) {
     if (typeof overrides[key] === "object" && overrides[key] !== null) {
       if (!object.hasOwnProperty(key) || typeof object[key] !== "object" || object[key] === null) {
-        object[key] = {};
+        object[key] = Array.isArray(overrides[key]) ? [] : {};
       }
       applyObjectOverrides({object:object[key], overrides:overrides[key]});
     } else {
