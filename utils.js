@@ -384,11 +384,12 @@ export function cosineDistance(vector1, vector2) {
   return 1 - (dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2)));
 }
 
-export function createLoadingModal(initialContent) {
+export function createLoadingModal(initialContent, parentElement) {
+  if(!parentElement) parentElement = document.body;
   let loadingModalCtn = document.createElement("div");
   loadingModalCtn.innerHTML = `<style>
     .loadingModalCtn-856246272937 {
-      position: fixed;
+      position: absolute;
       top: 0;
       left: 0;
       width: 100%;
@@ -415,7 +416,7 @@ export function createLoadingModal(initialContent) {
   contentEl.innerHTML = initialContent || "";
   loadingModalCtn.appendChild(contentEl);
   loadingModalCtn.classList.add("loadingModalCtn-856246272937");
-  document.body.appendChild(loadingModalCtn);
+  parentElement.appendChild(loadingModalCtn);
   return {
     updateContent: function(content) {
       contentEl.innerHTML = content;
@@ -566,9 +567,6 @@ export function importStylesheet(src) {
     document.head.append(link);
   });
 }
-
-
-
 
 
 
