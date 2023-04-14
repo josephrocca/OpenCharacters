@@ -183,7 +183,7 @@
       #chatThreads .thread .nameWrapper {
         overflow: hidden;
         white-space: nowrap;
-        max-width: 130px;
+        max-width: 150px;
         display: flex;
       }
       #chatThreads .thread .name {
@@ -598,6 +598,7 @@
         //  - getUserCharacterObj
         //  - getSystemCharacterObj
         //  - characterPropertiesVisibleToCustomCode
+        //  - the "share link" creation code (if you add any other private/user-specific data like id, lastMessageTime, etc.)
         // NOTE: I'm not adding customData to characters yet, because we'd need to have private and public (shared in link) silos, and I haven't thought enough about that yet
         return character;
       }
@@ -1496,6 +1497,8 @@
               const characterId = parseInt(characterEl.dataset.characterId);
               const character = (await db.characters.where("id").equals(characterId).toArray())[0];
               delete character.id;
+              delete character.creationTime;
+              delete character.lastMessageTime;
               let urlHashData = encodeURIComponent(JSON.stringify({addCharacter:character})).replace(/[!'()*]/g, function(c) {
                 return '%' + c.charCodeAt(0).toString(16); // since encodeURIComponent doesn't encode some characters (like parentheses) and I think they mess up markdown links
               });
