@@ -1686,8 +1686,10 @@
         }
       }
 
+      const defaultThreadName = "Unnamed Thread";
+
       async function createNewThreadWithCharacterId(characterId) {
-        const thread = await addThread("Unnamed Thread", characterId);
+        const thread = await addThread(defaultThreadName, characterId);
 
         let userCharacter = await getUserCharacterObj(thread.id);
 
@@ -2844,7 +2846,7 @@ OVERALL SUMMARY:
             }
             let text;
 
-            if(json.choices[0].text) { // this indicates that we're streaming from a 'general' (non-chat) model
+            if(json.choices[0].text !== undefined) { // this indicates that we're streaming from a 'general' (non-chat) model
               text = json.choices[0].text;
               if(chunkI===0) text = text.trimStart(); // trimStart due to the way we prompt 'general' models (we show messages with a space after `[name]:`)
             } else {
@@ -3253,6 +3255,28 @@ OVERALL SUMMARY:
       }
 
 
+      async function autoNameThreadIfNeeded(threadId) {
+        let thread = await db.threads.get(threadId);
+        let userCharacter = await getUserCharacterObj(threadId);
+        let aiCharacter = await db.characters.get(thread.characterId);
+        let messages = await db.messages.where("threadId").equals(threadId).toArray();
+        messages = messages.slice(0, 10);
+        let preparedMessages = await prepareMessagesForBot({messages, userCharacter, aiCharacter})
+        if(thread.name === defaultThreadName && messages.length > 2) {
+          let chatCompletionMessages = [
+            {role: "system", content: "You are an expert chat thread naming assistant. You help the user come up with a very short name that succinctly summarizes a text chat."},
+            {role: "user", content: `Here are some logs from a text chat:\n\n---\n\n${preparedMessages.map(m => `[[${m.name}]]: ${m.content}`).join("\n\n")}\n\n---\n\nPlease come up with a very short name for this thread (just a few words) that succinctly summarizes the chat. You MUST reply with this exact template:\n\nSUMMARY: <a couple of sentences describing the chat thread>\nSHORT NAME: <proposed name of the thread - only a few words>`},
+          ];
+          let response = await getChatCompletion({messages:chatCompletionMessages, modelName:"gpt-3.5-turbo", temperature:0.7, threadId});
+          let newName = response.match(/\nSHORT NAME: (.*)/)?.[1]?.slice(0, 50);
+          if(newName?.trim()) {
+            await db.threads.update(threadId, { name: newName });
+            await renderThreadList();
+          }
+        }
+      }
+
+
       let lastBotReplyTime = 0;
       let botIsCurrentlyReplying = false;
       async function doBotReplyIfNeeded({forceReply=false, replyInstruction=null}={}) {
@@ -3359,9 +3383,10 @@ OVERALL SUMMARY:
           alert(e.stack);
           botIsCurrentlyReplying = false;
         }
+        
+        autoNameThreadIfNeeded(threadId);
 
         botIsCurrentlyReplying = false;
-        
         botIsCurrentlyReplyingPromiseResolve();
         botIsCurrentlyReplyingPromise = null;
       }
@@ -5511,7 +5536,7 @@ OVERALL SUMMARY:
         }
         tavernOptions.characterId = parseInt(tavernOptions.characterId);
         let character = await db.characters.get(tavernOptions.characterId);
-        let thread = await addThread("Unnamed Thread", character.id);
+        let thread = await addThread(defaultThreadName, character.id);
         for(let m of jsonl.slice(1)) {
           let characterId;
           if(m.is_user) characterId = -1;
