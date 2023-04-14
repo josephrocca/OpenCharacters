@@ -3487,13 +3487,13 @@ OVERALL SUMMARY:
           let newMessageEl = await addMessageToFeed(messageObj, {inPlaceOf:messageEl});
           if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
-          let currentVariantNumber = renderedMessageObj.variants.findIndex(v => v===null) + 1;
-          newMessageEl.querySelector(".currentVariantNumber").innerHTML = `${currentVariantNumber}<span style="opacity:0.5">/${renderedMessageObj.variants.length}</span>`;
+          let currentVariantNumber = messageObj.variants.findIndex(v => v===null) + 1;
+          newMessageEl.querySelector(".currentVariantNumber").innerHTML = `${currentVariantNumber}<span style="opacity:0.5">/${messageObj.variants.length}</span>`;
           
           if(isMobile) showEl(newMessageEl.querySelector(".messageVariantsCtn"));
 
           // update db with bot's reply
-          await db.messages.put(renderedMessageObj);
+          await db.messages.put(messageObj);
           // update thread's lastMessageTime
           await db.threads.update(threadId, { lastMessageTime: Date.now() });
           // if this isn't at the top of the thread list, re-render the thread list
