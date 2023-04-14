@@ -61,7 +61,7 @@ You can also access and edit character data via `oc.character.propertyName`. Her
     * `avatar`
       * `url` - url to an image
       * `size` - multiple of default size
-      * `shape` - `circle` or `square` or `portrait` 
+      * `shape` - "circle" or "square" or "portrait" 
     * `roleInstruction`
     * `reminderMessage`
     * `initialMessages`
