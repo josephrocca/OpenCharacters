@@ -80,6 +80,10 @@ You can also access and edit character data via `oc.character.propertyName`. Her
      * `hiddenFrom` - array that can contain "user" or "ai" or both or neither
      * `expectsReply` - `true` (bot will reply to this message) or `false` (bot will not reply), or `undefined` (use default behavior - i.e. reply to user messages, but not own messages)
      * `customData` - message-specific custom data storage
+     * `avatar` - this will override the user's/ai's default avatar for this particular message
+       * url
+       * size
+       * shape
      * `messageWrapper` - css for the "message bubble" - e.g. "background:white; border-radius:10px; color:grey;"
        * note that you can include HTML within the `content` of message (but you should use `oc.messageRenderingPipeline` for visuals where possible - see below)
      * `scene` - the most recent message that has a scene is the scene that is "active"
