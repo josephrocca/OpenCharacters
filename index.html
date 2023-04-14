@@ -231,13 +231,31 @@
       }
 
       /* hide message feed scrollbar */
-      #messageFeed {
-        -ms-overflow-style: none;  /* Internet Explorer 10+ */
-        scrollbar-width: none;  /* Firefox */
+      /* #messageFeed {
+        -ms-overflow-style: none; 
+        scrollbar-width: none; 
       }
       #messageFeed::-webkit-scrollbar { 
-        display: none;  /* Safari and Chrome */
+        display: none;  
+      } */
+
+      /* custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
       }
+      ::-webkit-scrollbar-track {
+        background-color: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background-color: var(--button-bg);
+        border-radius: 10px;
+        border: 3px solid transparent;
+        background-clip: content-box;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: var(--button-bg-hover);
+      }
+
 
       #builtInChatInterfaceWrapper {
         display: flex;
@@ -482,7 +500,6 @@
 
       // add menu open/close button for narrow screens
       showEl($.leftColumnToggleButton);
-      $.leftColumnToggleButton.dataset.state = "closed";
       $.leftColumnToggleButton.addEventListener("click", function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -501,6 +518,7 @@
         document.body.classList.add("isMobile"); // to use in CSS selectors
         // hide the left column by default on mobile:
         hideEl($.leftColumn);
+        $.leftColumnToggleButton.dataset.state = "closed";
         // if they click anywhere in the middle column, close the menu
         $.middleColumn.addEventListener("click", function() {
           if($.leftColumnToggleButton.dataset.state === "open") {
@@ -3269,7 +3287,7 @@ OVERALL SUMMARY:
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
         messages = messages.slice(0, 10);
         let preparedMessages = await prepareMessagesForBot({messages, userCharacter, aiCharacter})
-        if(thread.name === defaultThreadName && messages.length > 2) {
+        if(thread.name === defaultThreadName && messages.length > 8) {
           let chatCompletionMessages = [
             {role: "system", content: "You are an expert chat thread naming assistant. You help the user come up with a very short name that succinctly summarizes a text chat."},
             {role: "user", content: `Here are some logs from a text chat:\n\n---\n\n${preparedMessages.map(m => `[[${m.name}]]: ${m.content}`).join("\n\n")}\n\n---\n\nPlease come up with a very short name for this thread (just a few words) that succinctly summarizes the chat. You MUST reply with this exact template:\n\nSUMMARY: <a couple of sentences describing the chat thread>\nSHORT NAME: <proposed name of the thread - only a few words>`},
