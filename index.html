@@ -419,7 +419,7 @@
     <audio id="musicPlayer" style="display:none;"></audio>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=25";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=26";
 
       // TODO: allow <style> when you work out how to scope it to the current message only - maybe just use a CSS parser and add .messageText prefix to selectors - https://github.com/jotform/css.js
       let domPurifyOptions = {
@@ -4552,10 +4552,12 @@ OVERALL SUMMARY:
               if(e.data.type === "init") {
 
                 function applyObjectOverrides({object, overrides}) {
-                  for (let key in overrides) {
-                    if (typeof overrides[key] === "object" && overrides[key] !== null) {
+                  for(let key in overrides) {
+                    if(Array.isArray(overrides[key])) {
+                      object[key] = structuredClone(overrides[key]); // arrays are treated as "final" values - we don't go "into" them
+                    } else if(typeof overrides[key] === "object" && overrides[key] !== null) {
                       if (!object.hasOwnProperty(key) || typeof object[key] !== "object" || object[key] === null) {
-                        object[key] = Array.isArray(overrides[key]) ? [] : {};
+                        object[key] = {};
                       }
                       applyObjectOverrides({object:object[key], overrides:overrides[key]});
                     } else {
@@ -4935,12 +4937,6 @@ OVERALL SUMMARY:
           // TODO: add some obvious optimisations here - e.g. go through messages until first change, then only update that one and all following (remember that messages can be completely re-ordered/removed/etc.)
           // replace messages in the database with the new messages
           let originalThreadJSON = await getThreadJSONById(threadId); // <-- backup in case fails
-          
-          // for debugging:
-          let originalMessagesArr = await db.messages.where("threadId").equals(threadId).toArray();
-          if(originalMessagesArr.length === 0 || outputMessageObjs.length > 1+originalMessagesArr.length) {
-            debugger;
-          }
 
           // we need to make sure that no other db.messages code runs between .delete and .bulkAdd, so we use a transaction that gets a read-write lock on the messages table.
           // otherwise e.g. another call to updateDbWithNewDataFromCustomCode could run between them, and that would cause `db.messages.where("threadId").equals(threadId).toArray()` to incorrectly return zero messages.
