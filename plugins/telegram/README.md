@@ -31,7 +31,7 @@ Create an .env file to hold the Telegram bot token in `plugins/telegram/.env` - 
 
     BOT_TOKEN = "12345678:XXXXXYYYYYYZZZZZZZ"
 
-Now we can edit the `bot-config.yml` file.  All values in this file are lower case.  At the top level are the character names from OpenCharacters. Each of these has a `bot_name` and `chat_id` value. Add entries for each character, bot and chat Id.
+Now we can create a `bot-config.yml` file. You can rename the `bot-config.yml.example` to `bot-config.yml` and edit this. All values in this file are lower case.  At the top level are the character names from OpenCharacters. Each of these has a `bot_name` and `chat_id` value. Add entries for each character, bot and chat Id.
 
 ```yml
 ---
