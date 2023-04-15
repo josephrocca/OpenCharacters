@@ -5,3 +5,4 @@ char_name: # Character name from OpenCharacters
                         #   https://api.telegram.org/bot<BOT_TOKEN>/getUpdates
 dan: 
   bot_name: dan_gpt_8d4f_bot
+  chat_id: '-904620196'
