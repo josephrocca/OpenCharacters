@@ -4,11 +4,11 @@ const app = require('express')(); // Express web framework
 const http = require('http').Server(app); // HTTP server
 const io = require('socket.io')(http, {
   cors: {
-    origin: "*",
-    methods: ["*"]
+    origin: '*',
+    methods: ['GET', 'POST']
   }
 }); // Socket.IO for real-time communication
-const port = process.env.PORT || 4000; // Port to run the server on
+const port = process.env.PORT || 3000; // Port to run the server on
 const fs = require('fs')
 const yaml = require('js-yaml')
 require('dotenv').config();
@@ -24,7 +24,7 @@ const logger = winston.createLogger({
   transports: [
     new winston.transports.Console(),
     new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/combined.log' }),
+    new winston.transports.File({ filename: 'logs/server.log' }),
   ],
 });
 
@@ -64,52 +64,40 @@ app.get('/utils.js', (req, res) => {
   res.sendFile(utilsPath);
 });
 
-// We will create a namespace for each bot, on the client 
-// side we do this with:
-//   const namespace = oc.character.name.toLowerCase();
-// then we use this in the set up for the socket connection:
-//   const socket = io(`http://127.0.0.1:4000/${namespace}`);
-const namespaces = io.of(/^\/\w+$/); // Create a Socket.IO namespace for each character
-
-// Handle connections to each namespace
-namespaces.on('connection', (socket) => {
-  const namespace = socket.nsp; // Get the namespace the user has connected to
-  //logger.info(`A user has connected to ${namespace.name}`);
-
-  // Handle changes in namespace (e.g. when a user switches to a different bot)
-  socket.on("namespace change", (namespace) => {
-    socket.leave(socket.room); // Leave the current room
-    socket.join(namespace); // Join the new room
-    socket.room = namespace; // Update the current room
-    logger.info(`User joined namespace ${namespace}`);
+// We will create a namespace for each character
+for (const [character, config] of Object.entries(botConfig)) {
+  const namespace = io.of(`/${character}`); // Create a namespace for the character
+  logger.info(`Namespace created: /${character}`); // Log that the namespace was created
+  
+  // Handle connections to the namespace
+  namespace.on('connection', (socket) => {
+    logger.info(`A user has connected to ${namespace.name}`);
+    
+    // Listen for user messages in Telegram
+    bot.on('message', async (ctx) => {
+      //const chatId = ctx.chat.id; // Chat Id from Telegram - Not using this for now
+      const message = ctx.message.text; 
+      await ctx.sendChatAction('typing'); // Send a typing indicator
+      logger.info(`Received user message [${namespace.name} channel]: ${message}`);
+      namespace.emit('user message', message); // Send the message to all connected clients in the namespace
+    });
+    
+    // Handle AI messages from the bot
+    socket.on('ai message', (msg) => {
+      logger.info(`Received ai message [${namespace.name} channel]: ${msg}`);
+      namespace.emit('ai message', msg);
+      const chatId = config.chat_id; // Get the chat ID from the YAML config
+      logger.info(`Send message to Telegram chatId ${chatId}`);
+      bot.telegram.sendMessage(chatId, `${msg}`); // Send the message to Telegram
+    });
+    
+    // Handle user messages from the client
+    socket.on('user message', (msg) => {
+      logger.info(`Received user message [${namespace.name} channel]: ${msg}`);
+      namespace.emit('user message', msg); // Emit the message to all clients in the namespace
+    });
   });
-
-  // Listen for user messages in Telegram
-  bot.on('message', async (ctx) => {
-    //const chatId = ctx.chat.id; // Chat Id from Telegram - Not using this for now
-    const message = ctx.message.text; 
-    await ctx.sendChatAction('typing'); // Send a typing indicator
-    logger.info(`Received user message [${namespace.name} channel]: ${message}`);
-    namespace.emit('user message', message); // Send the message to all connected clients in the namespace
-  });
-
-  // Handle AI messages from the bot
-  socket.on('ai message', (msg) => {
-    logger.info(`Received ai message [${namespace.name} channel]: ${msg}`);
-    namespace.emit('ai message', msg);
-    const chatId = botConfig[namespace.name.substring(1)].chat_id // Get the chat ID based on the namespace
-    //if (bot.options.username === namespace.name.substring(1)) { // check bot name from config matches namespace
-    logger.info('Send message to telegram chatId' + chatId)
-    bot.telegram.sendMessage(chatId, `${msg}`); // Send the message to Telegram
-    //}
-  });
-
-  // Handle user messages from the client
-  socket.on('user message', (msg) => {
-    logger.info(`Received user message [${namespace.name} channel]: ${msg}`);
-    namespace.emit('user message', msg); // Emit the message to all clients in the namespace
-  });
-});
+}
 
 // Start the server
 http.listen(port, () => {

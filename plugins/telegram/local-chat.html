@@ -44,7 +44,7 @@
         namespace = e.target.value.toLowerCase();
         socket.emit("namespace change", namespace);
         socket.disconnect();
-        socket = io('http://127.0.0.1:4000/' + namespace);
+        socket = io('http://127.0.0.1:3000/' + namespace);
         console.log(`Namespace changed to ${namespace}`);
 
         // Subscribe to updates from the new namespace
