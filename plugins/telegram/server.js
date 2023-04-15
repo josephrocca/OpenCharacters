@@ -1,4 +1,5 @@
 // Import necessary modules
+require('events').EventEmitter.defaultMaxListeners = 100; // Increase the maximum number of event listeners
 const path = require('path');
 const app = require('express')(); // Express web framework
 const http = require('http').Server(app); // HTTP server
