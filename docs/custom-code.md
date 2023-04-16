@@ -84,7 +84,7 @@ You can also access and edit character data via `oc.character.propertyName`. Her
        * `url`
        * `size`
        * `shape`
-     * `messageWrapper` - css for the "message bubble" - e.g. "background:white; border-radius:10px; color:grey;"
+     * `wrapperStyle` - css for the "message bubble" - e.g. "background:white; border-radius:10px; color:grey;"
        * note that you can include HTML within the `content` of message (but you should use `oc.messageRenderingPipeline` for visuals where possible - see below)
      * `scene` - the most recent message that has a scene is the scene that is "active"
        * `background`
