@@ -1,5 +1,4 @@
 **Note: This isn't available yet. It'll be available in the next update. Blocking issues:**
-* https://github.com/hyperonym/basaran/issues/144
 * https://github.com/hyperonym/basaran/issues/143
 
 # Custom Models
