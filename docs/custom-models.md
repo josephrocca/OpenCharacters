@@ -1,3 +1,7 @@
+**Note: This isn't available yet. It'll be available in the next update. Blocking issues:**
+* https://github.com/hyperonym/basaran/issues/144
+* https://github.com/hyperonym/basaran/issues/143
+
 # Custom Models
 
 Support for external models is in beta. Please try it out and let me know about any bugs/issues.
