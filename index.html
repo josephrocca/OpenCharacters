@@ -758,7 +758,12 @@
 
         let threadsWithoutCharacter = threads.filter(t => !t.character);
         if(threadsWithoutCharacter.length > 0) {
-          alert(`You have one or more threads (with ids=${threadsWithoutCharacter.map(t => t.id).join(",")}) that are referencing character(s) that don't exist. This is a bug. Please report it on Github or Discord.`);
+          let r = prompt(`You have one or more threads (with ids=${threadsWithoutCharacter.map(t => t.id).join(",")}) that are referencing character(s) that don't exist. This is a bug. Please report it on Github or Discord. You can type "yes" below to delete these threads if a OpenCharacters dev has recommended it, otherwise just click OK.`);
+          if(r?.toLowerCase().trim() === "yes") {
+            for(let thread of threadsWithoutCharacter) {
+              await safelyDeleteThreadById(thread.id);
+            }
+          }
         }
 
         threads = threads.filter(t => t.character);
@@ -1607,7 +1612,7 @@
         // delete all threads and messages associated with this character
         const threads = await db.threads.where("characterId").equals(characterId).toArray();
         for(let thread of threads) {
-          await safelyDeleteThread(thread.id)
+          await safelyDeleteThreadById(thread.id)
         }
       }
 
