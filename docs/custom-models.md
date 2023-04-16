@@ -1,8 +1,10 @@
+# Custom Models
+
 Support for external models is in beta. Please try it out and let me know about any bugs/issues.
 
 If you open your user settings and click the button to show advanced options, you'll see an input text box that allows you to declare custom models (one per line). You can put any OpenAI API-compatible model there.
 
-[Basaran](https://github.com/hyperonym/basaran) is a good option for running Hugging Face models in a way that's compatible with the OpenAI-style API. Here are the steps:
+[Basaran](https://github.com/hyperonym/basaran) is a good option for running any Hugging Face model in a way that's compatible with the OpenAI-style API. Here are the steps:
 
 ### Step 1
 [Install Docker](https://docs.docker.com/get-docker/)
@@ -31,3 +33,8 @@ Here are all the parameters:
 * `maxSequenceLength` (optional) - this will be fetched from Hugging Face automatically, but you should include it if you're using a non-Hugging Face model or if the value can't be found automatically
 * `apiKey` (optional) - just in case you're using a service that requires an API key
 * `type` (optional) - either `chat-completion` if the API accepts `messages` as an input or `completion` for APIs that accept `prompt` as an input. This will be automatically inferred from the URL (`v1/completions` vs `v1/chat/completions`)
+
+
+### Alternatives to Basaran
+
+If you know of any API wrappers for Anthropic, Cohere, etc. models that make them OpenAI API-compatible, then please let me know here on Github or on the Discord and I can make sure the custom model system works with them.
