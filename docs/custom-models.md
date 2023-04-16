@@ -10,14 +10,14 @@ If you open your user settings and click the button to show advanced options, yo
 ### Step 2
 Run this command in your terminal:
 ```bash
-docker run -p 80:80 -e MODEL=decapoda-research/llama-7b-hf hyperonym/basaran:0.15.3
+docker run -p 80:80 -e MODEL=cerebras/Cerebras-GPT-1.3B hyperonym/basaran:0.15.3
 ```
-Change `decapoda-research/llama-7b-hf` to a model name from [this list](https://huggingface.co/models?pipeline_tag=text-generation), and you can change `0.15.3` to the latest version from [here](https://hub.docker.com/r/hyperonym/basaran/tags).
+Change `cerebras/Cerebras-GPT-1.3B` to a model name from [this list](https://huggingface.co/models?pipeline_tag=text-generation), and you can change `0.15.3` to the latest version from [here](https://hub.docker.com/r/hyperonym/basaran/tags).
 
 ### Step 3
 Add this line to that text box in your user settings:
 ```json5
-{name:"decapoda-research/llama-7b-hf", endpointUrl:"http://127.0.0.1/v1/completions"}
+{name:"cerebras/Cerebras-GPT-1.3B", endpointUrl:"http://127.0.0.1/v1/completions"}
 ```
 
 Click save, and now the model selector at the top of the thread should show your new model.
