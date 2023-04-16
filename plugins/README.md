@@ -12,3 +12,7 @@ This causes your character to "speak" the text that it generates. To use it, jus
 await import("./plugins/tts/main.js");
 ```
 I recommend using **Chrome** rather than Firefox because as of writing, Firefox's voices are super robotic. We may get [completely customizable voices](https://github.com/xenova/transformers.js/issues/59) within the next 6 months or so.
+
+## Community Plugins
+
+* `Arete#4642` on Discord: https://github.com/Rs15z/OpenCharacters-plugins
