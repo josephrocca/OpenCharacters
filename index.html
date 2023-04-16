@@ -724,6 +724,11 @@
         if(summaries) {
           summaries.rows = summaries.rows.filter(s => keepThreadCheck(s.threadId));
         }
+        
+        let memories = json.data.data.find(d => d.tableName === "memories");
+        if(memories) {
+          memories.rows = memories.rows.filter(m => keepThreadCheck(m.threadId));
+        }
 
         if(result.exportUserData === "no") {
           json.data.data.find(d => d.tableName === "usageStats").rows = [];
