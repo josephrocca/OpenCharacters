@@ -28,6 +28,6 @@ Here are all the parameters:
 * `endpointUrl` - the URL of the inference server's completion endpoint
 * `modelUrl` (optional) - if omitted, the URL is assumed to be `https://huggingface.co/${name}` - this is used for the tokenizer & config
 * `tokenPricing` (optional) - an object like `{prompt:0.002, completion:0.002}` with prices per 1k tokens
-* `maxContextLength` (optional) - this will be fetched from Hugging Face automatically, but you should include it if you're using a non-Hugging Face model
+* `maxSequenceLength` (optional) - this will be fetched from Hugging Face automatically, but you should include it if you're using a non-Hugging Face model or if the value can't be found automatically
 * `apiKey` (optional) - just in case you're using a service that requires an API key
 * `type` (optional) - either `chat-completion` if the API accepts `messages` as an input or `completion` for APIs that accept `prompt` as an input. This will be automatically inferred from the URL (`v1/completions` vs `v1/chat/completions`)
