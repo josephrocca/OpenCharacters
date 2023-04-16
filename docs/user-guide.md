@@ -4,6 +4,8 @@ This will be more organised at some point, but for now it's just going to be a l
 
 * **Question**: What should I put in memories/lorebook, vs instruction message, vs reminder?
   * As a general guide: If you have lots of random things you want the GM to know that are only relevant in specific contexts, then use `/mem` to store them. If you have things that are relevant all the time, put them in the role/instruction. If you have things that are really important all the time, and that the AI needs a strong reminder about, put it in the reminder.
+
+
 * **Question**: "I am trying to understand the concept of memories. So, since memories go back very far, how do the memories make it into the context? I mean which memories make it into the context and where do they end up in the context?"
   * The character "recalls" memories based on their "semantic similarity" to the current context
   * "Semantic similarity" basically means memories that have similar concepts in them to the concepts currently being discussed in the latest messages
