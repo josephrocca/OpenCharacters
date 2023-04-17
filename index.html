@@ -38,6 +38,7 @@
         --avatar-bg: lightgrey;
         --notification-bg-color: #005ac2;
         --button-border-color: #b4b4b4;
+        --button-font-size: 0.825rem;
       }
 
 
@@ -99,6 +100,7 @@
         cursor:pointer;
         padding: 0.125rem;
         border: 1px solid var(--button-border-color);
+        font-size: var(--button-font-size);
       }
       button:hover {
         background: var(--button-bg-hover);
@@ -132,32 +134,42 @@
         mask-image: linear-gradient(to bottom, black calc(100% - 30px), #ffffff00 100%);
         padding-bottom:2rem;
       }
-      #chatThreads .thread {
+      #chatThreads .thread, #chatThreadFolders .threadFolder {
         border-radius: var(--border-radius);
         display:flex;
         padding:0.5rem;
         cursor:pointer;
         border: 1px solid var(--border-color);
         position: relative;
+        user-select:none;
+      }
+      #chatThreads .thread:not(:first-child), #chatThreadFolders .threadFolder {
+        margin-top: 0.5rem;
       }
 
-      #chatThreads .thread .favStar {
+      #chatThreads .thread .favStar, #chatThreads .thread .changeFolderPath {
         position: absolute;
-        top: 0.0625rem;
-        left: 0.0625rem;
         font-size: 80%;
         opacity: 0.5;
         display: none;
         text-shadow: 0px 1px 2px #515151;
       }
-      #chatThreads .thread .favStar:hover {
+      #chatThreads .thread .favStar {
+        top: 0.0625rem;
+        left: 0.0625rem;
+      }
+      #chatThreads .thread .changeFolderPath {
+        bottom: 0.0625rem;
+        left: 0.0625rem;
+      }
+      #chatThreads .thread .favStar:hover, #chatThreads .thread .changeFolderPath:hover {
         opacity: 1;
       }
-      #chatThreads .thread:hover .favStar {
+      #chatThreads .thread:hover .favStar, #chatThreads .thread:hover .changeFolderPath {
         display: inline;
       }
       /* can't hover on mobile, so display button on selected thread: */
-      body.isMobile #chatThreads .thread.selected .favStar {
+      body.isMobile #chatThreads .thread.selected .favStar, body.isMobile #chatThreads .thread.selected .changeFolderPath {
         display: inline;
       }
       #chatThreads .thread .favStar[data-is-fav="true"] {
@@ -268,6 +280,11 @@
         padding-right: 0.5rem;
       }
 
+      #messageFeed .message {
+        margin-top:0.5rem;
+        margin-bottom:0.5rem;
+      }
+
       #messageFeed .message .bottomButtons {
         display:none;
         position:absolute;
@@ -312,6 +329,26 @@
       }
       #messageFeed .message .avatar {
         
+      }
+
+      #messageFeed > *:first-child {
+        margin-top: 3rem;
+      }
+
+      #characterFoldersList {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, 280px);
+        grid-gap: 0.5rem;
+        justify-content: center;
+        margin-bottom: 0.5rem;
+      }
+      #characterFoldersList .characterFolder {
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        width: 100%;
+        padding:0.5rem;
+        cursor:pointer;
+        user-select:none;
       }
 
       #characterSelection .character {
@@ -361,34 +398,55 @@
       <div id="leftColumn" style="display:flex; flex-direction:column; width:270px; min-width:270px; padding:0.5rem; ">
         <div style="display:flex;">
           <button id="newThreadButton" style="width:100%; cursor:pointer; min-height:2rem;">💬 new chat</button>
-          <button id="closeLeftColumnButton" style="cursor:pointer;min-height:2rem;margin-left: 0.25rem;min-width: 2rem;">☰</button>
+          <button id="closeLeftColumnButton" style="cursor:pointer;min-height:2rem;margin-left: 0.5rem;min-width: 2rem;">☰</button>
         </div>
         <div id="threadSearchCtn" style="display:flex; width:100%; margin-top:0.5rem;">
           <input id="threadSearchInput" style="height: 100%; flex-grow: 1; min-width: 0; padding-left: 0.5rem;" type="text" placeholder="search threads...">
-          <button id="threadSearchButton" style="cursor:pointer;min-height: 2rem;min-width: 3rem;margin-left: 0.25rem;">🔎</button>
+          <button id="threadSearchButton" style="cursor:pointer;min-height: 2rem;min-width: 2rem;margin-left: 0.5rem;">🔎</button>
         </div>
-        <div id="chatThreads"></div>
+        <!-- <div id="threadFolderNavigationBar" style="display:flex; width:100%; margin-top:0.5rem;">
+          <button id="threadFolderBackButton" style="cursor:pointer;min-height: 2rem;min-width: 2rem;margin-left: 0.5rem;">🔙</button>
+        </div> -->
+        <div id="chatThreadFolders" data-current-folder-path=""></div>
+        <div id="chatThreads" data-current-folder-path=""></div>
         <div id="appOptions">
           <button id="settingsButton" class="appOptionButton">⚙️ settings</button>
-          <button id="clearDataButton" class="appOptionButton">🗑️ clear all data</button>
-          <button id="exportDataButton" class="appOptionButton">💾 export data</button>
-          <button class="appOptionButton" style="position:relative;">📁 import data<input id="importDataFileInput" style="position:absolute; top:0; left:0; right:0; bottom:0; opacity:0; cursor:pointer;" type="file"/></button>
+          <div style="display: flex;">
+            <button id="clearDataButton" class="appOptionButton" style="width: 4rem;">🗑️</button>
+            <button id="exportDataButton" class="appOptionButton" style="margin-left: 0.5rem; margin-right: 0.5rem;">💾 export</button>
+            <button class="appOptionButton" style="position:relative;">📁 import<input id="importDataFileInput" style="position:absolute; top:0; left:0; right:0; bottom:0; opacity:0; cursor:pointer;" type="file"></button>
+          </div>
           <button onclick="window.open('https://github.com/josephrocca/OpenCharacters/blob/main/README.md')" class="appOptionButton">❓ about this project</button>
         </div>
       </div>
 
-      <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden;">
-        <button id="openLeftColumnButton" style="display:none; position: absolute;top:0.25rem;left:0.25rem;z-index: 500;padding: 0.25rem;min-width: 2rem;min-height: 2rem;">☰</button>
+      <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; min-width:200px;">
+        <div id="middleColumnShadowOverlay" style="display:none; position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5); z-index:20;"></div>
         <div id="characterSelection" class="middleColumnScreen" style="flex-grow:1; display:none; overflow: auto;">
-          <div><h2 style="text-align:center;">Your Characters</h2></div>
-          <div id="characterList" style=""></div>
+          <button id="characterSelectionOpenLeftColumnButton" class="openLeftColumnButton" style="background: var(--button-bg);border-radius: var(--border-radius);border: 1px solid var(--button-border-color);padding: 0.25rem;width: 2rem;min-height: 2rem;margin-right: 0.5rem;position: absolute;top: 0.5rem;left: 0.5rem;">☰</button>
+          <div>
+            <h2 style="text-align:center;margin-bottom: 0.5rem;">Your Characters</h2>
+            <div style="margin-bottom: 0.5rem;display: flex;justify-content: center;">
+              <button id="newCharacterButton" style="padding: 0.25rem;">🆕 new character</button>
+              <!-- <button id="newFolderCharacterButton" style="padding: 0.25rem; margin-left: 0.5rem;">📁 new folder</button> -->
+            </div>
+          </div>
+          <div id="characterFoldersList" data-current-folder-path=""></div>
+          <div id="characterList"></div>
           <div><h2 style="text-align:center; margin-top:4rem;">Starter Characters</h2></div>
-          <div id="starterCharacterList" style=""></div>
+          <div id="starterCharacterList"></div>
           <br><br>
         </div>
-        <div id="chatInterface" class="middleColumnScreen" style="display:flex; flex-grow:1; flex-direction:column; height:100%;">
+        <div id="chatInterface" class="middleColumnScreen" style="display:flex; flex-grow:1; flex-direction:column; height:100%; position:relative;">
           <div id="customCodeChatInterfaceWrapper" style="display:none;"></div>
           <div id="builtInChatInterfaceWrapper">
+            <div id="messageFeedHeaderBar" style="display: flex; position:absolute;height: 2rem;right: 0;left: 0;margin: 0.5rem; z-index:30;">
+              <button id="messageFeedOpenLeftColumnButton" class="openLeftColumnButton" style="display:none; background: var(--button-bg);border-radius: var(--border-radius);border: 1px solid var(--button-border-color);padding: 0.25rem; min-width: 2rem; height: 100%; margin-right:0.5rem;">☰</button>
+              <div style="background: var(--button-bg); display:flex; height: 100%; border-radius: var(--border-radius);border: 1px solid var(--button-border-color);padding: 0.25rem;">
+                <div style="display: flex;align-items: center;font-size:var(--button-font-size);margin-right: 0.25rem;">model:</div>
+                <select id="threadModelSelector"></select>
+              </div>
+            </div>
             <div id="chatBackgroundCtn" style="pointer-events:none; position:absolute; top:0; left:0; right:0; bottom:0; z-index:-10;"></div>
             <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem;">Type a message to begin the chat.</div>
             <div id="messageFeed" style="flex-grow:1; overflow-y:auto;"></div>
@@ -421,6 +479,11 @@
 
     <script type="module">
       import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=26";
+
+      let JSON5;
+      (async function() {
+        JSON5 = await import('https://cdn.jsdelivr.net/npm/json5@2.2.2/dist/index.min.mjs').then(m => m.default);
+      })();
 
       // TODO: allow <style> when you work out how to scope it to the current message only - maybe just use a CSS parser and add .messageText prefix to selectors - https://github.com/jotform/css.js
       let domPurifyOptions = {
@@ -519,36 +582,99 @@
       
       function openLeftColumn() {
         showEl($.leftColumn);
-        hideEl($.openLeftColumnButton);
+        document.querySelectorAll(".openLeftColumnButton").forEach(el => hideEl(el));
         showEl($.closeLeftColumnButton);
+        if(isMobile) {
+          showEl($.middleColumnShadowOverlay);
+        }
       }
       function closeLeftColumn() {
         hideEl($.leftColumn);
-        showEl($.openLeftColumnButton);
+        document.querySelectorAll(".openLeftColumnButton").forEach(el => showEl(el));
         hideEl($.closeLeftColumnButton);
+        if(isMobile) {
+          hideEl($.middleColumnShadowOverlay);
+        }
       }
       $.closeLeftColumnButton.addEventListener("click", closeLeftColumn);
-      $.openLeftColumnButton.addEventListener("click", (e) => {
-        e.stopPropagation(); // <-- since this hovers over middle column, and on mobile we close left column when they tap middle column
-        openLeftColumn();
+      document.querySelectorAll(".openLeftColumnButton").forEach(el => {
+        el.addEventListener("click", (e) => {
+          e.stopPropagation(); // <-- since this hovers over middle column, and on mobile we close left column when they tap middle column
+          openLeftColumn();
+        });
       });
       if(isMobile) {
         closeLeftColumn();
         // if they click anywhere in the middle column, close the menu
-        $.middleColumn.addEventListener("click", closeLeftColumn);
+        $.middleColumnShadowOverlay.addEventListener("click", (e) => {
+          e.stopPropagation();
+          closeLeftColumn();
+        });
       }
+
+
+      {
+        let messageFeedHeaderBarHideTimeout = null;
+        let isMouseInTriggerArea = false;
+        function showMessageFeedTopMenu() {
+          clearTimeout(messageFeedHeaderBarHideTimeout);
+          messageFeedHeaderBarHideTimeout = null;
+          showEl($.messageFeedHeaderBar);
+        }
+        function hideMessageFeedTopMenu() {
+          if(messageFeedHeaderBarHideTimeout !== null) return; // hiding settimeout already in progress
+          clearTimeout(messageFeedHeaderBarHideTimeout);
+          messageFeedHeaderBarHideTimeout = setTimeout(() => {
+            hideEl($.messageFeedHeaderBar);
+          }, 2000);
+        }
+        window.addEventListener("mousemove", (e) => {
+          if (e.pageY < 80) { // show:
+            isMouseInTriggerArea = true;
+            showMessageFeedTopMenu();
+          } else { // hide if visible:
+            isMouseInTriggerArea = false;
+            if ($.messageFeedHeaderBar.offsetHeight > 0 && !lastMessageFeedScrollWasUp) {
+              hideMessageFeedTopMenu();
+            }
+          }
+        });
+        let messageFeedScrollTop = 0;
+        let lastMessageFeedScrollWasUp = true;
+        $.messageFeed.addEventListener("scroll", function (e) {
+          let newScrollTop = e.target.scrollTop;
+          if (newScrollTop < messageFeedScrollTop) { // they scrolled up, so show menu
+            lastMessageFeedScrollWasUp = true;
+            showMessageFeedTopMenu();
+          }
+          if (newScrollTop > messageFeedScrollTop) { // they scrolled down, so hide menu if their mouse isn't in trigger area
+            lastMessageFeedScrollWasUp = false;
+            if(!isMouseInTriggerArea) {
+              hideMessageFeedTopMenu();
+            }
+          }
+          messageFeedScrollTop = newScrollTop;
+        }, { passive: true });
+      }
+
+
 
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(37).stores({
+      db.version(48).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
+        // Things to check:
+        // - character hash computation
+        // - $.exportDataButton.addEventListener
+        // - import code
+
         // NOTE: The properties listed here are just the INDEXES, not *all* the columns/properties.
         characters: "++id,modelName,fitMessagesInContextMethod,temperature,creationTime,lastMessageTime",
         threads: "++id,name,characterId,creationTime,lastMessageTime,lastViewTime",
-        messages: "++id,threadId,characterId,creationTime", // characterId is -1 for user, and for system it is -2.
-        misc: "key,value",
+        messages: "++id,threadId,characterId,creationTime,order", // characterId is -1 for user, and for system it is -2.
+        misc: "key", // key=>value
         summaries: "hash,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries. we also need it for grabbing summaries for the edit interface.
         memories: "++id,[summaryHash+threadId+type],[characterId+status],[threadId+type+status],[threadId+status],[threadId+type],threadId", // memories are associated with a summary hash because they are computed alongside the summary. We need to track the hash so that if earlier messages are edited (and therefore the summaries need to be recomputed), we know to only consider "valid"/"current" the memories that are associated with currently-"used". The "type" property is used to track the "currentness", and also to track whether a memory was manually added by the user (in which case it is *always* considered valid)
         usageStats: "[dateHour+threadId+modelName],threadId,characterId,dateHour", // note that characterId can be derived from threadId - it's just included for quick aggregation. modelName is like "gpt-3.5-turbo", dateHour is like "2023-3-29-14"
@@ -562,9 +688,10 @@
           upgradeMessageFromOldVersion(message);
         });
 
-        await tx.table("threads").toCollection().modify(thread => {
-          upgradeThreadFromOldVersion(thread);
-        });
+        let characters = await tx.table("characters").toArray();
+        await tx.table("threads").toCollection().modify(async thread => {
+          await upgradeThreadFromOldVersion(thread, {characters});
+        });        
 
         if(db.apiUsage) await db.apiUsage.delete();
 
@@ -626,6 +753,7 @@
           character.roleInstruction = character.systemMessage;
           delete character.systemMessage;
         }
+        if(character.folderPath === undefined) character.folderPath = "";
         // WARNING: If you add something here, you'll likely have to edit:
         //  - characterDetailsPrompt (characterDetailsPrompt should return a valid character object - addCharacter only adds creationTime and lastMessageTime, so characterDetailsPrompt should fill in everything else, even if it's not visible in the editor)
         //  - getUserCharacterObj
@@ -645,23 +773,67 @@
         if(message.avatar === undefined) message.avatar = {};
         if(message.customData === undefined) message.customData = {};
         if(message.wrapperStyle === undefined) message.wrapperStyle = "";
-        // WARNING: If you add something here, you may need to edit createMessageObj
-        // WARNING: You may also need to edit messagesToCustomCodeFormat and messagesFromCustomCodeFormat if the data should be readable/writable from custom code
+        if(message.memoryQueriesUsed === undefined) message.memoryQueriesUsed = [];
+        if(message.messageIdsUsed === undefined) message.messageIdsUsed = [];
+        if(message.order === undefined) message.order = message.id; // <-- this is a little hacky, but it works because id is auto-incremented, and `order` values don't need to be contiguous
+        // WARNING: If you add something here, you may need to edit
+        // - createMessageObj
+        // - messagesToCustomCodeFormat and messagesFromCustomCodeFormat (if the data should be readable/writable from custom code)
         return message;
       }
 
-      function upgradeThreadFromOldVersion(thread) {
+      async function upgradeThreadFromOldVersion(thread, opts={}) {
         if(thread.isFav === undefined) thread.isFav = false;
         if(thread.userCharacter === undefined) thread.userCharacter = {}; // this overrides the default user character object (for this specific thread)
         if(thread.lastViewTime === undefined) thread.lastViewTime = thread.lastMessageTime;
         if(thread.customCodeWindow === undefined) thread.customCodeWindow = {visible:false, width:null}; 
         if(thread.customData === undefined) thread.customData = {}; 
-        // WARNING: If you add something here, you may need to edit addThread
+        if(thread.modelName === undefined) {
+          let character;
+          if(opts.characters) {// need this specifically for the db upgrade() function (i.e. not needed in import code) since modify can't be `async`, so we get all characters beforehand and pass them to this function
+            character = opts.characters.find(c => c.id === thread.characterId);
+          } else {
+            character = await db.characters.get(thread.characterId);
+          }
+          thread.modelName = character.modelName; // don't need to do good/great conversion here because that was not a feature previous to this change
+        }
+        if(thread.folderPath === undefined) thread.folderPath = ""; 
+        if(thread.character === undefined) thread.character = {avatar:{}}; 
+        // WARNING: If you add something here, you may need to edit:
+        // - addThread
         return thread;
       }
       
 
       window.db = db;
+
+
+      let availableModels = {};
+
+      // for openai and webgpu/webnn models (i.e. you don't need to setup your own inference server, and most people already have an openai account):
+      let broadlyAvailableModels = [
+        {name:"gpt-3.5-turbo", shortLabel:"gpt-3.5-turbo - good/fast/cheap", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"chat-completion", tokenPricing:{prompt: 0.002, completion: 0.002}},
+        {name:"text-davinci-003", shortLabel:"text-davinci-003 - good/expensive", endpointUrl:"https://api.openai.com/v1/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"completion", tokenPricing:{prompt: 0.02, completion: 0.02}},
+        {name:"gpt-4", shortLabel:"gpt-4 - excellent, but expensive (need access via openai waitlist)", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:8192, type:"chat-completion", tokenPricing:{prompt: 0.03, completion: 0.06}},
+        {name:"text-embedding-ada-002", shortLabel:"text-embedding-ada-002", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:8192, type:"text-embedding", tokenPricing:{prompt:0.0004, completion: 0.0004}},
+      ];
+      
+      async function updateModelList() {
+        console.log("updateModelList");
+        // debugger;
+        let modelsArr = broadlyAvailableModels.slice(0);
+        let customModelConfigs = (await db.misc.get("customModelConfigs"))?.value || [];
+        console.log("updateModelList", customModelConfigs);
+        modelsArr.push(...customModelConfigs);
+        availableModels = {};
+        for(let m of modelsArr) {
+          availableModels[m.name] = m;
+        }
+        console.log("updateModelList", availableModels);
+        let currentValue = $.threadModelSelector;
+        $.threadModelSelector.innerHTML = modelsArr.map(m => `<option value="${m.name}" ${m.name === currentValue ? "selected" : ""}>${m.name}</option>`).join("");
+      }
+      await updateModelList();
 
 
       // export data if they click export button
@@ -724,7 +896,7 @@
         if(summaries) {
           summaries.rows = summaries.rows.filter(s => keepThreadCheck(s.threadId));
         }
-        
+
         let memories = json.data.data.find(d => d.tableName === "memories");
         if(memories) {
           memories.rows = memories.rows.filter(m => keepThreadCheck(m.threadId));
@@ -749,6 +921,14 @@
           showEl($.threadSearchCtn);
         } else {
           hideEl($.threadSearchCtn);
+        }
+
+        let currentFolderPath = $.chatThreadFolders.dataset.currentFolderPath;
+        let allFolderPaths = [...new Set(threads.map(t => t.folderPath))];
+        let currentSubfolderNames = [...new Set(allFolderPaths.filter(p => p.startsWith(currentFolderPath) && p !== currentFolderPath).map(p => p.split("/").slice(currentFolderPath.split("/").length-(currentFolderPath === "" ? 1 : 0)).filter(s => s)[0]))];
+
+        if(!opts.filterWithQuery) { // don't do folder stuff if they're searching
+          threads = threads.filter(t => t.folderPath === currentFolderPath);
         }
 
         let characters = await db.characters.toArray();
@@ -801,14 +981,26 @@
           return 0;
         });
 
-        $.chatThreads.innerHTML = threads.map(thread => `
+        let foldersHtml = "";
+        if(!opts.filterWithQuery) { // don't do folder stuff if they're searching
+          if(currentFolderPath !== "") {
+            foldersHtml += `<div class="threadFolder" data-folder-path="${sanitizeHtml(currentFolderPath.split("/").slice(0, -1).join("/"))}">🔙 up one level</div>`;
+          }
+          foldersHtml += currentSubfolderNames.map(name => {
+            return `<div class="threadFolder" data-folder-path="${sanitizeHtml(currentFolderPath ? currentFolderPath+"/"+name : name)}">📁 ${sanitizeHtml(name)}</div>`;
+          }).join("");
+        }
+        $.chatThreadFolders.innerHTML = foldersHtml;
+
+        let threadsHtml = threads.map(thread => `
           <div class="thread" data-thread-id="${sanitizeHtml(thread.id)}">
             <span class="favStar" data-is-fav="${thread.isFav}">⭐</span>
+            <span class="changeFolderPath">📁</span>
             <div class="avatar" style="${thread.character.avatar.url ? `background-image:url(${sanitizeHtml(thread.character.avatar.url)})` : ""}; border:1px solid var(--border-color);"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem;">
-              <div class="nameWrapper" style="font-weight:bold; font-size:0.9rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
-              <div class="characterName" style="font-size:0.8rem;">${thread.character.name.length > 21 ? sanitizeHtml(thread.character.name.slice(0, 21)+"…") : sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span> <span class="characterEditButton">✏️</span></div>
-              <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span>${sanitizeHtml(thread.character.modelName)}</span><span class="usageStatsSpend" title="API usage/spend" style="font-size:0.7rem;display:flex;align-items:center;">$${threadIdToMoneySpent[thread.id].toFixed(2)}</span><span style="font-size:0.7rem; display:flex; align-items:center;" title="Thread ID">#${sanitizeHtml(thread.id)}</span></div>
+              <div class="nameWrapper" style="font-weight:bold; font-size:0.8rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
+              <div class="characterName" style="font-size:0.8rem;">${thread.character.name.length > 15 ? sanitizeHtml(thread.character.name.slice(0, 15)+"…") : sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span> <span class="characterEditButton">✏️</span></div>
+              <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span>${thread.modelName.length > 15 ? sanitizeHtml(thread.modelName.slice(0, 15))+"…" : sanitizeHtml(thread.modelName)}</span><span class="usageStatsSpend" title="API usage/spend" style="font-size:0.7rem;display:flex;align-items:center;">$${threadIdToMoneySpent[thread.id].toFixed(2)}</span><span style="font-size:0.7rem; display:flex; align-items:center;" title="Thread ID">#${sanitizeHtml(thread.id)}</span></div>
             </div>
             <div style="display:flex; flex-direction:column; justify-content:space-between; font-size:0.65rem;">
               <span class="button nameEditButton">✏️</span>
@@ -817,6 +1009,8 @@
             </div>
           </div>
         `).join("");
+
+        $.chatThreads.innerHTML = threadsHtml;
 
         // if message feed is visible, set selected thread to the currently-visible chat thread
         if($.messageFeed.offsetWidth > 0 && $.messageFeed.dataset.threadId) {
@@ -838,6 +1032,26 @@
             let isFav = !thread.isFav;
             await db.threads.update(threadId, { isFav });
             favStarEl.dataset.isFav = isFav;
+          });
+        });
+        $.chatThreads.querySelectorAll(".thread .changeFolderPath").forEach(changeFolderPathEl => {
+          changeFolderPathEl.addEventListener("click", async function(e) {
+            e.stopPropagation();
+            const threadId = parseInt(changeFolderPathEl.closest(".thread").dataset.threadId);
+            let thread = await db.threads.get(threadId);
+            let newFolderPath = prompt("Enter new folder path for this thread. You can add subfolders with forward-slashes like 'folder/subfolder/...'", thread.folderPath);
+            if(newFolderPath !== null) {
+              newFolderPath = newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
+              await db.threads.update(threadId, { folderPath: newFolderPath });
+              await renderThreadList();
+            }
+          });
+        });
+        $.chatThreadFolders.querySelectorAll(".threadFolder").forEach(threadFolderEl => {
+          threadFolderEl.addEventListener("click", async function(e) {
+            e.stopPropagation();
+            $.chatThreadFolders.dataset.currentFolderPath = threadFolderEl.dataset.folderPath;
+            await renderThreadList();
           });
         });
         $.chatThreads.querySelectorAll(".nameEditButton").forEach(btn => {
@@ -899,30 +1113,10 @@
         });
       }
 
-      // prices are per 1000 tokens
-      const modelNameToTokenCosts = {
-        "gpt-3.5-turbo": {
-          prompt: 0.002,
-          completion: 0.002,
-        },
-        "gpt-4": {
-          prompt: 0.03,
-          completion: 0.06,
-        },
-        "text-davinci-003": {
-          prompt: 0.02,
-          completion: 0.02,
-        },
-        "text-embedding-ada-002": {
-          prompt: 0.0004,
-          completion: 0.0004,
-        },
-      };
-
       function usageStatsEntriesToCost(entries) {
         let sum = 0;
         for(let entry of entries) {
-          let costs = modelNameToTokenCosts[entry.modelName];
+          let costs = availableModels[entry.modelName].tokenPricing;
           sum += costs.prompt * entry.tokens.prompt/1000;
           sum += costs.completion * entry.tokens.completion/1000;
         }
@@ -981,6 +1175,7 @@
         $.messageFeed.dataset.threadId = threadId;
         const thread = (await db.threads.where("id").equals(threadId).toArray())[0];
         const messages = await db.messages.where("threadId").equals(threadId).toArray();
+        messages.sort((a,b) => a.order - b.order);
         const character = (await db.characters.where("id").equals(thread.characterId).toArray())[0];
         let userCharacter = await getUserCharacterObj(threadId);
         let systemCharacter = await getSystemCharacterObj();
@@ -1050,7 +1245,7 @@
           observer.observe(triggerEl);
         }
 
-        await updateInlineReminderMessage({aiCharacter:character});
+        await updateInlineReminderMessage({aiCharacter:character, thread});
         await updateThreadScene();
 
         doBotReplyIfNeeded(); // we shouldn't `await` this because thread is already rendered.
@@ -1210,12 +1405,29 @@
         let el = tmp.firstElementChild;
         el.querySelector(".inlineReminderMessageEditButton").addEventListener("click", async function() {
           let characterId = parseInt($.messageFeed.dataset.characterId);
-          let reminderMessage = await db.characters.get(characterId).then(c => c.reminderMessage);
+          let threadId = parseInt($.messageFeed.dataset.threadId);
+          let character = await db.characters.get(characterId);
+          let thread = await db.threads.get(threadId);
+
+          let reminderMessage = character.reminderMessage || "";
+          
+          let usingThreadReminderMessage = false;
+          if(typeof thread.character.reminderMessage === "string") {
+            usingThreadReminderMessage = true;
+            reminderMessage = thread.character.reminderMessage;
+          }
+
           let result = await prompt2({
-            reminderMessage: {label: "Reminder message:", height:"fit-content", type: "text", defaultValue: reminderMessage, focus:true, placeholder: "Enter a reminder message here. A reminder message is a 'system' message that helps remind/command/instruct the AI on how to respond."}
+            reminderMessage: {label: "Edit the character's reminder message. <b>Note:</b> This text is placed in a 'hidden' message right before the character responds. Be careful that your reminder message doesn't 'throw off' the conversation. You can try putting your reminder message in parentheses like (Reminder: ...) or (Note: ...) or (Thought: ...) or (OOC: ...) if your character is responding to the reminder message. The <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced syntax</a> may also be useful.", height:"fit-content", type: "text", defaultValue: reminderMessage, focus:true, placeholder: "Enter a reminder message here. A reminder message is a 'system' message that helps remind/command/instruct the AI on how to respond."}
           });
+          // debugger;
           if(result) {
-            await db.characters.update(characterId, {reminderMessage:result.reminderMessage});
+            if(usingThreadReminderMessage) {
+              thread.character.reminderMessage = result.reminderMessage;
+              await db.threads.put(thread);
+            } else {
+              await db.characters.update(characterId, {reminderMessage:result.reminderMessage});
+            }
             await updateInlineReminderMessage();
           }
         });
@@ -1223,16 +1435,32 @@
       }
 
       async function updateInlineReminderMessage(opts={}) {
-        // note: opts.aiCharacter can be passed for performance reasons if the caller already has the aiCharacter object
+        // note: opts.aiCharacter and opt.thread can be passed for performance reasons if the caller already has the aiCharacter object
 
         // place reminder element before the most recent bot message
         let characterId = parseInt($.messageFeed.dataset.characterId);
-        let reminderMessage
+        let threadId = parseInt($.messageFeed.dataset.threadId);
+        let character;
         if(!opts.aiCharacter){
-          reminderMessage = await db.characters.get(characterId).then(c => c.reminderMessage || "");
+          character = await db.characters.get(characterId);
         } else {
-          reminderMessage = opts.aiCharacter.reminderMessage || "";
+          character = opts.aiCharacter;
         }
+
+        let thread;
+        if(!opts.thread){
+          thread = await db.threads.get(threadId);
+        } else {
+          thread = opts.thread;
+        }
+
+        let reminderMessage = character.reminderMessage || "";
+        let usingThreadReminderMessage = false;
+        if(typeof thread.character.reminderMessage === "string") {
+          usingThreadReminderMessage = true;
+          reminderMessage = thread.character.reminderMessage;
+        }
+
         let botMessages = [...$.messageFeed.querySelectorAll(`.message[data-character-id='${characterId}']`)];
 
         // remove existing inline reminder messages (important to do this after the async db call above to be sure that if updateInlineReminderMessage is for some reason called twice very close together, we won't get too inline reminders)
@@ -1262,11 +1490,12 @@
           <div class="character" data-character-id="${sanitizeHtml(character.id)}" style="display:flex; padding:0.5rem; cursor:pointer;">
             <div class="avatar" style="${character.avatar.url ? `background-image:url(${sanitizeHtml(character.avatar.url)})` : ""};"></div>
             <div class="info" style="flex-grow:1; padding-left:0.5rem; display: flex; flex-direction: column; justify-content: space-between;">
-              <div class="name" style="font-weight:bold;">${character.name.length > 21 ? sanitizeHtml(character.name.slice(0, 21)+"…") : sanitizeHtml(character.name)} <span style="opacity:0.5; font-weight:normal;">${character.id !== null ? "#"+sanitizeHtml(character.id) : ""}</span></div>
+              <div class="name" style="font-weight:bold;${character.name.length > 21 ? "font-size:0.8rem;" : ""}">${character.name.length > 21 ? sanitizeHtml(character.name.slice(0, 22)+"…") : sanitizeHtml(character.name)} <span style="opacity:0.5; font-weight:normal;">${character.id !== null ? "#"+sanitizeHtml(character.id) : ""}</span></div>
               <!-- <div class="roleInstruction" style="font-size: 0.8rem; text-overflow: ellipsis; word-wrap: break-word; overflow: hidden; height: 2em; line-height: 1em;">${character.roleInstruction.length > 85 ? sanitizeHtml(character.roleInstruction.slice(0, 85)+"...") : sanitizeHtml(character.roleInstruction)}</div> -->
               <div class="buttons" style="text-align:right;">
                 ${character.id === null ? "" :
                 `<button class="edit" title="Edit this character">✏️ edit</button>
+                <button class="changeFolderPath" title="Change folder">📁</button>
                 <button class="duplicate" title="Duplicate this character">➕</button>
                 <button class="share" title="Share this character with a link">🔗</button>
                 <button class="delete" title="Delete this character">🗑️</button>`
@@ -1281,17 +1510,22 @@
       // If they click a character, it starts a new thread with that character.
       async function renderCharacterList() {
         // get characters, sort by lastMessageTime
-        const characters = await db.characters.orderBy("lastMessageTime").reverse().toArray();
-        
-        // Add an entry for the "create character" option with `id=null`.
-        characters.unshift(upgradeCharacterFromOldVersion({
-          id: null,
-          name: "Create New Character",
-          roleInstruction: "Click here to create a new character",
-          avatar: {
-            url: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgZmlsbD0iY3VycmVudENvbG9yIiBjbGFzcz0iYmkgYmktcGx1cy1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+CiAgPHBhdGggZD0iTTggMTVBNyA3IDAgMSAxIDggMWE3IDcgMCAwIDEgMCAxNHptMCAxQTggOCAwIDEgMCA4IDBhOCA4IDAgMCAwIDAgMTZ6Ii8+CiAgPHBhdGggZD0iTTggNGEuNS41IDAgMCAxIC41LjV2M2gzYS41LjUgMCAwIDEgMCAxaC0zdjNhLjUuNSAwIDAgMS0xIDB2LTNoLTNhLjUuNSAwIDAgMSAwLTFoM3YtM0EuNS41IDAgMCAxIDggNHoiLz4KPC9zdmc+",
-          },
-        }));
+        let characters = await db.characters.orderBy("lastMessageTime").reverse().toArray();
+
+        let currentFolderPath = $.characterFoldersList.dataset.currentFolderPath;
+        let allFolderPaths = [...new Set(characters.map(c => c.folderPath))];
+        let currentSubfolderNames = [...new Set(allFolderPaths.filter(p => p.startsWith(currentFolderPath) && p !== currentFolderPath).map(p => p.split("/").slice(currentFolderPath.split("/").length-(currentFolderPath === "" ? 1 : 0)).filter(s => s)[0]))];
+        characters = characters.filter(t => t.folderPath === currentFolderPath);
+
+        let foldersHtml = "";
+        if(currentFolderPath !== "") {
+          foldersHtml += `<div class="characterFolder" data-folder-path="${sanitizeHtml(currentFolderPath.split("/").slice(0, -1).join("/"))}">🔙 up one level</div>`;
+        }
+        foldersHtml += currentSubfolderNames.map(name => {
+          return `<div class="characterFolder" data-folder-path="${sanitizeHtml(currentFolderPath ? currentFolderPath+"/"+name : name)}">📁 ${sanitizeHtml(name)}</div>`;
+        }).join("");
+
+        $.characterFoldersList.innerHTML = foldersHtml;
 
         $.characterList.innerHTML = characters.map(character => createCharacterCardHtml(character)).join("");
 
@@ -1535,76 +1769,97 @@
           });
         });
 
+        $.characterFoldersList.querySelectorAll(".characterFolder").forEach(characterFolderEl => {
+          characterFolderEl.addEventListener("click", async function(e) {
+            e.stopPropagation();
+            $.characterFoldersList.dataset.currentFolderPath = characterFolderEl.dataset.folderPath;
+            await renderCharacterList();
+          });
+        });
+
         // Add an onclick handler to each character which starts a new thread with that character.
-        // If they click the "create character" option (characterId === "null"), it prompts them for a name, system message, and avatar URL.
         $.characterList.querySelectorAll(".character").forEach(characterEl => {
 
-          if(characterEl.dataset.characterId !== "null") {
-
-            // copy link to clipboard and show a little notification at top of page if they click the share button
-            characterEl.querySelector(".share").addEventListener("click", async function(e) {
-              e.stopPropagation();
-              const characterId = parseInt(characterEl.dataset.characterId);
-              const character = (await db.characters.where("id").equals(characterId).toArray())[0];
-              delete character.id;
-              delete character.creationTime;
-              delete character.lastMessageTime;
-              let urlHashData = encodeURIComponent(JSON.stringify({addCharacter:character})).replace(/[!'()*]/g, function(c) {
-                return '%' + c.charCodeAt(0).toString(16); // since encodeURIComponent doesn't encode some characters (like parentheses) and I think they mess up markdown links
-              });
-              const url = `${window.location.origin+window.location.pathname}#${urlHashData}`;
-              await navigator.clipboard.writeText(url);
-              $.topNotificationContent.innerHTML = `Copied character link to clipboard!`;
-              showEl($.topNotification);
-              setTimeout(() => hideEl($.topNotification), 3000);
+          // copy link to clipboard and show a little notification at top of page if they click the share button
+          characterEl.querySelector(".share").addEventListener("click", async function(e) {
+            e.stopPropagation();
+            const characterId = parseInt(characterEl.dataset.characterId);
+            const character = (await db.characters.where("id").equals(characterId).toArray())[0];
+            delete character.id;
+            delete character.creationTime;
+            delete character.lastMessageTime;
+            let urlHashData = encodeURIComponent(JSON.stringify({addCharacter:character})).replace(/[!'()*]/g, function(c) {
+              return '%' + c.charCodeAt(0).toString(16); // since encodeURIComponent doesn't encode some characters (like parentheses) and I think they mess up markdown links
             });
+            const url = `${window.location.origin+window.location.pathname}#${urlHashData}`;
+            await navigator.clipboard.writeText(url);
+            $.topNotificationContent.innerHTML = `Copied character link to clipboard!`;
+            showEl($.topNotification);
+            setTimeout(() => hideEl($.topNotification), 3000);
+          });
 
-            // edit character details if they click the edit button
-            characterEl.querySelector(".edit").addEventListener("click", async function(e) {
-              e.stopPropagation();
-              const characterId = parseInt(characterEl.dataset.characterId);
-              await editCharacterById(characterId);
-            });
+          // edit character details if they click the edit button
+          characterEl.querySelector(".edit").addEventListener("click", async function(e) {
+            e.stopPropagation();
+            const characterId = parseInt(characterEl.dataset.characterId);
+            await editCharacterById(characterId);
+          });
 
-            // duplicate
-            characterEl.querySelector(".duplicate").addEventListener("click", async function(e) {
-              e.stopPropagation();
-              const originalCharacterId = parseInt(characterEl.dataset.characterId);
-              let originalCharacter = await db.characters.get(originalCharacterId);
-              const result = await characterDetailsPrompt(originalCharacter);
-              if(!result) return;
-              const character = await addCharacter(result);
-              await createNewThreadWithCharacterId(character.id);
-            });
+          // duplicate
+          characterEl.querySelector(".duplicate").addEventListener("click", async function(e) {
+            e.stopPropagation();
+            const originalCharacterId = parseInt(characterEl.dataset.characterId);
+            let originalCharacter = await db.characters.get(originalCharacterId);
+            const result = await characterDetailsPrompt(originalCharacter);
+            if(!result) return;
+            const character = await addCharacter(result);
+            await createNewThreadWithCharacterId(character.id);
+          });
 
-            // delete character if they click the delete button
-            characterEl.querySelector(".delete").addEventListener("click", async function(e) {
-              e.stopPropagation();
-              const characterId = parseInt(characterEl.dataset.characterId);
-              if(confirm(`Are you sure you want to delete this character? This will delete ALL THREADS associated with this character.`)) {
-                await safelyDeleteCharacterById(characterId);
-                await renderCharacterList();
-                await renderThreadList();
-              }
-            });
+          // delete character if they click the delete button
+          characterEl.querySelector(".delete").addEventListener("click", async function(e) {
+            e.stopPropagation();
+            const characterId = parseInt(characterEl.dataset.characterId);
+            if(confirm(`Are you sure you want to delete this character? This will delete ALL THREADS associated with this character.`)) {
+              await safelyDeleteCharacterById(characterId);
+              await renderCharacterList();
+              await renderThreadList();
+            }
+          });
 
-          }
+          characterEl.querySelector(".changeFolderPath").addEventListener("click", async function(e) {
+            e.stopPropagation();
+            const characterId = parseInt(characterEl.dataset.characterId);
+            let character = await db.characters.get(characterId);
+            let newFolderPath = prompt("Enter new folder path for this character. You can add subfolders with forward-slashes like 'folder/subfolder/...'", character.folderPath);
+            if(newFolderPath !== null) {
+              newFolderPath = newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
+              await db.characters.update(characterId, { folderPath: newFolderPath });
+              await renderCharacterList();
+            }
+          });
           
           // create a new thread if they click a character
           characterEl.addEventListener("click", async function() {
-            let characterId;
-            if(characterEl.dataset.characterId === "null") { // <-- i.e. they clicked on the 'new character' option.
-              const result = await characterDetailsPrompt();
-              if(!result) return;
-              const character = await addCharacter(result);
-              characterId = character.id;
-            } else {
-              characterId = parseInt(characterEl.dataset.characterId);
-            }
+            let characterId = parseInt(characterEl.dataset.characterId);
             await createNewThreadWithCharacterId(characterId);
           });
         });
       }
+
+      $.newCharacterButton.addEventListener("click", async function() {
+        const result = await characterDetailsPrompt();
+        if(!result) return;
+        const character = await addCharacter(result);
+        await createNewThreadWithCharacterId(character.id);
+      });
+
+      // $.newFolderCharacterButton.addEventListener("click", async function() {
+      //   let folderName = prompt("Folder name:");
+      //   if(!folderName) return;
+      // });
+
+
 
       async function safelyDeleteCharacterById(characterId) {
         // let character = await db.characters.get(characterId);
@@ -1627,27 +1882,27 @@
         await db.usageStats.where("threadId").equals(threadId).delete();
       }
 
-      // this function deletes and "cleans up references" to messages - e.g. ids in `message.memoryIdBatchesUsed`
-      async function safelyDeleteMessagesByIds(ids) {
-        if(ids.length === 0) return;
+      // this function deletes and "cleans up references" to messages - e.g. ids in `message.messageIdsUsed`
+      async function safelyDeleteMessagesByIds(idsToDelete) {
+        if(idsToDelete.length === 0) return;
         // get thread id:
-        let threadId = await db.messages.get(ids[0]).then(m => m.threadId);
+        let threadId = await db.messages.get(idsToDelete[0]).then(m => m.threadId);
         // delete messages:
-        await db.messages.where("id").anyOf(ids).delete();
+        await db.messages.where("id").anyOf(idsToDelete).delete();
         // clean up references to the deleted messages:
         let remainingMessages = await db.messages.where("threadId").equals(threadId).toArray();
+        
         for(let m of remainingMessages) {
           let changed = false;
-          for(let i = 0; i < m.memoryIdBatchesUsed.length; i++) {
-            let batchIds = m.memoryIdBatchesUsed[i];
-            let newBatchIds = batchIds.filter(id => !ids.includes(id));
-            if(newBatchIds.length !== batchIds.length) {
-              m.memoryIdBatchesUsed[i] = newBatchIds;
-              changed = true;
-            }
+          
+          // if the deleted messages were reference by other messages via messageIdsUsed, we need to change those references to -1
+          let originalNumMessageIdsUsed = m.messageIdsUsed.length;
+          m.messageIdsUsed = m.messageIdsUsed.map(id => idsToDelete.includes(id) ? -1 : id);
+          if(m.messageIdsUsed.length !== originalNumMessageIdsUsed) {
+            changed = true;
           }
+
           if(changed) {
-            m.memoryIdBatchesUsed = m.memoryIdBatchesUsed.filter(batch => batch.length > 0);
             await db.messages.put(m);
           }
         }
@@ -1660,7 +1915,7 @@
 
         await db.characters.update(characterId, result);
 
-        if(result.customCode !== character.customCode) {
+        if(result.customCode?.trim() && result.customCode !== character.customCode) {
           // get all threads with this character and delete custom code iframes for them if they exist
           const threads = await db.threads.where("characterId").equals(characterId).toArray();
           for(let thread of threads) {
@@ -1681,7 +1936,8 @@
         let memories = await db.memories.where({characterId:characterId}).toArray();
         if(memories.length > 0 && character.associativeMemoryMethod !== "none" && character.associativeMemoryEmbeddingModelName !== result.associativeMemoryEmbeddingModelName) {
           // character already had memories, and they changed the embedding model. we need to recompute memory embeddings
-          let recomputeCost = (countTokens(memories.map(m => m.text).join(""))/1000) * modelNameToTokenCosts[result.associativeMemoryEmbeddingModelName].prompt;
+          let numTokensInAllMemories = await countTokens(memories.map(m => m.text).join(""), character.associativeMemoryEmbeddingModelName);
+          let recomputeCost = (numTokensInAllMemories/1000) * availableModels[result.associativeMemoryEmbeddingModelName].tokenPricing.prompt;
           let choiceResult = await prompt2({
             action: {label: `Your character has existing memories that were created using a different 'embedding model'. We'll need to recompute the memory embeddings (<b>estimated cost: $${recomputeCost.toFixed(2)}</b>), or you can revert to the previous embedding model.`, type: "select", options:[{content:"Recompute memory embeddings", value:"recompute"}, {content:"Revert to previous embedding model", value:"revert"}]},
           });
@@ -1742,7 +1998,8 @@
       const defaultThreadName = "Unnamed Thread";
 
       async function createNewThreadWithCharacterId(characterId) {
-        const thread = await addThread(defaultThreadName, characterId);
+        let folderPath = $.chatThreadFolders.dataset.currentFolderPath;
+        const thread = await addThread({name:defaultThreadName, characterId, folderPath});
 
         let userCharacter = await getUserCharacterObj(thread.id);
 
@@ -1771,8 +2028,29 @@
         await renderThreadList();
         await showThread(thread.id);
       }
+      
+
+      $.threadModelSelector.addEventListener("change", async function() {
+        let threadId = parseInt($.messageFeed.dataset.threadId);
+        let thread = await db.threads.get(threadId);
+        let modelName = $.threadModelSelector.value;
+        await db.threads.update(threadId, {modelName});
+        if(userModelCapabilities[modelName]?.canRun === false) {
+          alert(userModelCapabilities[modelName].reason);
+        } else {
+          await renderThreadList();
+        }
+      });
 
       async function showThread(threadId) {
+
+        let thread = await db.threads.get(threadId);
+        let characterObj = await db.characters.get(thread.characterId);
+
+        $.chatThreadFolders.dataset.currentFolderPath = thread.folderPath;
+        await renderThreadList();
+
+        $.messageFeed.innerHTML = "";
 
         $.musicPlayer.pause();
 
@@ -1790,8 +2068,7 @@
         document.querySelectorAll("#middleColumn > .middleColumnScreen").forEach(el => hideEl(el));
         showEl($.chatInterface);
 
-        let thread = await db.threads.get(threadId);
-        let characterObj = await db.characters.get(thread.characterId);
+        $.threadModelSelector.value = thread.modelName;
 
         // thus must come before rendering the message feed because we may need to render the messages with `oc.messageRenderingPipeline`
         if(!customCodeIframes[threadId] && characterObj.customCode) {
@@ -1824,21 +2101,21 @@
           roleInstruction: { label: "Instruction/role/personality (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message defines the personality or 'role' that the AI will take during the chat. Every request to the API will include this as the first message. If you later decide to edit this, all existing and new threads will be immediately updated. This message does not get summarized by the summarization algorithm - it will always be present as the first message.", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.roleInstruction || "" },
           reminderMessage: { label: "Reminder message - an invisible system message that is placed before every AI response (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message is inserted as a reminder at the end of the chat right before each AI response. This will always be the last/most-recent message that the AI sees when writing its response. If you later decide to edit this, all existing and new threads will be immediately updated. This message is not seen/summarized by the summarization algorithm - it will always be present as the final message.", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
           initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md" target='blank'>here</a>.`, infoTooltip:"During the initialization of every new thread with this character, these messages will be created and placed at the start of the thread. Note that the summarization algorithm will eventually summarize these messages - so they won't stay around forever (unlike the instruction and reminder messages, which *do* stay around forever). Also note that if you edit the initial messages, only *new* threads will have the updated initial messages. In other words, once a chat thread has been created, the initial messages that are added to a thread during init 'belong' to that thread, not to the character.", type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
+          modelName: { label: "Model name:", infoTooltip:"GPT-4 is really smart, but expensive (about 15x price of gpt-3.5-turbo), and you need to have have access via the GPT-4 waitlist. If you use gpt-3.5-turbo and set the 'temperature' option (see advanced settings) to 1, then apparently (according to community members) it's pretty close to DaVinci in terms of creativity and overall quality. DaVinci is overpriced given its performance - GPT-4 is significantly better and only ~1.5x the price.", type:"select", options:[{content:"good, cheap (currently: gpt-3.5-turbo)", value:"good"}, {content:"great, but *expensive* (currently: davinci, or gpt-4 *if* you have access)", value:"great"}, ...broadlyAvailableModels.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => ({value:m.name, content:m.shortLabel}))], defaultValue: defaultValues.modelName || "good" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatar?.url || "" },
           avatarSize: { hidden:true, label: "Avatar size, as a multiple of the default size.", type:"textLine", defaultValue: defaultValues.avatar?.size ?? "1" },
-          avatarShape: { hidden:true, label: "Avatar shape.", type:"select", options:[{value:"square"}, {value:"circle"}, {value:"portrait"}], defaultValue: defaultValues.avatar?.shape ?? "square" },
+          avatarShape: { hidden:true, label: "Avatar shape:", type:"select", options:[{value:"square"}, {value:"circle"}, {value:"portrait"}], defaultValue: defaultValues.avatar?.shape ?? "square" },
           sceneBackgroundUrl: { hidden:true, label: "Chat background image/video URL (jpg, webp, webm, mp4, etc.)", type:"textLine", defaultValue: defaultValues.scene?.background?.url ?? "" },
           sceneMusicUrl: { hidden:true, label: "Chat background music/audio URL (mp3, webm, mp4, etc.)", infoTooltip:"Permission is always requested from the user before playing audio - i.e. music will not autoplay because that could annoy some users. You can use a video file for audio - the visuals will obviously not be shown.", type:"textLine", defaultValue: defaultValues.scene?.music?.url ?? "" },
-          userCharacterName: { hidden:true, label: "User's name. This overrides the user's default username when chatting to this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.name || "" },
+          userCharacterName: { hidden:true, label: "User's name. This overrides the user's default username when chatting with this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.name || "" },
           userCharacterAvatarUrl: { hidden:true, label: "User's avatar. This overrides the user's default avatar when chatting to this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.avatar?.url || "" },
-          modelName: { hidden:true, label: "Model name. The text-davinci-003 model is a bit more creative, but 10x more expensive.", infoTooltip:"If use gpt-3.5-turbo and set the 'temperature' option (see advanced settings) to 1, then apparently (according to community members) it's pretty close to davinci in terms of creativity.", type:"select", options:[{content:"gpt-3.5-turbo (stable, smart, cheap)", value:"gpt-3.5-turbo"}, {content:"text-davinci-003 (creative, free-form, expensive)", value:"text-davinci-003"}, {content:"gpt-4 (only works if you have waitlist access)", value:"gpt-4"}], defaultValue: defaultValues.modelName || "gpt-3.5-turbo" },
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
           associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Persistent, 'infinite' character memory:", infoTooltip:"This increases the cost by up to 2x and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. Please request cross-thread memory in the Discord server if you want it.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod ?? "none" },
           associativeMemoryEmbeddingModelName: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Memory embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory (text) into a list of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[{value:"text-embedding-ada-002", content:"text-embedding-ada-002"}], defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "text-embedding-ada-002" },
           // initialThreadMemories: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Initial thread-specific memories. The character will create memories based on the chat, but you can add some starter memories/lore here.", infoTooltip:"Manually-written memories can be used as 'dynamic' instruction/role/reminders that engage when relevant. This saves you from having to pack too much text into your instruction/reminder, which will 'eat up' your context, which means the AI will be able to see fewer recent messages, and summarization will have to be done more often.", type:"text", defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "" },
           temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", infoTooltip:"People seem to get good results between 0.7 and 1.2 - higher values may sacrifice some 'correctness' but should result in more 'imagination'.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.85 },
           customCode: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
-        }, {submitButtonText: "Save Character", showHiddenInputsText: "Show advanced options"});
+        }, {submitButtonText: "save character", showHiddenInputsText: "show advanced options"});
         
         if(!result) return;
         
@@ -1891,6 +2168,8 @@
 
         // this is not editable in the UI, but it's needed for a valid character obj
         result.streamingResponse = true;
+
+        result.folderPath = defaultValues.folderPath ?? "";
 
         // If it contains [AI], [SYSTEM], or [USER], but doesn't *start* with one of those, warn them that it's being treated as one big system message
         if(/(^|\s)\[(AI|SYSTEM|USER)\]:/.test(result.reminderMessage) && !/^\[(AI|SYSTEM|USER)\]:/.test(result.reminderMessage.trim())) {
@@ -1985,7 +2264,7 @@
       }
 
 
-      function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime, expectsReply, memoryIdBatchesUsed, summaryHashUsed, scene, avatar, customData, wrapperStyle}) {
+      function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime, expectsReply, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed, scene, avatar, customData, wrapperStyle}) {
         if(threadId === undefined || message === undefined || characterId === undefined) throw new Error(`createMessageObj: threadId, message, and characterId are required: ${threadId}, ${message}, ${characterId}`);
         return {
           threadId,
@@ -1997,10 +2276,13 @@
           variants: [null], // null is the placeholder for the currently-selected variant (i.e. the one in the `message` property)
           memoryIdBatchesUsed: memoryIdBatchesUsed ?? [],
           summaryHashUsed: summaryHashUsed ?? null,
+          memoryQueriesUsed: memoryQueriesUsed ?? [],
+          messageIdsUsed: messageIdsUsed ?? [],
           scene: scene ?? null,
           avatar: avatar ?? {},
           customData: customData ?? {},
           wrapperStyle: wrapperStyle ?? "",
+          // `order` is added during `addMessageToDb`
         };
       }
 
@@ -2008,6 +2290,13 @@
 
         messageObj = JSON.parse(JSON.stringify(messageObj));
         delete messageObj.character; // just in case I'm sloppy somewhere
+
+        let lastMessage = await db.messages.where({threadId:messageObj.threadId}).toArray();
+        if(lastMessage.length > 0) {
+          messageObj.order = lastMessage.reduce((max, p) => p.order > max ? p.order : max, lastMessage[0].order) + 1;
+        } else {
+          messageObj.order = 0;
+        }
 
         let id = await db.messages.add(messageObj);
         // update the thread's lastMessageTime.
@@ -2021,7 +2310,53 @@
         return id;
       }
 
-      async function addThread(name, characterId) {
+      // determine which models the user has access to and can run:
+      let userModelCapabilities = {};
+      (async function() {
+        userModelCapabilities = (await db.misc.get("userModelCapabilities"))?.value ?? {};
+        
+        while(1) {
+          if(!await db.isOpen()) {
+            await delay(1000);
+            continue;
+          }
+          // wait for user's API key to be set
+          let openAiApiKey = (await db.misc.get("openAiApiKey"))?.value;
+          if(!openAiApiKey) {
+            await delay(1000);
+            continue;
+          }
+        }
+
+        if(!userModelCapabilities["gpt-4"]) {
+          let canRun = await fetch("https://api.openai.com/v1/chat/completions", {
+            "headers": { "authorization": `Bearer ${openAiApiKey}`, "content-type": "application/json" },
+            "body": JSON.stringify({
+              model: "gpt-4",
+              messages: [{role:"user", text:"Hi."}],
+              max_tokens: 5,
+            }),
+            "method": "POST",
+          }).then(r => r.json()).then(json => !json.error).catch(e => false);
+
+          userModelCapabilities["gpt-4"] = {
+            canRun,
+            reason: canRun ? null : "You don't have access to the GPT-4 model. You need to join the waitlist: https://openai.com/waitlist/gpt-4-api",
+          };
+        }
+
+        await db.misc.put({ key:"userModelCapabilities", value:userModelCapabilities });
+      })();
+
+      async function addThread({name, characterId, folderPath}) {
+        let character = await db.characters.get(characterId);
+
+        let modelName = character.modelName;
+        if(modelName === "good") modelName = "gpt-3.5-turbo";
+        if(modelName === "great") {
+          if(userModelCapabilities["gpt-4"]?.canRun) modelName = "gpt-4";
+          else modelName = "text-davinci-003";
+        }
         
         const threadObj = {
           name,
@@ -2037,8 +2372,11 @@
               size: null,
             },
           },
+          character: {avatar:{}}, // thread-specific ai character overrides
+          modelName,
           customCodeWindow: {visible:false, width:null},
           customData: {},
+          folderPath: folderPath || "",
         };
 
         let aiCharacter = await db.characters.get(characterId);
@@ -2050,23 +2388,44 @@
         return threadObj;
       }
 
-      let gpt3Tokenizer = null;
-      function countTokens(str) {
-        if(!gpt3Tokenizer) gpt3Tokenizer = createGpt3Tokenizer();
+      let modelNameToTokenizerCache = {};
+      let gpt3Tokenizer;
+      async function getTokenizerByModelName(modelName) {
+        if(modelNameToTokenizerCache[modelName]) return modelNameToTokenizerCache[modelName];
+
+        let modelObj = availableModels[modelName];
+
+        if(modelName === "gpt-3.5-turbo" || modelName === "text-davinci-003" || modelName === "gpt-4") {
+          if(!gpt3Tokenizer) gpt3Tokenizer = createGpt3Tokenizer();
+          modelNameToTokenizerCache[modelName] = gpt3Tokenizer;
+          return gpt3Tokenizer;
+        }
+
+        if(!modelObj.modelUrl) throw new Error("Model doesn't have a modelUrl: "+modelName);
+
+        let modelUrl = modelObj.modelUrl;
+        let tokenizer = await AutoTokenizer.from_pretrained(modelUrl+"/resolve/main/tokenizer.json");
+        modelNameToTokenizerCache[modelName] = tokenizer;
+        return tokenizer;
+      }
+
+      async function countTokens(str, modelName) {
+        let tokenizer = await getTokenizerByModelName(modelName);
+        
         // We just use GPT-3 tokenizer for all models as an ESTIMATE for now.
         // It's better than `Math.ceil(str.length/4)` because it can handle non-ASCII characters (which very rarely are 4 characters per token).
         // But it's still just an estimate.
         // TODO: have a tokenizer per modelName, and use the right one here.
-        return gpt3Tokenizer(str).length
+        return await tokenizer(str).length
       }
 
       let messageHashToTokenCountCache = {};
-      async function countTokensInMessages(messages) {
+      async function countTokensInMessages(messages, modelName) {
         let sum = 0;
         for(let messageText of messages.map(m => `\n\n[${m.name || m.role}]: ${m.content || m.message}`)) {
           let hash = await sha256Text(messageText);
           if(messageHashToTokenCountCache[hash] === undefined) {
-            messageHashToTokenCountCache[hash] = countTokens(messageText);
+            messageHashToTokenCountCache[hash] = await countTokens(messageText, modelName);
           }
           sum += messageHashToTokenCountCache[hash];
         }
@@ -2100,59 +2459,94 @@
       }
 
 
-
-      const modelNameToMaxTokenLimit = {
-        "gpt-3.5-turbo": 4096,
-        "text-davinci-003": 4096,
-        "gpt-4": 8192,
-      };
-      const modelNameToModelType = {
-        "gpt-3.5-turbo": "chat",
-        "gpt-4": "chat",
-        "text-davinci-003": "general",
-      };
-
-
       async function compressText({text, tokenLimit, modelName, onProgressMessage, threadId}) {
         // note: the threadId is just used to track token usage
+
+        let originalText = text;
+        let currentText = text;
+
+        let modelTokenLimit = availableModels[modelName].maxSequenceLength;
+
         let i = 0;
-        let textArr = [text]; // just for debugging
-        while(countTokens(text) > tokenLimit) {
+        let textArr = [currentText]; // just for debugging
+        while(await countTokens(currentText, modelName) > tokenLimit) {
           if(onProgressMessage) onProgressMessage({message:`compressing text (${i})`});
-          let messages = [
-            {role: "system", content: "You are a text compression assistant. You respond only with the text that the user requests - nothing more, nothing less."},
-            {role: "user", content: `Please compress this text to 75% of its original size:\n\n---\n\n${text}\n\n---\n\nTry to remove unimportant details and make the wording more *concise* to save space. DON'T MAKE IT TOO SHORT. Retain all important details.\n\nPlease reply with the *slightly* shortened text - nothing else. Keep *almost all* of the information. Make it slightly shorter.`},
-          ];
-          let newText = await getChatCompletion({messages, modelName, temperature:0.7, threadId});
+
+          // split text into chunks no longer than modelTokenLimit/2, with some overlap between chunks
+          let textChunks = [];
+          let chunkOverlap = 0.15;
+          {
+            let textChunksRemaining = [currentText];
+            while(textChunksRemaining.length > 0) {
+              let textChunk = textChunksRemaining.shift();
+              if(await countTokens(textChunk, modelName) > modelTokenLimit/2) {
+                // split the chunk into two
+                let splitIndex = Math.floor(textChunk.length / 2);
+                let overlap = Math.floor(chunkOverlap * splitIndex);
+
+                textChunksRemaining.unshift(textChunk.slice(splitIndex));
+                textChunksRemaining.unshift(textChunk.slice(0, splitIndex + overlap));
+              } else {
+                textChunks.push(textChunk);
+              }
+            }
+          }
+
+          // compress all the chunks of currentText into a newText by iteratively adding each chunk to the running summary
+          // note: we do it this way so that GPT has the summary-so-far as context, versus trying to summarize a random-looking chunk of text with no context
+          let chunkI = 0;
+          let newText;
+          for(let chunk of textChunks) {
+            let messages = [{role: "system", content: "You are a helpful writing assistant. You respond with exactly the text that the user requests - nothing more, nothing less."}];
+            let resultText;
+            if(chunkI === 0) {
+              messages.push({role: "user", content: `Please respond with the following text, almost verbatim, but slightly shorter:\n\n------\n\n${chunk}${textChunks.length > 1 ? "..." : ""}\n\n------\n\nYour response should start with "NEW TEXT:" and should repeat the above text verbatim, but **SLIGHTLY** shorter. Don't cut out ANY details at all.`});
+              resultText = await getChatCompletion({messages, modelName, temperature:0.7, threadId});
+              resultText = resultText.trim().replace(/^NEW TEXT: ?/, "").trim();
+            } else {
+              messages.push({role: "user", content: `I'm rewriting a document to make it slightly shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding the "NEXT PART" section to the end of it. Add every single sentence/paragraph/etc. from "NEXT PART" to the "SO FAR" text, almost verbatim, except with slighly shorter (e.g. drop superfluous words to shorten sentences). Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR: ${newText.slice(0, 70)}..." and add the "NEXT PART" text to the end of it, almost verbatim, but with each individual sentence reworded to be more concise.`});
+              resultText = await getChatCompletion({messages, modelName, temperature:0.7, threadId});
+              resultText = resultText.trim().replace(/^SO FAR: ?/, "").trim();
+            }
+            newText = resultText;
+            chunkI++;
+          }
+          
+          
           if(!newText) {
             if(onProgressMessage) onProgressMessage({message:`error, retrying compression...`});
             await delay(3000);
           } else {
-            text = newText;
+            currentText = newText;
             textArr.push(text);
-            console.log(`compressed text (${countTokens(text)} tokens): ${text}`);
+            console.log(`compressed text (${await countTokens(currentText, modelName)} tokens): ${currentText}`);
           }
           i++;
-          if(i > 10) {
+          if(i >= 10 && i%10 === 0) {
             await prompt2({
               display:{html:`<div style="white-space:pre-wrap;">For some reason the summarizer is struggling to summarize your text. If you close this message it will continue trying to compress the summary, but be aware that it may use a lot of API credits if it's caught in a loop. Refresh the page if you'd like to stop, or click close to continue. This could be a bug in OpenCharacters, so please report it on Github or Discord if this happens regularly. It should happen very rarely if at all. You can manually edit the summary by typing <b>/sum</b> in the chat. Here's the sequence of compression steps it has taken so far:\n\n${textArr.map((t, i) => `<b>Summary ${i}:</b>\n${t}`).join("\n\n")}</div>`, type:"none"},
-            }, { submitButtonText: "Close", cancelButtonText: null });
+            }, { submitButtonText: "close", cancelButtonText: null });
           }
         }
-        return text;
+        return currentText;
       }
 
 
       async function computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId, onProgressMessage}) {
         // here's the overall idea: "consume" old messages (remove them from the start of the messages array) until you get to `messageTokensToConsumePerSummary` tokens, and then summarize them (use an existing summary if we already have it - it's kinda treated like the first message), and then keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
         // note: upToMessageId is inclusive. it's needed for things like recomputeBotReply, where it may be that not all messages in the thread are visible to the bot.
-        
-        // WARNING: If you change this, you'll probably have to change the summarization prompts.
-        const modelName = "gpt-3.5-turbo"; // TODO: maybe make this depend on character's modelName (but people have requested that turbo/cheap model is used, and it seems to work well as-is, so maybe leave it like this)
 
         let thread = await db.threads.get(threadId);
         let aiCharacter = await db.characters.get(thread.characterId);
         let userCharacter = await getUserCharacterObj(threadId);
+
+        // WARNING: If you change this, you'll probably have to change the summarization prompts.
+        let modelName;
+        if(await threadIsUsingOpenAiModel(thread)) {
+          modelName = "gpt-3.5-turbo"; // if they're using any OpenAI model, then we use turbo for summarization
+        } else {
+          modelName = thread.modelName;
+        }
 
         const characterId = aiCharacter.id;
 
@@ -2162,14 +2556,18 @@
 
         let remainingMessages = await prepareMessagesForBot({messages:originalMessages, aiCharacter, userCharacter, onProgressMessage});
 
-        const tokenLimitForSummaryAndMessages = getTokenLimitForSummaryAndMessages(aiCharacter);
+        const tokenLimitForSummaryAndMessages = await getTokenLimitForSummaryAndMessages(aiCharacter, thread);
+
+        if(tokenLimitForSummaryAndMessages < 500) {
+          alert("Heads up: It looks like you may have an instruction or reminder that is really long - this means that there's only a very small amount of room for the messages and the summary. If your character's instruction/reminder isn't very long, then this could be a bug - in which case, please report this on Github or the Discord server.");
+        }
 
         // these two can't really be any bigger, because we need to leave the final ~third for the *new* summary (although I think, practically, the summary will tend to be a lot smaller than 0.3*token limit, since the model naturally prevents summaries from getting too long)
         // CAUTION: if you change these, users will have to recompute all their summaries (since hashes will change) but you can fix this by checking for an instruction hash match every time we add a message to the batch (TODO)
         const maxTokenCountOfSummary = Math.round(tokenLimitForSummaryAndMessages/3); // <-- probably don't want summary to be any longer than the first third of our token budget
-        const messageTokensToConsumePerSummary = Math.round(modelNameToMaxTokenLimit[modelName]*0.3);
+        const messageTokensToConsumePerSummary = Math.round(availableModels[modelName].maxSequenceLength*0.3);
 
-        if(maxTokenCountOfSummary + messageTokensToConsumePerSummary > modelNameToMaxTokenLimit[modelName]-500) { // -500 due to token estimation and to make room for summarization prompt
+        if(maxTokenCountOfSummary + messageTokensToConsumePerSummary > availableModels[modelName].maxSequenceLength-500) { // -500 due to token estimation and to make room for summarization prompt
           throw new Error("The specified values of `maxTokenCountOfSummary` and `messageTokensToConsumePerSummary` are such that the summarization process could go over this model's token limit.");
         }
 
@@ -2179,12 +2577,13 @@
         }
 
         // get total tokens in all messages
-        let initialTokenCount = await countTokensInMessages(remainingMessages);
+        let initialTokenCount = await countTokensInMessages(remainingMessages, modelName);
         let currentTokenCount = initialTokenCount;
         let prevSummary;
         let prevSummaryObj;
         let prevInstructionHash;
         let i = 0;
+        let numSummariesGenerated = 0; // <-- i.e. where we didn't have an existing matching summary
         // while the total token count is too high, grab batches of old messages, and summarize them
         while(currentTokenCount > tokenLimitForSummaryAndMessages) {
           let progess = 1 - ((currentTokenCount-tokenLimitForSummaryAndMessages) / (initialTokenCount-tokenLimitForSummaryAndMessages));
@@ -2197,7 +2596,7 @@
             if(remainingMessages.length === 0) break; // no more messages
             
             let m = remainingMessages[0];
-            let tokens = await countTokensInMessages([m]);
+            let tokens = await countTokensInMessages([m], modelName);
             if(messageBatchTokenCount > 0 && messageBatchTokenCount+tokens >= messageTokensToConsumePerSummary) {
               break; // don't add this message to the batch, because it would put us over the limit
             }
@@ -2212,7 +2611,7 @@
             remainingMessages.shift();
           }
 
-          if(messageBatchTokenCount > modelNameToMaxTokenLimit[modelName]*0.8) {
+          if(messageBatchTokenCount > availableModels[modelName].maxSequenceLength*0.8) {
             console.error("The messageBatchTokenCount is nearly the full size of the model's token limit.");
             console.error("messageBatchTokenCount:", messageBatchTokenCount);  
           }
@@ -2318,12 +2717,27 @@ OVERALL SUMMARY:
               if(onProgressMessage) onProgressMessage({message:`error, retrying summary...`});
               await delay(3000);
             }
+            numSummariesGenerated++;
+            if(numSummariesGenerated === 100) {
+              alert("Seems like the summary might be caught in a loop? This could be a bug - or you've only recently enabled summaries on a very long thread, or you've edited an early message in a long thread so a lot of summaries need to be computed.");
+            }
             if(aiCharacter.associativeMemoryMethod === "v1") {
               let [ memoriesText, summaryText ] = result.split(/OVERALL SUMMARY:|NEW OVERALL SUMMARY:/);
               let memories = memoriesText.trim().replace(/^LEARNINGS:|NEW LEARNINGS:/, "").trim().split("\n").map(m => m.trim().replace(/^\* (We learned that )?/, "").trim()).filter(m => m);
               memories = memories.map(m => m.replace(/\n+/g, "\n")); // not ideal, but: memories cannot have two consecutive newlines, since in the memory editing UI two newlines indicate a gap between entries
 
               let embeddingModelName = aiCharacter.associativeMemoryEmbeddingModelName;
+
+              // Warn user if they're using a non-OpenAI model and have character memories enabled (TODO: add option for locally-computed embeddings)
+              if(!await threadIsUsingOpenAiModel(thread)) {
+                let userPermissionToUseOpenAiByThread = (await db.misc.get("userPermissionToUseOpenAiModelByThread")) || {};
+                if(!userPermissionToUseOpenAiByThread[thread.id]) {
+                  let confirm = window.confirm(`You're using a non-OpenAI model (${thread.modelName}), but you currently have character memories enabled. Character memories currenly rely on an OpenAI API, so this message is to inform you that text from this chat will be processed via OpenAI's text embedding service. Do you want to continue?`);
+                  userPermissionToUseOpenAiByThread[thread.id] = confirm;
+                  await db.misc.put({key:"userPermissionToUseOpenAiModelByThread", value:userPermissionToUseOpenAiModelByThread});
+                  if(!confirm) return;
+                }
+              }
 
               let embeddings = await embedTexts(memories, embeddingModelName);
 
@@ -2364,7 +2778,7 @@ OVERALL SUMMARY:
           // Compress summary if needed.
           // Note this is *outside* of the above `if` block because user will be able to adjust maxTokenCountOfSummary, and we want to re-compute/compress summaries if they change that value.
           // (this also helps with backwards-compat since maxTokenCountOfSummary previously didn't exist, we so we may need to compress some old summaries)
-          if(countTokens(summary) > maxTokenCountOfSummary) {
+          if(await countTokens(summary, modelName) > maxTokenCountOfSummary) {
             addToSummaryLog(`<b>summary to compress:</b> ${summary}`);
             summary = await compressText({text:summary, tokenLimit:maxTokenCountOfSummary, modelName, onProgressMessage, threadId});
             await db.summaries.where({hash}).modify({summary});
@@ -2380,7 +2794,7 @@ OVERALL SUMMARY:
           // let overallTokenChange = summaryTokenChange + messageArrTokenChange;
           // currentTokenCount += overallTokenChange; // overallTokenChange is almost certainly negative but we can't assume that for sure, since it's not technically *impossible* for the LLM to return a summary that's longer than message batch
 
-          currentTokenCount = countTokens(summary || "") + await countTokensInMessages(remainingMessages);
+          currentTokenCount = await countTokens(summary||"", modelName) + await countTokensInMessages(remainingMessages, modelName);
           prevSummary = summary;
           prevSummaryObj = summaryObj;
           prevInstructionHash = hash;
@@ -2570,17 +2984,29 @@ OVERALL SUMMARY:
           obj.id = m.id; // see messagesToCustomCodeFormat for why we need ids
           return obj;
         });
+
         return messages;
       }
 
       const retrievedMemoriesTokenLimitFraction = 0.075;
 
-      function getTokenLimitForSummaryAndMessages(character, threadId) {
-        let tokenLimit = modelNameToMaxTokenLimit[character.modelName];
+      async function getTokenLimitForSummaryAndMessages(character, thread) {
+
+        let reminderMessage = character.reminderMessage || "";
+        if(typeof thread.character.reminderMessage === "string") {
+          reminderMessage = thread.character.reminderMessage;
+        }
+
+        let roleInstruction = character.roleInstruction || "";
+        if(typeof thread.character.roleInstruction === "string") {
+          roleInstruction = thread.character.roleInstruction;
+        }
+
+        let tokenLimit = availableModels[thread.modelName].maxSequenceLength;
         // TODO: let user set aiCharacter.tokenLimit (via oc.character.tokenLimit) here to override this if it's smaller than the model's max token limit
         tokenLimit -= Math.round(tokenLimit*0.10); // buffer due to token count being an estimate
-        tokenLimit -= countTokens(character.roleInstruction); // allow for system message tokens
-        tokenLimit -= countTokens( "("+(character.reminderMessage||"")+")" ); // allow for reminder message tokens
+        tokenLimit -= await countTokens(roleInstruction, thread.modelName); // allow for system message tokens
+        tokenLimit -= await countTokens( "("+(reminderMessage||"")+")" , thread.modelName); // allow for reminder message tokens
         tokenLimit -= Math.round(tokenLimit*0.15); // allow for bot response
         if(character.associativeMemoryMethod !== "none") {
           tokenLimit -= Math.round(tokenLimit*retrievedMemoriesTokenLimitFraction); // allow for retrieved memories
@@ -2596,18 +3022,20 @@ OVERALL SUMMARY:
       async function getBotReply({messages, threadId, aiCharacter, userCharacter, replyInstruction, onStreamingReplyChunk, onProgressMessage, signals}) {
         if(!signals) signals = {};
 
+        let thread = await db.threads.get(threadId);
+
         let fullMessagesArr = await prepareMessagesForBot({messages, aiCharacter, userCharacter, onProgressMessage});
 
         onProgressMessage({message:"starting..."});
         
-        let modelName = aiCharacter.modelName;
+        let modelName = thread.modelName;
         
-        let tokenLimitForSummaryAndMessages = getTokenLimitForSummaryAndMessages(aiCharacter);
+        let tokenLimitForSummaryAndMessages = await getTokenLimitForSummaryAndMessages(aiCharacter, thread);
         
         console.log("getBotReply - fullMessagesArr:", fullMessagesArr);
         
         let messagesArr = [];
-        let numTokensInContext = await countTokensInMessages(fullMessagesArr);
+        let numTokensInContext = await countTokensInMessages(fullMessagesArr, modelName);
 
         let summaryUsed = null;
         let summaryHashUsed = null;
@@ -2621,7 +3049,7 @@ OVERALL SUMMARY:
             for(let i = fullMessagesArr.length-1; i >= 0; i--) {
               if(numTokensInContext + fullMessagesArr[i].content.length > tokenLimitForSummaryAndMessages) break;
               messagesArr.unshift(fullMessagesArr[i]);
-              numTokensInContext += await countTokensInMessages([fullMessagesArr[i]]);
+              numTokensInContext += await countTokensInMessages([fullMessagesArr[i]], modelName);
             }
           } else if(fitMessagesInContextMethod === "summarizeOld") {
             
@@ -2647,6 +3075,13 @@ OVERALL SUMMARY:
           messagesArr = fullMessagesArr.slice(0);
         }
 
+        let messageIdsUsed = [];
+        for(let m of messagesArr) {
+          if(m._isSummary) continue;
+          if(m.id === undefined) throw new Error("Message ID is undefined.");
+          messageIdsUsed.push(m.id);
+        }
+
         if(signals.stop === true) {
           return undefined;
         }
@@ -2657,10 +3092,13 @@ OVERALL SUMMARY:
           system: "system",
         };
 
-        if(aiCharacter.roleInstruction?.trim()) {
-          let messages = parseMessagesFromTextFormat(aiCharacter.roleInstruction);
+        let roleInstruction = aiCharacter.roleInstruction?.trim();
+        if(thread.character.roleInstruction?.trim()) roleInstruction = thread.character.roleInstruction?.trim();
+
+        if(roleInstruction) {
+          let messages = parseMessagesFromTextFormat(roleInstruction);
           if(messages === null) {
-            let content = aiCharacter.roleInstruction;
+            let content = roleInstruction;
             content = content.replaceAll("{{user}}", userCharacter.name);
             content = content.replaceAll("{{char}}", aiCharacter.name);
             messagesArr.unshift({role:"system", content});
@@ -2678,10 +3116,13 @@ OVERALL SUMMARY:
           }          
         }
 
-        if(aiCharacter.reminderMessage?.trim()) {
-          let messages = parseMessagesFromTextFormat(aiCharacter.reminderMessage);
+        let reminderMessage = aiCharacter.reminderMessage?.trim();
+        if(thread.character.reminderMessage?.trim()) reminderMessage = thread.character.reminderMessage?.trim();
+
+        if(reminderMessage) {
+          let messages = parseMessagesFromTextFormat(reminderMessage);
           if(messages === null) {
-            let content = aiCharacter.reminderMessage;
+            let content = reminderMessage;
             content = content.replaceAll("{{user}}", userCharacter.name);
             content = content.replaceAll("{{char}}", aiCharacter.name);
             messagesArr.push({role:"system", content, _isReminder:true});
@@ -2710,6 +3151,7 @@ OVERALL SUMMARY:
         }
 
         let memoryIdBatchesUsed = [];
+        let memoryQueriesUsed = [];
 
         let memories = await db.memories.where({threadId, status:"current"}).toArray();
         if(aiCharacter.associativeMemoryMethod === "v1" && memories.length > 0) {
@@ -2739,6 +3181,8 @@ OVERALL SUMMARY:
           searchQueries = searchQueries.map(q => q.replace(/^"(.+)"$/, "$1"));
 
           console.log(`MEMORY SEARCH QUERIES:\n${searchQueries.join("\n")}`);
+
+          memoryQueriesUsed.push(...searchQueries);
 
           let embeddingModelName = aiCharacter.associativeMemoryEmbeddingModelName;
           let searchEmbeddings = await embedTexts(searchQueries, embeddingModelName);
@@ -2837,9 +3281,9 @@ OVERALL SUMMARY:
 
           console.log("memoryBatches:", memoryBatches.slice(0));
           if(memoryBatches.length > 0) {
-            const createMemoriesMessageContent = () => `Some potentially helpful things/facts/happenings to take note of:\n\nNOTE:\n${memoryBatches.map(b => b.memories.map(m => "* "+m.text).join("\n")).join("\n\nNOTE:\n")}`;
+            const createMemoriesMessageContent = () => `Some potentially helpful things/facts/happenings to take note of:\n\nA memory or a piece of world lore:\n${memoryBatches.map(b => b.memories.map(m => "* "+m.text).join("\n")).join("\n\nAnother memory or a piece of world lore:\n")}`;
             // drop worst batches until we're under token limit allocated to memories:
-            while(countTokens(createMemoriesMessageContent()) > retrievedMemoriesTokenLimitFraction * modelNameToMaxTokenLimit[modelName]) {
+            while(await countTokens(createMemoriesMessageContent(), modelName) > retrievedMemoriesTokenLimitFraction * availableModels[modelName].maxSequenceLength) {
               memoryBatches.pop();
             }
             // put memoryBatches in chronological order:
@@ -2879,15 +3323,20 @@ OVERALL SUMMARY:
         onProgressMessage({message:"querying api..."});
 
         console.log("getBotReply - messagesArr:", messagesArr);
+
+        let modelObj = availableModels[modelName];
+        let apiKey = modelObj.apiKey;
         
-        let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
-        if(!OPENAI_API_KEY) {
-          let result = await prompt2({
-            openAiApiKey: { label: "Please create a new OpenAI API secret key and paste it here. Go to <a style='color:blue' href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a> to do that. You can change or delete this later by clicking the 'settings' button.", type:"textLine", placeholder:"sk-...", focus:true },
-          });
-          if(!result) return;
-          await db.misc.put({ key: "openAiApiKey", value: result.openAiApiKey });
-          OPENAI_API_KEY = result.openAiApiKey;
+        if(apiKey === "<OPENAI>") {
+          apiKey = (await db.misc.get("openAiApiKey"))?.value;
+          if(!apiKey) {
+            let result = await prompt2({
+              openAiApiKey: { label: "Please create a new OpenAI API secret key and paste it here. Go to <a style='color:blue' href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a> to do that. You can change or delete this later by clicking the 'settings' button.", type:"textLine", placeholder:"sk-...", focus:true },
+            });
+            if(!result) return;
+            await db.misc.put({ key: "openAiApiKey", value: result.openAiApiKey });
+            apiKey = result.openAiApiKey;
+          }
         }
 
         async function handleStreamingResponse(reader) {
@@ -2911,9 +3360,9 @@ OVERALL SUMMARY:
             }
             let text;
 
-            if(json.choices[0].text !== undefined) { // this indicates that we're streaming from a 'general' (non-chat) model
+            if(json.choices[0].text !== undefined) { // this indicates that we're streaming from a 'completion' (non-chat) model
               text = json.choices[0].text;
-              if(chunkI===0) text = text.trimStart(); // trimStart due to the way we prompt 'general' models (we show messages with a space after `[name]:`)
+              if(chunkI===0) text = text.trimStart(); // trimStart due to the way we prompt 'completion' models (we show messages with a space after `[name]:`)
             } else {
               if(json.choices[0].delta.role) return; // first response always starts with a role=assistant delta to indicate that the assistant is the one talking
               if(!json.choices[0].delta.content) return; // final response alway has empty delta object
@@ -2964,13 +3413,17 @@ OVERALL SUMMARY:
         }
 
 
-        let modelType = modelNameToModelType[modelName];
+        let modelType = availableModels[modelName].type;
+        if(!modelType) throw new Error("modelType is undefined for model "+modelName);
         let getStreamingResponse = aiCharacter.streamingResponse;
 
         let result;
         let apiTokenUsage;
 
-        if(modelType === "chat") {
+        let headers = {"Content-Type": "application/json"};
+        if(apiKey) headers.authorization = `Bearer ${apiKey}`;
+
+        if(modelType === "chat-completion") {
 
           let data = {
             model: modelName,
@@ -2985,23 +3438,23 @@ OVERALL SUMMARY:
 
           if(getStreamingResponse) {
             data.stream = true;
-            let tokensInPrompt = await countTokensInMessages(messagesArr);
+            let tokensInPrompt = await countTokensInMessages(messagesArr, modelName);
             apiTokenUsage = {prompt:tokensInPrompt, completion:0, total:tokensInPrompt};
 
-            let response = await fetch("https://api.openai.com/v1/chat/completions", {
-              "headers": { "authorization": `Bearer ${OPENAI_API_KEY}`, "content-type": "application/json" },
-              "body": JSON.stringify(data),
-              "method": "POST",
+            let response = await fetch(modelObj.endpointUrl, {
+              headers,
+              body: JSON.stringify(data),
+              method: "POST",
             }).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
             const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
             result = await handleStreamingResponse(reader);
 
-            apiTokenUsage.completion += countTokens(result);
-            apiTokenUsage.total += countTokens(result);
+            apiTokenUsage.completion += await countTokens(result, modelName);
+            apiTokenUsage.total += await countTokens(result, modelName);
           } else {
-            let json = await fetch('https://api.openai.com/v1/chat/completions', {
+            let json = await fetch(modelObj.endpointUrl, {
               method: 'POST',
-              headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+              headers,
               body: JSON.stringify(data),
             }).then(r => r.json()).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
 
@@ -3020,7 +3473,7 @@ OVERALL SUMMARY:
           let prompt = promptIntro + messagesArr.slice(1).map(m => (m.role=="user"?`[${userCharacter.name}]: `:m.role=="system"?"[SYSTEM]: ":`[${aiCharacter.name}]: `)+m.content).join("\n\n") + `\n\n[${aiCharacter.name}]:`;
           
           // davinci *requires* max_tokens else it defaults to 16 (unlike turbo which defaults to infinity)
-          let max_tokens = Math.round((modelNameToMaxTokenLimit[modelName] - countTokens(prompt)) * 0.85); // *0.85 because countTokens is an estimate
+          let max_tokens = Math.round((availableModels[modelName].maxSequenceLength - await countTokens(prompt, modelName)) * 0.85); // *0.85 because countTokens is an estimate
           
           let data = {
             model: modelName,
@@ -3037,23 +3490,23 @@ OVERALL SUMMARY:
 
           if(getStreamingResponse) {
             data.stream = true;
-            let tokensInPrompt = await countTokensInMessages(messagesArr);
+            let tokensInPrompt = await countTokensInMessages(messagesArr, modelName);
             apiTokenUsage = {prompt:tokensInPrompt, completion:0, total:tokensInPrompt};
 
-            let response = await fetch("https://api.openai.com/v1/completions", {
-              "headers": { "authorization": `Bearer ${OPENAI_API_KEY}`, "content-type": "application/json" },
-              "body": JSON.stringify(data),
-              "method": "POST",
+            let response = await fetch(modelObj.endpointUrl, {
+              headers,
+              body: JSON.stringify(data),
+              method: "POST",
             }).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
             const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
             result = await handleStreamingResponse(reader);
 
-            apiTokenUsage.completion += countTokens(result);
-            apiTokenUsage.total += countTokens(result);
+            apiTokenUsage.completion += await countTokens(result, modelName);
+            apiTokenUsage.total += await countTokens(result, modelName);
           } else {
-            let json = await fetch("https://api.openai.com/v1/completions", {
+            let json = await fetch(modelObj.endpointUrl, {
               method: "POST",
-              headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+              headers,
               body: JSON.stringify(data),
             }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
             
@@ -3080,7 +3533,7 @@ OVERALL SUMMARY:
           result = result.slice(aiCharacter.name.length+1).trim();
         }
 
-        return {message:result, memoryIdBatchesUsed, summaryHashUsed};
+        return {message:result, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed};
       }
 
       function getCurrentDateHour() {
@@ -3114,12 +3567,11 @@ OVERALL SUMMARY:
       }
 
 
-      async function getChatCompletion({messages, modelName, temperature, stopSequences, topP, frequencyPenalty, presencePenalty, threadId}) {
+      async function getChatCompletion(opts) {
+        let {messages, modelName, temperature, stopSequences, topP, frequencyPenalty, presencePenalty, threadId, retries, triesAttempted} = opts;
+        if(opts.attemptsSoFar === undefined) opts.attemptsSoFar = 0;
+        if(opts.maxAttempts === undefined) opts.maxAttempts = 2;
         // note: threadId is just for tracking token usage
-
-        // let tokenLimit = modelNameToMaxTokenLimit[model];
-        // tokenLimit -= tokenLimit*0.15; // buffer due to token count being an estimate
-        // let numTokensInContext = await countTokensInMessages(messages);
 
         messages = JSON.parse(JSON.stringify(messages));
 
@@ -3129,14 +3581,22 @@ OVERALL SUMMARY:
           m.content = m.content.replace(/<!--hidden-from-ai-start-->.+?<!--hidden-from-ai-end-->/gs, "");
         }
 
-        let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
+        let modelObj = availableModels[modelName];
+        let apiKey = modelObj.apiKey;
+        if(apiKey === "<OPENAI>") {
+          apiKey = (await db.misc.get("openAiApiKey"))?.value;
+        }
 
-        let modelType = modelNameToModelType[modelName];
+        let modelType = availableModels[modelName].type;
+        if(!modelType) throw new Error("modelType not found for model: "+modelName);
 
         let result;
         let apiTokenUsage;
 
-        if(modelType === "chat") {
+        let headers = {"content-type": "application/json"};
+        if(apiKey) headers.authorization = `Bearer ${apiKey}`;
+
+        if(modelType === "chat-completion") {
 
           let data = {
             model:modelName,
@@ -3148,9 +3608,9 @@ OVERALL SUMMARY:
           if(frequencyPenalty) data.frequency_penalty = frequencyPenalty;
           if(presencePenalty) data.presence_penalty = presencePenalty;
 
-          let json = await fetch('https://api.openai.com/v1/chat/completions', {
+          let json = await fetch(modelObj.endpointUrl, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getChatCompletion: "+e.stack));
           
@@ -3186,9 +3646,9 @@ OVERALL SUMMARY:
           if(frequencyPenalty) data.frequency_penalty = frequencyPenalty;
           if(presencePenalty) data.presence_penalty = presencePenalty;
 
-          let json = await fetch("https://api.openai.com/v1/completions", {
+          let json = await fetch(modelObj.endpointUrl, {
             method: "POST",
-            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify(data),
           }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
           
@@ -3207,97 +3667,114 @@ OVERALL SUMMARY:
           await trackTokenUsage({threadId, modelName, usageData});
         }
 
+        opts.attemptsSoFar++;
+
+        if(!result) {
+          if(opts.attemptsSoFar >= opts.maxAttempts) {
+            return null;
+          } else {
+            return await getChatCompletion(opts);
+          }
+        }
+
         return result;
       }
 
       // for debugging:
       window.embedTexts = embedTexts;
       window.cosineDistance = cosineDistance;
+      window.getChatCompletion = getChatCompletion;
 
 
-      async function getCompletion({prompt, modelName, temperature, stopSequences, topP, frequencyPenalty, presencePenalty}) {
+      // async function getCompletion({prompt, modelName, temperature, stopSequences, topP, frequencyPenalty, presencePenalty}) {
 
-        // NOTE: This function is currently unused.
-        // TODO: before using this function, you need to fix/add this stuff like in getChatCompletion:
-        // - openAiErrorTypeToReadableError
-        // - trackTokenUsage
-        // - modelNameToModelType
-        // - modelNameToMaxTokenLimit
+      //   // NOTE: This function is currently unused.
+      //   // TODO: before using this function, you need to fix/add this stuff like in getChatCompletion:
+      //   // - openAiErrorTypeToReadableError
+      //   // - trackTokenUsage
+      //   // - modelNameToModelType
+      //   // - modelNameToMaxTokenLimit
+      //   // ********You basically need to go through getChatCompletion line-by-line and copy over the relevant stuff.********
 
-        // let tokenLimit = modelNameToMaxTokenLimit[modelName];
-        // tokenLimit -= tokenLimit*0.15; // buffer due to token count being an estimate
-        // let numTokensInContext = await countTokensInMessages(messages);
+      //   // let tokenLimit = modelNameToMaxTokenLimit[modelName];
+      //   // tokenLimit -= tokenLimit*0.15; // buffer due to token count being an estimate
+      //   // let numTokensInContext = await countTokensInMessages(messages);
 
-        let OPENAI_API_KEY = (await db.misc.get("openAiApiKey"))?.value;
+      //   let modelObj = availableModels[modelName];
+      //   let apiKey = modelObj.apiKey;
+      //   if(apiKey === "<OPENAI>") {
+      //     apiKey = (await db.misc.get("openAiApiKey"))?.value;
+      //   }
 
-        let modelType = modelName==="gpt-3.5-turbo" ? "chat" : "general";
+      //   let modelType = availableModels[modelName].type;
+      //   if(!modelType) throw new Error(`getCompletion: modelType not found for modelName: ${modelName}`);
 
-        let result;
+      //   let result;
 
-        if(modelType === "general") {
+      //   if(modelType === "completion") {
 
-          let data = {
-            model:modelName,
-            prompt,
-            temperature: temperature ?? 0.7,
-          };
-          if(stopSequences) data.stop = stopSequences;
-          if(topP) data.top_p = topP;
-          if(frequencyPenalty) data.frequency_penalty = frequencyPenalty;
-          if(presencePenalty) data.presence_penalty = presencePenalty;
+      //     let data = {
+      //       model:modelName,
+      //       prompt,
+      //       temperature: temperature ?? 0.7,
+      //     };
+      //     if(stopSequences) data.stop = stopSequences;
+      //     if(topP) data.top_p = topP;
+      //     if(frequencyPenalty) data.frequency_penalty = frequencyPenalty;
+      //     if(presencePenalty) data.presence_penalty = presencePenalty;
 
-          let json = await fetch("https://api.openai.com/v1/completions", {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-          }).then(r => r.json()).catch(e => alert("getCompletion: "+e.stack));
+      //     let json = await fetch(modelObj.endpointUrl, {
+      //       method: "POST",
+      //       headers: apiKey ? { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" } : undefined,
+      //       body: JSON.stringify(data),
+      //     }).then(r => r.json()).catch(e => alert("getCompletion: "+e.stack));
           
-          if(json?.error) {
-            console.error(json.error);
-            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
-          }
+      //     if(json?.error) {
+      //       console.error(json.error);
+      //       alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+      //     }
 
-          result = json?.choices[0].text.trim();
+      //     result = json?.choices[0].text.trim();
 
-        } else {
+      //   } else {
 
-          let leadInTextLength = 20;
+      //     let leadInTextLength = 20;
 
-          let data = {
-            model:modelName,
-            messages: [
-              {
-                role: "system",
-                content: "You are a text completion assistant. You respond with the most likely completion of the prompt that the user provides."
-              },
-              {
-                role: "user",
-                content: `${prompt}\n\n---\n\nPlease continue the above text. Your reply must start with "${prompt.slice(-leadInTextLength)}", and should ONLY include the completion of the prompt - nothing else. Reply with a plausible completion and start your message with: "${prompt.slice(-leadInTextLength)}"`,
-              },
-            ],
-            temperature: temperature ?? 0.7,
-          };
-          if(stopSequences) data.stop = stopSequences;
-          if(topP) data.top_p = topP;
-          if(frequencyPenalty) data.frequency_penalty = frequencyPenalty;
-          if(presencePenalty) data.presence_penalty = presencePenalty;
+      //     let data = {
+      //       model:modelName,
+      //       messages: [
+      //         {
+      //           role: "system",
+      //           content: "You are a text completion assistant. You respond with the most likely completion of the prompt that the user provides."
+      //         },
+      //         {
+      //           role: "user",
+      //           content: `${prompt}\n\n---\n\nPlease continue the above text. Your reply must start with "${prompt.slice(-leadInTextLength)}", and should ONLY include the completion of the prompt - nothing else. Reply with a plausible completion and start your message with: "${prompt.slice(-leadInTextLength)}"`,
+      //         },
+      //       ],
+      //       temperature: temperature ?? 0.7,
+      //     };
+      //     if(stopSequences) data.stop = stopSequences;
+      //     if(topP) data.top_p = topP;
+      //     if(frequencyPenalty) data.frequency_penalty = frequencyPenalty;
+      //     if(presencePenalty) data.presence_penalty = presencePenalty;
 
-          let json = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          }).then(r => r.json()).catch(e => alert("getCompletion: "+e.stack));
+      //     let json = await fetch(modelObj.endpointUrl, {
+      //       method: 'POST',
+      //       headers: apiKey ? { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' } : undefined,
+      //       body: JSON.stringify(data),
+      //     }).then(r => r.json()).catch(e => alert("getCompletion: "+e.stack));
           
-          if(json?.error) {
-            console.error(json.error);
-            alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
-          }
+      //     if(json?.error) {
+      //       console.error(json.error);
+      //       alert(`Error during getCompletion:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+      //     }
 
-          result = json.choices[0].message.content;
-          result = result.slice(leadInTextLength); // remove the "lead in" text
-        }
-        return result;
-      }
+      //     result = json.choices[0].message.content;
+      //     result = result.slice(leadInTextLength); // remove the "lead in" text
+      //   }
+      //   return result;
+      // }
 
       let hljs = null;
       let initiatedHighlightJsLoad = false;
@@ -3345,6 +3822,17 @@ OVERALL SUMMARY:
         if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
       }
 
+      async function threadIsUsingOpenAiModel(threadOrThreadId) {
+        let thread;
+        if(typeof threadOrThreadId === "number") {
+          thread = await db.threads.get(threadOrThreadId);
+        } else {
+          thread = threadOrThreadId;
+        }
+        let modelObj = availableModels[thread.modelName];
+        return modelObj.endpointUrl.startsWith("https://api.openai.com");
+      }
+
 
       async function autoNameThreadIfNeeded(threadId) {
         let thread = await db.threads.get(threadId);
@@ -3354,11 +3842,19 @@ OVERALL SUMMARY:
         messages = messages.slice(0, 10);
         let preparedMessages = await prepareMessagesForBot({messages, userCharacter, aiCharacter})
         if(thread.name === defaultThreadName && messages.length > 8) {
+
+          let modelName;
+          if(await threadIsUsingOpenAiModel(thread)) {
+            modelName = "gpt-3.5-turbo"; // if they're using any OpenAI model, then we use turbo for summarization
+          } else {
+            modelName = thread.modelName;
+          }
+
           let chatCompletionMessages = [
             {role: "system", content: "You are an expert chat thread naming assistant. You help the user come up with a very short name that succinctly summarizes a text chat."},
             {role: "user", content: `Here are some logs from a text chat:\n\n---\n\n${preparedMessages.map(m => `[[${m.name}]]: ${m.content}`).join("\n\n")}\n\n---\n\nPlease come up with a very short name for this thread (just a few words) that succinctly summarizes the chat. You MUST reply with this exact template:\n\nSUMMARY: <a couple of sentences describing the chat thread>\nSHORT NAME: <proposed name of the thread - only a few words>`},
           ];
-          let response = await getChatCompletion({messages:chatCompletionMessages, modelName:"gpt-3.5-turbo", temperature:0.7, threadId});
+          let response = await getChatCompletion({messages:chatCompletionMessages, modelName, temperature:0.7, threadId});
           let newName = response.match(/\nSHORT NAME: (.*)/)?.[1]?.slice(0, 50);
           if(newName?.trim()) {
             await db.threads.update(threadId, { name: newName });
@@ -3442,11 +3938,13 @@ OVERALL SUMMARY:
           instructionForNextBotReply = null; // TODO: refactor various calls to doBotReplyIfNeeded (e.g. at end of renderMessageFeed) so we don't need it and can easily just pass replyInstruction without all the threading-through-multiple-functions issues
 
           const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-          const {message, memoryIdBatchesUsed, summaryHashUsed} = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, replyInstruction, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl), signals});
+          const {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, replyInstruction, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl), signals});
           messageEl.querySelector(".statusMessage").innerHTML = "";
 
           messageObj.memoryIdBatchesUsed = memoryIdBatchesUsed;
           messageObj.summaryHashUsed = summaryHashUsed;
+          messageObj.memoryQueriesUsed = memoryQueriesUsed;
+          messageObj.messageIdsUsed = messageIdsUsed;
 
           if(signals.stop) { // user deleted message
             botIsCurrentlyReplying = false;
@@ -3498,11 +3996,13 @@ OVERALL SUMMARY:
         const character = await db.characters.get(characterId);
 
         const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-        const {message, memoryIdBatchesUsed, summaryHashUsed} = await getBotReply({messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl)});
+        const {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl)});
         messageEl.querySelector(".statusMessage").innerHTML = "";
 
         messageObj.memoryIdBatchesUsed = memoryIdBatchesUsed;
         messageObj.summaryHashUsed = summaryHashUsed;
+        messageObj.memoryQueriesUsed = memoryQueriesUsed;
+        messageObj.messageIdsUsed = messageIdsUsed;
 
         if(message) {
           messageObj.variants[messageObj.variants.findIndex(v => v===null)] = messageObj.message;
@@ -3645,10 +4145,11 @@ OVERALL SUMMARY:
         messageEl.querySelector(".brainButton")?.addEventListener("click", async function() {
           let message = await db.messages.get(parseInt(messageEl.dataset.id));
           
+          let summary;
           let summaryUsed;
           if(message.summaryHashUsed) {
-            summaryUsed = await db.summaries.get(message.summaryHashUsed);
-            summaryUsed = summaryUsed.summary;
+            summary = await db.summaries.get(message.summaryHashUsed);
+            summaryUsed = summary.summary;
           }
 
           let memoriesUsed = await db.memories.where("id").anyOf(message.memoryIdBatchesUsed.flat()).toArray();
@@ -3666,18 +4167,39 @@ OVERALL SUMMARY:
           } else if(message.summaryHashUsed === null) {
             content.push(`<b>Summary Used:</b><div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(No summary was used to generate this message. This is likely because the conversation was not yet long enough to warrant summarization)</div>`);
           } else {
-            content.push(`<b>Summary Used:</b>\n${summaryUsed}<div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(you can edit the latest summary by typing <b>/sum</b> in the chat)</div>`);
+
+            let summarySummarized = summary.prevSummaryHash ? await db.summaries.get(summary.prevSummaryHash) : null;
+            let messagesSummarized = await db.messages.where("id").anyOf(summary.messageIds).toArray();
+
+            let messagesSummarizedHtml = `<details style="opacity:0.5; padding:1rem;"><summary style="cursor:pointer;">Click here to show what was summarized</summary>${summarySummarized ? "\n"+summarySummarized.summary : ""}\n\n${messagesSummarized.map(m => `<b>[${m.characterId=== -1 ? "USER" : m.characterId === -2 ? "SYSTEM" : "AI"}]:</b> ${sanitizeHtml(m.message)}`).join("\n\n")}</details>`;
+
+            content.push(`<b>Summary Used:</b>\n${sanitizeHtml(summaryUsed)}<div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(you can edit the latest summary by typing <b>/sum</b> in the chat)</div>${messagesSummarizedHtml}`);
           }
 
           if(memoryBatchesUsed.length > 0) {
-            content.push(`<b>Memories Used:</b>\n${memoryBatchesUsed.map(batch => batch.map(m => m.text).join(" ⮕ ")).join("\n\n")}<div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(you can add and edit memories by typing <b>/mem</b> in the chat)</div>`);
+            content.push(`<b>Memories Used:</b>\n${sanitizeHtml(memoryBatchesUsed.map(batch => batch.map(m => m.text).join(" ⮕ ")).join("\n\n"))}<div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(you can add and edit memories by typing <b>/mem</b> in the chat)</div>`);
           } else {
             content.push(`<b>Memories Used:</b>\n<div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(No memories were used to generate this message. This is likely because the conversation was not yet long enough to warrant memory storage/retrieval, or you don't have memories enabled in the character settings)</div>`);
+          }
+
+          if(message.memoryQueriesUsed.length > 0) {
+            content.push(`<b>Memory Queries Used:</b>\n${sanitizeHtml(message.memoryQueriesUsed.join("\n"))}`);
+          }
+
+          if(message.messageIdsUsed.length > 0) {
+            let messages = await db.messages.where("id").anyOf(message.messageIdsUsed.filter(id => id !== -1)).toArray();
+            
+            // we want `null` "holes" in the array for the messages that no longer exist:
+            let messagesMap = {};
+            messages.forEach((message) => { messagesMap[message.id] = message; });
+            let messagesWithHoles = message.messageIdsUsed.map(id => id === -1 ? null : messagesMap[id]);
+
+            content.push(`<b>Messages Used:</b>\n<details style="opacity:0.5; padding:1rem;"><summary style="cursor:pointer;">Click here to show messages</summary>\n${messagesWithHoles.map(m => m ? `<b>[${m.characterId=== -1 ? "USER" : m.characterId === -2 ? "SYSTEM" : "AI"}]:</b> ${sanitizeHtml(m.message)}` : "<b>[???]</b>: <span style='opacity:0.5;'>(Message no longer exists. May have been deleted manually by user, or by custom code.)</span>").join("\n\n")}</details>`);
           }
           
           prompt2({
             display:{html:`<div style="white-space:pre-wrap;">Here's some data that the character used to generate this message:\n\n${content.join("\n\n")}</div>`, type:"none"},
-          }, { submitButtonText: "Close", cancelButtonText: null });
+          }, { submitButtonText: "close", cancelButtonText: null });
         });
       }
 
@@ -3688,6 +4210,8 @@ OVERALL SUMMARY:
       }
 
       async function createMessageElement(messageObj) {
+
+        let thread = await db.threads.get(messageObj.threadId);
 
         // sometimes the message comes "hydrated" with a character for performance reasons (i.e. get characters from db *once*, add reference to all messages)
         // but we don'te require it because that's just a performance optimisation, so we grab it here if needed:
@@ -3712,12 +4236,15 @@ OVERALL SUMMARY:
         }
 
         let avatarUrl = messageObj.character.avatar.url;
+        if(thread.character.avatar.url) avatarUrl = thread.character.avatar.url;
         if(messageObj.avatar?.url) avatarUrl = messageObj.avatar.url;
 
         let avatarShape = messageObj.character.avatar.shape;
+        if(thread.character.avatar.shape) avatarShape = thread.character.avatar.shape;
         if(messageObj.avatar?.shape) avatarShape = messageObj.avatar.shape;
 
         let avatarSize = messageObj.character.avatar.size;
+        if(thread.character.avatar.size) avatarSize = thread.character.avatar.size;
         if(messageObj.avatar?.size !== undefined) avatarSize = messageObj.avatar.size;
 
         let wrapperStyle = messageObj.wrapperStyle ?? "";
@@ -3746,7 +4273,7 @@ OVERALL SUMMARY:
         }
 
         tmp.innerHTML = `
-          <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" style="${sanitizeHtml(wrapperStyle)}; margin-top:0.5rem; margin-bottom:0.5rem; position:relative;">
+          <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" style="${sanitizeHtml(wrapperStyle)}; position:relative;">
             <div style="text-align:center;"><button class="showHiddenMessageButton" style="cursor:pointer; font-size:0.65rem;">Show hidden message</button></div>
             <div class="bottomButtons">
               ${messageObj.characterId >= 0 ? `<div class="brainButton emojiButton">🧠</div>` : ""}
@@ -3907,7 +4434,7 @@ OVERALL SUMMARY:
             if(message.trim().length > "/user ".length) instruction = message.trim().replace(/^\/user /, "");
             let characterToReplyWith = await getUserCharacterObj(threadId);
             let threadCharacter = await db.characters.get(parseInt($.messageFeed.dataset.characterId));
-            characterToReplyWith.modelName = threadCharacter.modelName; // use whatever model the thread character is using
+            characterToReplyWith.modelName = thread.modelName; // use whatever model the thread character is using
             if(instruction) {
               characterToReplyWith.reminderMessage = `(The next message will be written from the perspective of '${characterToReplyWith.name}' and will conform to this user-provided instruction: "${instruction}")`;
             }
@@ -3982,7 +4509,7 @@ OVERALL SUMMARY:
               let result = await prompt2({
                 manualMemoriesText: {label: "<b>Add or edit</b> manually-written memories. Your character will try to recall these memories when appropriate. You must separate entries with a blank line.", type: "text", height:"fit-content", defaultValue:manualDefaultValue, placeholder:"Here's an example memory.\n\nAnd here's another.\n\nAnd here's yet another. As you can see, memories should be separated with a blank line.", focus:true, infoTooltip:"Memories are automatically created by the AI based on the conversation, but you can use this input box to manually add memories - e.g. to describe the lore of your world without having to explicitely tell the AI, or remind the AI of things that it seems to be forgetting. Memories are recalled by the AI at times where it deems that they're appropriate. Use relevant words, phrases, character names, etc. in the memory to help it trigger the memory at the appropriate time. Don't make memories too big - probably under 5 sentences is fine."},
                 generatedMemoriesText: {hidden:true, label: "You can also <b>edit</b> memories that your character has automatically created, but for technical reasons <b>you must not add or delete entries</b>. I.e. the number of entries should remain the same, and edits should not significantly change the overall chronology.", type: "text", height:"fit-content", defaultValue:generatedDefaultValue, placeholder:"If this box is empty, your character hasn't stored any memories yet because the chat thread isn't long enough to warrant it."},
-              }, {showHiddenInputsText:"Show automatically-created memories", submitButtonText:"Save"});
+              }, {showHiddenInputsText:"show automatically-created memories", submitButtonText:"save"});
               if(!result) break;
               
               // we set these so that if there's an error (e.g. while embedding, or with database) the while loop continues and they don't lose their edits
@@ -4243,12 +4770,22 @@ OVERALL SUMMARY:
               thread: Object.seal({
                 messages: [],
                 userCharacter: Object.seal({
-                  name: null,
+                  name: undefined,
                   avatar: Object.seal({
-                    url: null,
-                    size: null,
-                    shape: null,
+                    url: undefined,
+                    size: undefined,
+                    shape: undefined,
                   }),
+                }),
+                character: Object.seal({
+                  name: undefined,
+                  avatar: Object.seal({
+                    url: undefined,
+                    size: undefined,
+                    shape: undefined,
+                  }),
+                  reminderMessage: undefined,
+                  roleInstruction: undefined,
                 }),
                 customData: null,
                 on: function(eventName, callback) {
@@ -4796,7 +5333,7 @@ OVERALL SUMMARY:
             });
             let o = {
               messages: options.messages,
-              modelName: character.modelName,
+              modelName: thread.modelName,
               temperature: options.temperature === undefined ? undefined : Number(options.temperature),
               stopSequences: Array.isArray(options.stopSequences) ? options.stopSequences.map(s => s+"") : undefined,
               topP: options.topP === undefined ? undefined : Number(options.topP),
@@ -4804,7 +5341,7 @@ OVERALL SUMMARY:
               presencePenalty: options.presencePenalty === undefined ? undefined : Number(options.presencePenalty),
             };
             if(!customCodeCompletionUsage[threadId]) customCodeCompletionUsage[threadId] = 0;
-            let tokens = await countTokensInMessages(o.messages);
+            let tokens = await countTokensInMessages(o.messages, thread.modelName);
             customCodeCompletionUsage[threadId] += tokens;
             if(customCodeCompletionUsage[threadId] > customCodeCompletionTokenWarnLimit && !threadIdsAllowedToGoOverTokenLimit.has(threadId)) {
               if(threadIdsBlockedFromGoingOverTokenLimit.has(threadId)) {
@@ -4822,7 +5359,7 @@ OVERALL SUMMARY:
             o.threadId = threadId; // this is just for tracking token usage
 
             let result = await getChatCompletion(o);
-            customCodeCompletionUsage[threadId] += countTokens(result);
+            customCodeCompletionUsage[threadId] += await countTokens(result, thread.modelName);
             customCodeIframes[e.data.threadId].contentWindow.postMessage({_id:e.data._id, success:true, result}, "*");
           }
 
@@ -4877,6 +5414,7 @@ OVERALL SUMMARY:
             messages: formattedMessages,
             userCharacter: thread.userCharacter,
             customData: thread.customData,
+            character: thread.character,
           },
           character: {},
         };
@@ -4886,7 +5424,7 @@ OVERALL SUMMARY:
 
         // backwards-compat properties:
         data.character.avatarUrl = threadCharacter.avatar.url;
-
+        
         return data;
       }
 
@@ -4911,7 +5449,10 @@ OVERALL SUMMARY:
         $.statusNotifier.innerHTML = "";
         hideEl($.statusNotifier);
 
-        await renderMessageFeed(threadId);
+        let currentThreadId = parseInt($.messageFeed.dataset.threadId);
+        if(threadId === currentThreadId) { // <-- since user may have switched threads
+          await renderMessageFeed(threadId);
+        }
       }
 
       async function triggerStreamingMessageChunkCustomCodeEvent(threadId, chunkData) {
@@ -4924,7 +5465,7 @@ OVERALL SUMMARY:
 
       // let alreadyCurrentlyUpdatingDbWithNewDataFromCustomCode = false;
       async function updateDbWithNewDataFromCustomCode(threadId, data) {
-
+        
         // backwards-compat:
         if(data.character?.avatarUrl) {
           if(!data.character?.avatar?.url?.trim()) {
@@ -4948,18 +5489,29 @@ OVERALL SUMMARY:
           let messageIdsToDelete = originalMessageIds.filter(id => !outputMessageIds.includes(id));
           await safelyDeleteMessagesByIds(messageIdsToDelete);
 
-          // delete all ids from the output messages, otherwise if custom code re-ordered messages, they would not be re-ordered in the db
-          // TODO: maybe change message ordering in renderMessageFeed so that it uses something other than the id? can't really use creationTime though because our `messagesFromCustomCodeFormat` code will re-add that to the outputMessageObjs.
-          for(let messageObj of outputMessageObjs) {
-            delete messageObj.id;
+          // order the messages (from the db's perspective) according to how the custom code ordered the oc.thread.messages array
+          let order = 0;
+          for(let m of outputMessageObjs) {
+            m.order = order++;
           }
 
-          // TODO: add some obvious optimisations here - e.g. go through messages until first change, then only update that one and all following (remember that messages can be completely re-ordered/removed/etc.)
-          // replace messages in the database with the new messages
-          let originalThreadJSON = await getThreadJSONById(threadId); // <-- backup in case fails
+          // if messages have been deleted, then we need to set those m.messageIdsUsed to -1
+          for(let m of outputMessageObjs) {
+            m.messageIdsUsed = m.messageIdsUsed.map(referencedId => {
+              if(!originalMessageIds.includes(referencedId) && referencedId !== -1) {
+                throw new Error("messageIdsUsed should only contain ids of messages that exist in the original messages");
+              }
+              if(messageIdsToDelete.includes(referencedId)) return -1;
+              else return referencedId;
+            });
+          }
 
+          // note that messagesFromCustomCodeFormat re-numbers `message.order` so it matches the order of the oc.thread.messages array that was returned.
+
+          // replace messages in the database with the new messages
           // we need to make sure that no other db.messages code runs between .delete and .bulkAdd, so we use a transaction that gets a read-write lock on the messages table.
           // otherwise e.g. another call to updateDbWithNewDataFromCustomCode could run between them, and that would cause `db.messages.where("threadId").equals(threadId).toArray()` to incorrectly return zero messages.
+          let originalThreadJSON = await getThreadJSONById(threadId); // <-- backup in case fails
           await db.transaction('rw', db.messages, async () => {
             let existingMessageIds = await db.messages.where("threadId").equals(threadId).toArray().then(arr => arr.map(m => m.id));
             await safelyDeleteMessagesByIds(existingMessageIds);
@@ -4970,10 +5522,18 @@ OVERALL SUMMARY:
               alert("There was an error during custom code handling. The original thread has been downloaded so you can import it in case of data loss.\n\n"+e.stack);
             });
           });
+
+          // let newMessages = await db.messages.where("threadId").equals(threadId).toArray();
+          // debugger;
         }
         if(data.thread?.userCharacter) {
           let thread = await db.threads.get(threadId);
           applyObjectOverrides({object:thread.userCharacter, overrides:data.thread.userCharacter});
+          await db.threads.put(thread);
+        }
+        if(data.thread?.character) {
+          let thread = await db.threads.get(threadId);
+          applyObjectOverrides({object:thread.character, overrides:data.thread.character});
           await db.threads.put(thread);
         }
         if(data.thread?.customData) {
@@ -5024,11 +5584,13 @@ OVERALL SUMMARY:
         
         // the "aiCharacter" is the one that replies 
         const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-        let {message, memoryIdBatchesUsed, summaryHashUsed} = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl)});
+        let {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl)});
         messageEl.querySelector(".statusMessage").innerHTML = "";
 
         messageObj.memoryIdBatchesUsed = memoryIdBatchesUsed;
         messageObj.summaryHashUsed = summaryHashUsed;
+        messageObj.memoryQueriesUsed = memoryQueriesUsed;
+        messageObj.messageIdsUsed = messageIdsUsed;
 
         // if `message` is falsy, it means the bot failed to reply, so delete the message and end the loop
         if(typeof message !== "string") {
@@ -5152,6 +5714,8 @@ OVERALL SUMMARY:
         
         if(isMobile) {
           closeLeftColumn();
+        } else {
+          hideEl($.characterSelectionOpenLeftColumnButton);
         }
       });
 
@@ -5223,20 +5787,62 @@ OVERALL SUMMARY:
         let userNameOriginal = (await db.misc.get("userName"))?.value || "You";
         let userAvatarUrlOriginal = (await db.misc.get("userAvatarUrl"))?.value || "";
         let openAiApiKeyOriginal = (await db.misc.get("openAiApiKey"))?.value || "";
+        let customModelConfigsOriginal = (await db.misc.get("customModelConfigs"))?.value || [];
         const result = await prompt2({
           userName: {label: "Your name:", type: "textLine", defaultValue: userNameOriginal},
           userAvatarUrl: {label: "Your avatar URL:", type: "textLine", placeholder: "(optional)", defaultValue: userAvatarUrlOriginal},
-          openAiApiKey: {label: "OpenAI API secret key (<a style='color:blue' href='https://platform.openai.com/account/api-keys' target='_blank'>from here</a>):", type: "textLine", placeholder:"sk-...", defaultValue: openAiApiKeyOriginal},
-        });
+          openAiApiKey: {label: "OpenAI API secret key (<a href='https://platform.openai.com/account/api-keys' target='_blank'>from here</a>):", type: "textLine", placeholder:"sk-...", defaultValue: openAiApiKeyOriginal},
+          customModelConfigs: {hidden:true, cssText:"white-space:pre; font-family:monospace;", label: "Custom model configs (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-models.md' target='_blank'>follow this guide</a>):", type: "text", placeholder:`{name:"...", endpointUrl:"..."}\n{name:"...", endpointUrl:"...", apiKey:"..."}\n...`, defaultValue: customModelConfigsOriginal.map(o => JSON5.stringify(o)).join("\n")},
+        }, {showHiddenInputsText: "show advanced settings"});
         if(!result) return;
-        const { userName, userAvatarUrl, openAiApiKey } = result;
+        let { userName, userAvatarUrl, openAiApiKey, customModelConfigs } = result;
+
+        customModelConfigs = customModelConfigs.split("\n").map(s => s.trim()).filter(s => s).map(s => JSON5.parse(s));
+        for(let config of customModelConfigs) {
+          config.endpointUrl = config.endpointUrl.trim();
+          config.name = config.name.trim();
+          if(!config.modelUrl) {
+            config.modelUrl = `https://huggingface.co/${config.name}`;
+          }
+          config.modelUrl = config.modelUrl.trim().replace(/\/$/, ""); // remove trailing slash
+          if(!config.name || !config.endpointUrl) {
+            alert("Invalid custom model config. Must include at least name and endpointUrl:\n\n" + JSON5.stringify(config));
+          }
+          if(!config.type) {
+            if(/v1\/completions\/?/.test(config.endpointUrl)) {
+              config.type = "completion";
+            } else if(/v1\/chat\/completions\/?/.test(config.endpointUrl)) {
+              config.type = "chat-completion";
+            } else {
+              alert("Warning: If endpointUrl doesn't end with v1/completions or v1/chat/completions, then you need to specify a 'type' parameter that is either 'completion' or 'chat-completion'. You should choose 'chat-completion' if the model accepts the 'messages' parameter, or choose 'completion' if it accepts the 'prompt' parameter. The model has been assumed to be a 'completion' model. Here's the config line causing this warning:\n\n" + JSON5.stringify(config));
+              config.type = "completion";
+            }
+          }
+          if(!config.maxSequenceLength) {
+            let modelConfigJson;
+            modelConfigJson = await fetch(config.modelUrl+"/raw/main/config.json").then(r => r.json()).catch(e => null);
+            if(modelConfigJson) {
+              config.maxSequenceLength = modelConfigJson.ctx_len || modelConfigJson.max_position_embeddings || modelConfigJson.n_positions || modelConfigJson.max_position_embeddings || modelConfigJson.max_sequence_length;
+            }
+            if(!config.maxSequenceLength) {
+              alert("Warning: maxSequenceLength was not provided, and could not be loaded from Hugging Face. It has been assumed to be 4096. Here's the config line causing this warning:" + JSON5.stringify(config));
+              config.maxSequenceLength = 4096;
+            }
+          }
+          if(!config.tokenPricing) {
+            config.tokenPricing = {prompt:0, completion:0};
+          }
+        }
+
         // save to db
         await db.misc.put({key: "userName", value: userName});
         await db.misc.put({key: "userAvatarUrl", value: userAvatarUrl});
         await db.misc.put({key: "openAiApiKey", value: openAiApiKey});
+        await db.misc.put({key: "customModelConfigs", value: customModelConfigs});
         // update the user's name and avatar in the message feed:
         let threadId = parseInt($.messageFeed.dataset.threadId);
         await renderMessageFeed(threadId);
+        await updateModelList();
       });
 
       async function getCharacterHash(characterObj) {
@@ -5260,7 +5866,7 @@ OVERALL SUMMARY:
 
         let options = await prompt2({
           keepExistingData: {label: "Keep existing data?", type: "select", options:[{value:"yes", content:"Yes, keep."}, {value:"no", content:"No, DELETE existing data."}], defaultValue: "yes"},
-        }, {submitButtonText:"Import Data"});
+        }, {submitButtonText:"import data"});
 
         if(!options) {
           $.importDataFileInput.value = "";
@@ -5291,6 +5897,8 @@ OVERALL SUMMARY:
         if(!success) {
           alert("The file that you're importing doesn't seem to be a valid format. If you think it is valid, please report this as a bug on Github or Discord.");
         }
+
+        await updateModelList();
 
       });
 
@@ -5419,6 +6027,13 @@ OVERALL SUMMARY:
           }
           // (note: we don't need to do the same as above for summaryHashUsed since it obviously uses a hash instead of an id)
 
+          // re-number message.messageIdsUsed
+          for(let message of importedMessages) {
+            if(message.messageIdsUsed) { // <-- old exports won't have this
+              message.messageIdsUsed = message.messageIdsUsed.map(id => id === -1 ? -1 : messageIdMap[id]);
+            }
+          }
+
           if(importedSummaries) {
             // delete summaries that don't have messageIds (from an old version of the app)
             importedSummaries = importedSummaries.filter(s => s.messageIds !== undefined);
@@ -5467,7 +6082,7 @@ OVERALL SUMMARY:
             upgradeCharacterFromOldVersion(character);
           }
           for(let thread of importedThreads) {
-            upgradeThreadFromOldVersion(thread);
+            await upgradeThreadFromOldVersion(thread);
           }
           for(let message of importedMessages) {
             upgradeMessageFromOldVersion(message);
@@ -5540,7 +6155,6 @@ OVERALL SUMMARY:
         if(!json) {
           try {
             let loadingModal = createLoadingModal("Loading parser...");
-            let JSON5 = await import('https://cdn.jsdelivr.net/npm/json5@2.2.2/dist/index.min.mjs').then(m => m.default);
             let ExifReader = await import('https://cdn.jsdelivr.net/npm/exifreader@4.12.0/+esm');
             loadingModal.delete();
 
@@ -5642,13 +6256,13 @@ OVERALL SUMMARY:
         const characters = await db.characters.orderBy("lastMessageTime").reverse().toArray();
         let tavernOptions = await prompt2({
           characterId: {label: "You're importing a TavernAI thread. Choose the character for this thread. If you haven't created/imported it yet, you should click cancel and do that first.", type: "select", options:characters.map(c => ({content:`${c.name} #${c.id}`, value:c.id}))},
-        }, {submitButtonText:"Submit"});
+        }, {submitButtonText:"submit"});
         if(!tavernOptions) {
           return "finished";
         }
         tavernOptions.characterId = parseInt(tavernOptions.characterId);
         let character = await db.characters.get(tavernOptions.characterId);
-        let thread = await addThread(defaultThreadName, character.id);
+        let thread = await addThread({name:defaultThreadName, characterId:character.id});
         for(let m of jsonl.slice(1)) {
           let characterId;
           if(m.is_user) characterId = -1;
@@ -5669,8 +6283,11 @@ OVERALL SUMMARY:
         $.newThreadButton.click();
       } else {
         // otherwise click the most recently-interacted-with thread
-        let threads = await db.threads.orderBy("lastViewTime").reverse().toArray();
-        $.chatThreads.querySelector(`.thread[data-thread-id="${threads[0].id}"]`).click();
+        let allThreads = await db.threads.orderBy("lastViewTime").reverse().toArray();
+        let thread = allThreads[0];
+        $.chatThreadFolders.dataset.currentFolderPath = thread.folderPath;
+        await renderThreadList();
+        $.chatThreads.querySelector(`.thread[data-thread-id="${thread.id}"]`).click();
       }
 
       // parse url hash as json
