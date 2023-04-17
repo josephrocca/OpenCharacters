@@ -1,5 +1,7 @@
-**Note: This isn't available yet. It'll be available in the next update. Blocking issues:**
+**Note: This isn't entirely ready yet due to this issue:**
 * https://github.com/hyperonym/basaran/issues/143
+
+(it's possible to get around this with [a browser extension](https://chrome.google.com/webstore/detail/lhobafahddgcelffkeicbaginigeejlf), but it should be fixed within the next few days anyway)
 
 # Custom Models
 
