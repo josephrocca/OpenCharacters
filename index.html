@@ -448,7 +448,7 @@
               </div>
             </div>
             <div id="chatBackgroundCtn" style="pointer-events:none; position:absolute; top:0; left:0; right:0; bottom:0; z-index:-10;"></div>
-            <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem;">Type a message to begin the chat.</div>
+            <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem; margin-top:4rem;">Type a message to begin the chat.</div>
             <div id="messageFeed" style="flex-grow:1; overflow-y:auto;"></div>
             <div id="statusNotifier" style="text-align: center; display: none; height: 0; position: relative; top: -0.4rem; display: flex; align-items: center; justify-content: center;"></div>
             <div id="inputWrapper" style="display:flex; padding:0.5rem; padding-left:0; padding-right:0; flex-direction:column;">
@@ -791,6 +791,7 @@
         if(thread.modelName === undefined) {
           let character;
           if(opts.characters) {// need this specifically for the db upgrade() function (i.e. not needed in import code) since modify can't be `async`, so we get all characters beforehand and pass them to this function
+            // oh and I now use this in the import code too because we need to pass in the *new* characters as well, since new threads can obviously reference them.
             character = opts.characters.find(c => c.id === thread.characterId);
           } else {
             character = await db.characters.get(thread.characterId);
@@ -6081,8 +6082,9 @@ OVERALL SUMMARY:
           for(let character of importedCharacters) {
             upgradeCharacterFromOldVersion(character);
           }
+          let allCharacters = [...existingCharacters, ...importedCharacters];
           for(let thread of importedThreads) {
-            await upgradeThreadFromOldVersion(thread);
+            await upgradeThreadFromOldVersion(thread, {characters:allCharacters});
           }
           for(let message of importedMessages) {
             upgradeMessageFromOldVersion(message);
