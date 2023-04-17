@@ -1,5 +1,5 @@
 // Import necessary modules
-require('events').EventEmitter.defaultMaxListeners = 100; // Increase the maximum number of event listeners
+require('events').EventEmitter.defaultMaxListeners = Infinity; // Increase the maximum number of event listeners to Infinity
 const path = require('path');
 const app = require('express')(); // Express web framework
 const http = require('http').Server(app); // HTTP server
@@ -89,7 +89,7 @@ for (const [character, config] of Object.entries(botConfig)) {
       namespace.emit('ai message', msg);
       const chatId = config.chat_id; // Get the chat ID from the YAML config
       logger.info(`Send message to Telegram chatId ${chatId}`);
-      bot.telegram.sendMessage(chatId, `${msg}`); // Send the message to Telegram
+      bot.telegram.sendMessage(chatId, `${msg}`, { parse_mode: 'MarkdownV2' }); // Send the message to Telegram
     });
     
     // Handle user messages from the client
