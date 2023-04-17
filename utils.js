@@ -84,8 +84,8 @@ export async function prompt2(specs, opts={}) {
           ` : ""}
         </div>
         <div style="text-align:center; margin-top:1rem; ${opts.cancelButtonText === null ? "" : `display:flex; justify-content:space-between;`}">
-          ${opts.cancelButtonText === null ? "" : `<button class="cancel" style="padding: 0.25rem;">${opts.cancelButtonText ?? "Cancel"}</button>`}
-          <button class="submit" style="padding: 0.25rem;">${opts.submitButtonText || "Submit"}</button>
+          ${opts.cancelButtonText === null ? "" : `<button class="cancel" style="padding: 0.25rem;">${opts.cancelButtonText ?? "cancel"}</button>`}
+          <button class="submit" style="padding: 0.25rem;">${opts.submitButtonText || "submit"}</button>
         </div>
       </div>
       <style>
