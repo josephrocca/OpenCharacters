@@ -2317,14 +2317,13 @@
         userModelCapabilities = (await db.misc.get("userModelCapabilities"))?.value ?? {};
         
         while(1) {
+          await delay(1000);
           if(!await db.isOpen()) {
-            await delay(1000);
             continue;
           }
           // wait for user's API key to be set
           let openAiApiKey = (await db.misc.get("openAiApiKey"))?.value;
           if(!openAiApiKey) {
-            await delay(1000);
             continue;
           }
         }
