@@ -831,7 +831,7 @@
         }
         console.log("updateModelList", availableModels);
         let currentValue = $.threadModelSelector;
-        $.threadModelSelector.innerHTML = modelsArr.map(m => `<option value="${m.name}" ${m.name === currentValue ? "selected" : ""}>${m.name}</option>`).join("");
+        $.threadModelSelector.innerHTML = modelsArr.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => `<option value="${m.name}" ${m.name === currentValue ? "selected" : ""}>${m.name}</option>`).join("");
       }
       await updateModelList();
 
