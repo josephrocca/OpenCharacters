@@ -93,7 +93,15 @@ You can also access and edit character data via `oc.character.propertyName`. Her
        * `music`
          * `url` - audio url (also supports video urls)
          * `volume` - between 0 and 1
-   * `userCharacter`
+   * `character` - thread-specific character overrides
+     * `name`
+     * `avatar`
+       * `url`
+       * `size`
+       * `shape`
+     * `reminderMessage`
+     * `roleInstruction`
+   * `userCharacter` - thread-specific user character overrides
      * `name`
      * `avatar`
        * `url`
