@@ -778,7 +778,6 @@
         if(message.wrapperStyle === undefined) message.wrapperStyle = "";
         if(message.memoryQueriesUsed === undefined) message.memoryQueriesUsed = [];
         if(message.messageIdsUsed === undefined) message.messageIdsUsed = [];
-        debugger;
         if(message.order === undefined) message.order = message.id; // <-- this is a little hacky, but it works because id is auto-incremented, and `order` values don't need to be contiguous
         // WARNING: If you add something here, you may need to edit
         // - createMessageObj
@@ -825,7 +824,6 @@
       
       async function updateModelList() {
         console.log("updateModelList");
-        // debugger;
         let modelsArr = broadlyAvailableModels.slice(0);
         let customModelConfigs = (await db.misc.get("customModelConfigs"))?.value || [];
         console.log("updateModelList", customModelConfigs);
@@ -838,7 +836,7 @@
         let currentValue = $.threadModelSelector;
         $.threadModelSelector.innerHTML = modelsArr.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => `<option value="${m.name}" ${m.name === currentValue ? "selected" : ""}>${m.name}</option>`).join("");
       }
-      await updateModelList();
+      updateModelList();
 
 
       // export data if they click export button
@@ -1184,7 +1182,7 @@
         const character = (await db.characters.where("id").equals(thread.characterId).toArray())[0];
         let userCharacter = await getUserCharacterObj(threadId);
         let systemCharacter = await getSystemCharacterObj();
-debugger;
+
         let displayedMessages = messages.slice(-numMessagesPerDisplayBatch);
 
         displayedMessages = await renderMessagesForReader({messages:displayedMessages, reader:"user", threadId});
@@ -3804,7 +3802,6 @@ OVERALL SUMMARY:
       let hljs = null;
       let initiatedHighlightJsLoad = false;
       async function highlightCodeBlocks(el) {
-        // if(el.innerHTML.includes("Your New Name")) debugger;
         if(el.querySelectorAll("pre").length === 0) return;
         if(!initiatedHighlightJsLoad) {
           initiatedHighlightJsLoad = true;
@@ -4302,7 +4299,6 @@ OVERALL SUMMARY:
         if(avatarShape === "portrait") {
           avatarHeight *= 1.5;
         }
-        // debugger;
 
         tmp.innerHTML = `
           <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-order="${sanitizeHtml(messageObj.order)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" style="${sanitizeHtml(wrapperStyle)}; position:relative;">
@@ -5398,9 +5394,6 @@ OVERALL SUMMARY:
 
           if(data.type === "dataChanged") {
             let receivedData = data.data;
-            // if(receivedData.thread.messages && new Set(receivedData.thread.messages.map(m => m.content)).size < changedData.thread.messages.length) {
-            //   debugger;
-            // }
             if(botIsCurrentlyReplyingPromise) {
               await botIsCurrentlyReplyingPromise; // otherwise we'll render the feed and thus delete the "typing indicator" placeholder or the streaming response
             }
@@ -5585,7 +5578,6 @@ OVERALL SUMMARY:
 
             let ids = outputMessageObjs.filter(m => m.id !== undefined).map(m => m.id);
             if(new Set(ids).size !== ids.length) {
-              debugger;
               throw new Error("Duplicate message ids after custom code processing. This is a bug.");
             }
 
