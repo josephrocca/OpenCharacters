@@ -446,6 +446,9 @@
                 <div style="display: flex;align-items: center;font-size:var(--button-font-size);margin-right: 0.25rem;">model:</div>
                 <select id="threadModelSelector"></select>
               </div>
+              <!-- <div id="threadSettingsButton" style="margin-left:0.5rem; cursor:pointer;   background: var(--button-bg); display:flex; height: 100%; border-radius: var(--border-radius);border: 1px solid var(--button-border-color);padding: 0.25rem;">
+                <div style="display: flex;align-items: center;justify-content:center;font-size:var(--button-font-size);min-width:1.5rem;">⚙️</div>
+              </div> -->
             </div>
             <div id="chatBackgroundCtn" style="pointer-events:none; position:absolute; top:0; left:0; right:0; bottom:0; z-index:-10;"></div>
             <div id="noMessagesNotice" style="display:none; text-align:center; padding:1rem; margin-top:4rem;">Type a message to begin the chat.</div>
@@ -661,7 +664,7 @@
 
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(48).stores({
+      db.version(49).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -775,6 +778,7 @@
         if(message.wrapperStyle === undefined) message.wrapperStyle = "";
         if(message.memoryQueriesUsed === undefined) message.memoryQueriesUsed = [];
         if(message.messageIdsUsed === undefined) message.messageIdsUsed = [];
+        debugger;
         if(message.order === undefined) message.order = message.id; // <-- this is a little hacky, but it works because id is auto-incremented, and `order` values don't need to be contiguous
         // WARNING: If you add something here, you may need to edit
         // - createMessageObj
@@ -1117,7 +1121,7 @@
       function usageStatsEntriesToCost(entries) {
         let sum = 0;
         for(let entry of entries) {
-          let costs = availableModels[entry.modelName].tokenPricing;
+          let costs = availableModels[entry.modelName]?.tokenPricing ?? {prompt:0, completion:0}; // might not be available if they added a custom model but it's now removed.
           sum += costs.prompt * entry.tokens.prompt/1000;
           sum += costs.completion * entry.tokens.completion/1000;
         }
@@ -1180,7 +1184,7 @@
         const character = (await db.characters.where("id").equals(thread.characterId).toArray())[0];
         let userCharacter = await getUserCharacterObj(threadId);
         let systemCharacter = await getSystemCharacterObj();
-
+debugger;
         let displayedMessages = messages.slice(-numMessagesPerDisplayBatch);
 
         displayedMessages = await renderMessagesForReader({messages:displayedMessages, reader:"user", threadId});
@@ -2045,6 +2049,22 @@
         }
       });
 
+      // $.threadSettingsButton.addEventListener("click", async function() {
+      //   let threadId = parseInt($.messageFeed.dataset.threadId);
+      //   let thread = await db.threads.get(threadId);
+
+      //   const result = await prompt2({
+      //     modelName: { label: "Model name:", type:"select", options:[availableModels.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => ({value:m.name, content:m.shortLabel ?? m.name}))], defaultValue: thread.modelName },
+      //     fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod },
+      //     associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Persistent, 'infinite' character memory:", infoTooltip:"This increases the cost by up to 2x and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod },
+      //     associativeMemoryEmbeddingModelName: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Memory embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory (text) into a list of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[...broadlyAvailableModels.filter(m => m.type === "text-embedding").map(m => ({value:m.name, content:m.name}))], defaultValue: defaultValues.associativeMemoryEmbeddingModelName },
+      //   }, {submitButtonText: "save", showHiddenInputsText: "show advanced options"});
+      //   if(!result) return;
+
+      //   ## todo: update that code that re-computes all embeddings if they change the embedding model- that's not needed at the character-level anymore, but we need it here at the thread-level edits.
+
+      // });
+
       async function showThread(threadId) {
 
         let thread = await db.threads.get(threadId);
@@ -2113,8 +2133,8 @@
           userCharacterName: { hidden:true, label: "User's name. This overrides the user's default username when chatting with this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.name || "" },
           userCharacterAvatarUrl: { hidden:true, label: "User's avatar. This overrides the user's default avatar when chatting to this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.avatar?.url || "" },
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
-          associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Persistent, 'infinite' character memory:", infoTooltip:"This increases the cost by up to 2x and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. Please request cross-thread memory in the Discord server if you want it.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod ?? "none" },
-          associativeMemoryEmbeddingModelName: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Memory embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory (text) into a list of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[{value:"text-embedding-ada-002", content:"text-embedding-ada-002"}], defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "text-embedding-ada-002" },
+          associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Persistent, 'infinite' character memory:", infoTooltip:"This increases the cost by up to 2x and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod ?? "none" },
+          associativeMemoryEmbeddingModelName: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Memory embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory (text) into a list of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[...broadlyAvailableModels.filter(m => m.type === "text-embedding").map(m => ({value:m.name, content:m.name}))], defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "text-embedding-ada-002" },
           // initialThreadMemories: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Initial thread-specific memories. The character will create memories based on the chat, but you can add some starter memories/lore here.", infoTooltip:"Manually-written memories can be used as 'dynamic' instruction/role/reminders that engage when relevant. This saves you from having to pack too much text into your instruction/reminder, which will 'eat up' your context, which means the AI will be able to see fewer recent messages, and summarization will have to be done more often.", type:"text", defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "" },
           temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", infoTooltip:"People seem to get good results between 0.7 and 1.2 - higher values may sacrifice some 'correctness' but should result in more 'imagination'.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.85 },
           customCode: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
@@ -2267,7 +2287,7 @@
       }
 
 
-      function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime, expectsReply, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed, scene, avatar, customData, wrapperStyle}) {
+      function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime, expectsReply, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed, scene, avatar, customData, wrapperStyle, order}) {
         if(threadId === undefined || message === undefined || characterId === undefined) throw new Error(`createMessageObj: threadId, message, and characterId are required: ${threadId}, ${message}, ${characterId}`);
         return {
           threadId,
@@ -2285,7 +2305,8 @@
           avatar: avatar ?? {},
           customData: customData ?? {},
           wrapperStyle: wrapperStyle ?? "",
-          // `order` is added during `addMessageToDb`
+          order: order ?? undefined,
+          // RE `order` being undefined - this can happen if it's just being created (but not when e.g. being called from messagesFromCustomCodeFormat)
         };
       }
 
@@ -4281,6 +4302,7 @@ OVERALL SUMMARY:
         if(avatarShape === "portrait") {
           avatarHeight *= 1.5;
         }
+        // debugger;
 
         tmp.innerHTML = `
           <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-order="${sanitizeHtml(messageObj.order)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" style="${sanitizeHtml(wrapperStyle)}; position:relative;">
