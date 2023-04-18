@@ -11,25 +11,27 @@ If you open your user settings and click the button to show advanced options, yo
 
 [Basaran](https://github.com/hyperonym/basaran) is a good option for running any Hugging Face model in a way that's compatible with the OpenAI-style API. Here are the steps:
 
-### Step 1
+### Step 1:
 [Install Docker](https://docs.docker.com/get-docker/)
 
-### Step 2
+### Step 2:
 Run this command in your terminal:
 ```bash
-docker run -p 80:80 -e MODEL=databricks/dolly-v2-3b hyperonym/basaran:0.15.3
+docker run --rm -p 80:80 -e MODEL=databricks/dolly-v2-3b hyperonym/basaran:0.15.3
 ```
 Change `databricks/dolly-v2-3b` to a model name from [this list](https://huggingface.co/models?pipeline_tag=text-generation), and you can change `0.15.3` to the latest version from [here](https://hub.docker.com/r/hyperonym/basaran/tags).
 
-### Step 3
+### Step 3:
 Add this line to that text box in your user settings:
 ```json5
 {name:"databricks/dolly-v2-3b", endpointUrl:"http://127.0.0.1/v1/completions"}
 ```
 
-Click save, and now the model selector at the top of the thread should show your new model.
+### That's it
 
-Here are all the parameters:
+The model selector at the top of the thread should show your new model.
+
+### Full parameter list
 
 * `name` - passed to the API as the `model` parameter
 * `endpointUrl` - the URL of the inference server's completion endpoint
