@@ -134,7 +134,7 @@
         mask-image: linear-gradient(to bottom, black calc(100% - 30px), #ffffff00 100%);
         padding-bottom:2rem;
       }
-      #chatThreads .thread, #chatThreadFolders .threadFolder {
+      #chatThreads .thread, #chatThreads .threadFolder {
         border-radius: var(--border-radius);
         display:flex;
         padding:0.5rem;
@@ -143,7 +143,7 @@
         position: relative;
         user-select:none;
       }
-      #chatThreads .thread:not(:first-child), #chatThreadFolders .threadFolder {
+      #chatThreads .thread:not(:first-child), #chatThreads .threadFolder {
         margin-top: 0.5rem;
       }
 
@@ -407,7 +407,7 @@
         <!-- <div id="threadFolderNavigationBar" style="display:flex; width:100%; margin-top:0.5rem;">
           <button id="threadFolderBackButton" style="cursor:pointer;min-height: 2rem;min-width: 2rem;margin-left: 0.5rem;">🔙</button>
         </div> -->
-        <div id="chatThreadFolders" data-current-folder-path=""></div>
+        <!-- <div id="chatThreadFolders" data-current-folder-path=""></div> -->
         <div id="chatThreads" data-current-folder-path=""></div>
         <div id="appOptions">
           <button id="settingsButton" class="appOptionButton">⚙️ settings</button>
@@ -924,7 +924,7 @@
           hideEl($.threadSearchCtn);
         }
 
-        let currentFolderPath = $.chatThreadFolders.dataset.currentFolderPath;
+        let currentFolderPath = $.chatThreads.dataset.currentFolderPath;
         let allFolderPaths = [...new Set(threads.map(t => t.folderPath))];
         let currentSubfolderNames = [...new Set(allFolderPaths.filter(p => p.startsWith(currentFolderPath) && p !== currentFolderPath).map(p => p.split("/").slice(currentFolderPath.split("/").length-(currentFolderPath === "" ? 1 : 0)).filter(s => s)[0]))];
 
@@ -991,7 +991,7 @@
             return `<div class="threadFolder" data-folder-path="${sanitizeHtml(currentFolderPath ? currentFolderPath+"/"+name : name)}">📁 ${sanitizeHtml(name)}</div>`;
           }).join("");
         }
-        $.chatThreadFolders.innerHTML = foldersHtml;
+        // $.chatThreadFolders.innerHTML = foldersHtml;
 
         let threadsHtml = threads.map(thread => `
           <div class="thread" data-thread-id="${sanitizeHtml(thread.id)}">
@@ -1011,7 +1011,7 @@
           </div>
         `).join("");
 
-        $.chatThreads.innerHTML = threadsHtml;
+        $.chatThreads.innerHTML = foldersHtml + threadsHtml;
 
         // if message feed is visible, set selected thread to the currently-visible chat thread
         if($.messageFeed.offsetWidth > 0 && $.messageFeed.dataset.threadId) {
@@ -1048,10 +1048,10 @@
             }
           });
         });
-        $.chatThreadFolders.querySelectorAll(".threadFolder").forEach(threadFolderEl => {
+        $.chatThreads.querySelectorAll(".threadFolder").forEach(threadFolderEl => {
           threadFolderEl.addEventListener("click", async function(e) {
             e.stopPropagation();
-            $.chatThreadFolders.dataset.currentFolderPath = threadFolderEl.dataset.folderPath;
+            $.chatThreads.dataset.currentFolderPath = threadFolderEl.dataset.folderPath;
             await renderThreadList();
           });
         });
@@ -1999,7 +1999,7 @@
       const defaultThreadName = "Unnamed Thread";
 
       async function createNewThreadWithCharacterId(characterId) {
-        let folderPath = $.chatThreadFolders.dataset.currentFolderPath;
+        let folderPath = $.chatThreads.dataset.currentFolderPath;
         const thread = await addThread({name:defaultThreadName, characterId, folderPath});
 
         let userCharacter = await getUserCharacterObj(thread.id);
@@ -2048,7 +2048,7 @@
         let thread = await db.threads.get(threadId);
         let characterObj = await db.characters.get(thread.characterId);
 
-        $.chatThreadFolders.dataset.currentFolderPath = thread.folderPath;
+        $.chatThreads.dataset.currentFolderPath = thread.folderPath;
         await renderThreadList();
 
         $.messageFeed.innerHTML = "";
@@ -2391,6 +2391,9 @@
       let modelNameToTokenizerCache = {};
       let gpt3Tokenizer;
       async function getTokenizerByModelName(modelName) {
+        if(!window.AutoTokenizer) {
+          await import("https://cdn.jsdelivr.net/npm/@xenova/transformers@1.4.2/dist/transformers.min.js");
+        }
         if(modelNameToTokenizerCache[modelName]) return modelNameToTokenizerCache[modelName];
 
         let modelObj = availableModels[modelName];
@@ -2404,7 +2407,7 @@
         if(!modelObj.modelUrl) throw new Error("Model doesn't have a modelUrl: "+modelName);
 
         let modelUrl = modelObj.modelUrl;
-        let tokenizer = await AutoTokenizer.from_pretrained(modelUrl+"/resolve/main/tokenizer.json");
+        let tokenizer = await AutoTokenizer.from_pretrained(modelUrl+"/resolve/main");
         modelNameToTokenizerCache[modelName] = tokenizer;
         return tokenizer;
       }
@@ -6286,7 +6289,7 @@ OVERALL SUMMARY:
         // otherwise click the most recently-interacted-with thread
         let allThreads = await db.threads.orderBy("lastViewTime").reverse().toArray();
         let thread = allThreads[0];
-        $.chatThreadFolders.dataset.currentFolderPath = thread.folderPath;
+        $.chatThreads.dataset.currentFolderPath = thread.folderPath;
         await renderThreadList();
         $.chatThreads.querySelector(`.thread[data-thread-id="${thread.id}"]`).click();
       }
