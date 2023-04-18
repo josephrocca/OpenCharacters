@@ -1,8 +1,3 @@
-**Note: This isn't entirely ready yet due to this issue:**
-* https://github.com/hyperonym/basaran/issues/143
-
-(it's possible to get around this with [a browser extension](https://chrome.google.com/webstore/detail/lhobafahddgcelffkeicbaginigeejlf), but it should be fixed within the next few days anyway)
-
 # Custom Models
 
 Support for external models is in beta. Please try it out and let me know about any bugs/issues.
@@ -17,9 +12,9 @@ If you open your user settings and click the button to show advanced options, yo
 ### Step 2:
 Run this command in your terminal:
 ```bash
-docker run --rm -p 80:80 -e MODEL=databricks/dolly-v2-3b hyperonym/basaran:0.15.3
+docker run --rm -p 80:80 -e MODEL=databricks/dolly-v2-3b hyperonym/basaran:0.16.0
 ```
-Change `databricks/dolly-v2-3b` to a model name from [this list](https://huggingface.co/models?pipeline_tag=text-generation), and you can change `0.15.3` to the latest version from [here](https://hub.docker.com/r/hyperonym/basaran/tags).
+You can change `databricks/dolly-v2-3b` to ~any Hugging Face language model (see [this list](https://huggingface.co/models?pipeline_tag=text-generation)), and you can change `0.16.0` to the latest version from [here](https://hub.docker.com/r/hyperonym/basaran/tags).
 
 ### Step 3:
 Add this line to that text box in your user settings:
