@@ -59,7 +59,6 @@ for (const [character, config] of Object.entries(botConfig)) {
   // Handle connections to each namespace
   namespaces.on('connection', (socket) => {
     const namespace = socket.nsp; // Get the namespace the user has connected to
-    console.log(namespace.name);
     logger.info(`A user has connected to ${namespace.name}`);
 
     // Handle changes in namespace (e.g. when a user switches to a different bot - this is used more for testing with local-chat.html)
@@ -73,26 +72,28 @@ for (const [character, config] of Object.entries(botConfig)) {
     // Listen for user messages in Telegram
     bot.on('message', async (ctx) => {
       const chatId = ctx.chat.id; // Chat Id from Telegram
+      const chatName = ctx.message.chat.title;
+      const user = ctx.message.from; // User info from Telegram
       const message = ctx.message.text; 
       await ctx.sendChatAction('typing'); // Send a typing indicator
-      logger.info(`Received user message [${namespace.name} channel]: ${message}`);
-      namespace.emit('user message', message, chatId); // Send the message to all connected clients in the namespace
+      logger.info(`Received user message from ${user.first_name} on [${namespace.name} channel]: ${message}`);
+      namespace.emit('user message', message, chatId, chatName, user.first_name); // Send the message to all connected clients in the namespace
     });
 
     // Handle AI messages from the bot
-    socket.on('ai message', (msg, chatId) => {
-      logger.info(`Received ai message [${namespace.name} channel]: ${msg} ${chatId}}`);
-      //namespace.emit('ai message', msg);
+    socket.on('ai message', (message, chatId) => {
+      logger.info(`Received ai message [${namespace.name} channel]: ${message} ${chatId}}`);
+      //namespace.emit('ai message', message);
       //const chatId = botConfig[namespace.name.substring(1)].chat_id // Get the chat ID based on the namespace
       logger.info('Send message to telegram chatId ' + chatId)
-      bot.telegram.sendMessage(chatId, `${msg}`); // Send the message to Telegram
+      bot.telegram.sendMessage(chatId, `${message}`); // Send the message to Telegram
       //}
     });
 
     // Handle user messages from the client
-    socket.on('user message', (msg) => {
-      logger.info(`Received user message [${namespace.name} channel]: ${msg}`);
-      namespace.emit('user message', msg); // Emit the message to all clients in the namespace
+    socket.on('user message', (message) => {
+      logger.info(`Received user message [${namespace.name} channel]: ${message}`);
+      namespace.emit('user message', message); // Emit the message to all clients in the namespace
     });
   });
 };
