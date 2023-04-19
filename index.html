@@ -2463,7 +2463,8 @@
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${(await db.misc.get("openAiApiKey"))?.value}`
+              "Authorization": `Bearer ${(await db.misc.get("openAiApiKey"))?.value}`,
+              "api-key": `${(await db.misc.get("openAiApiKey"))?.value}`,
             },
             body: JSON.stringify({
               input: textsToEmbed,
@@ -3445,6 +3446,7 @@ OVERALL SUMMARY:
 
         let headers = {"Content-Type": "application/json"};
         if(apiKey) headers.authorization = `Bearer ${apiKey}`;
+        if(apiKey) headers["api-key"] = apiKey; // some non-OpenAI APIs require this (e.g. Azure)
 
         if(modelType === "chat-completion") {
 
@@ -3618,6 +3620,7 @@ OVERALL SUMMARY:
 
         let headers = {"content-type": "application/json"};
         if(apiKey) headers.authorization = `Bearer ${apiKey}`;
+        if(apiKey) headers["api-key"] = apiKey; // some non-OpenAI APIs require this (e.g. Azure)
 
         if(modelType === "chat-completion") {
 
