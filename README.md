@@ -23,7 +23,7 @@
   * Give your character a voice via the browser's built-in TTS, or via an external API like ElevenLabs
   * Characters can [edit their own personality and custom code](https://tinyurl.com/4ccnn9zb) - self-improving and change over time
   * Allow your character to execute [Python](https://github.com/josephrocca/OpenCharacters/blob/main/docs/running-python-code.md) or JavaScript code.
-* Currently only supports OpenAI APIs, but can add more (like LLaMA) later.
+* Currently supports OpenAI APIs [and most Hugging Face models](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-models.md).
 * Import TavernAI `.jsonl` chat/thread files.
 * Send new feature ideas or bug reports [here](https://github.com/josephrocca/OpenCharacters/issues) or on our [Discord server](https://discord.gg/5tkWXJFqPV).
 
