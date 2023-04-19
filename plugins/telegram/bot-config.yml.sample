@@ -1,8 +1,5 @@
 ---
-char_name: # Character name from OpenCharacters
-  bot_name: sample_bot # Telegram bot name
-  chat_id: '-987654321' # ChatId - can be found by sending a message to the bot in Telegram the opening
-                        #   https://api.telegram.org/bot<BOT_TOKEN>/getUpdates
-dan: 
-  bot_name: dan_gpt_1234_bot
-  chat_id: '1234567890'
+char_name1: # Character name from OpenCharacters
+  bot_token: '0000000000:XXXXXXXYYYYYYZZZZZZZ' # Bot token given by the BotFather
+char_name2:
+  bot_token: '0000000000:XXXXXXXYYYYYYZZZZZZZ'
