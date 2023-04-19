@@ -18,6 +18,7 @@ import("https://cdn.socket.io/4.6.0/socket.io.esm.min.js").then(io => {
     let lastMessage = oc.thread.messages.at(-1);
     if(lastMessage.author !== "ai") return; // only send AI messages
 
+    console.log(lastMessage);
     console.log("ai message", lastMessage.content);
     socket.emit('ai message', lastMessage.content);
   });
