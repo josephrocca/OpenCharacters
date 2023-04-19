@@ -1,5 +1,7 @@
 ---
 char_name1: # Character name from OpenCharacters
   bot_token: '0000000000:XXXXXXXYYYYYYZZZZZZZ' # Bot token given by the BotFather
+  greeting_message: 'I am char_name1. How can help you with your queries.'
 char_name2:
   bot_token: '0000000000:XXXXXXXYYYYYYZZZZZZZ'
+  greeting_message: 'I am char_name2. How can help you with your queries.'

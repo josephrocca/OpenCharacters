@@ -71,13 +71,24 @@ for (const [character, config] of Object.entries(botConfig)) {
 
     // Listen for user messages in Telegram
     bot.on('message', async (ctx) => {
-      const chatId = ctx.chat.id; // Chat Id from Telegram
-      const chatName = ctx.message.chat.title;
-      const user = ctx.message.from; // User info from Telegram
-      const message = ctx.message.text; 
-      await ctx.sendChatAction('typing'); // Send a typing indicator
-      logger.info(`Received user message from ${user.first_name} on [${namespace.name} channel]: ${message}`);
-      namespace.emit('user message', message, chatId, chatName, user.first_name); // Send the message to all connected clients in the namespace
+      //logger.info(ctx);
+      if (ctx.message.new_chat_member) {
+        await ctx.sendChatAction('typing'); // Send a typing indicator
+        const chatId = ctx.message.chat.id;
+        const chatName = ctx.message.chat.title;
+        const newMemberName = ctx.message.new_chat_member.first_name;
+        //namespace.emit('user message', `${newMemberName}: has joined the group, please great ${newMemberName} by their first name.  Then let them know who you are and how you can help. Say something like: Hello! My name is Alva and I'm an AI assistant designed to assist you with any questions or tasks you may have. How can I be of help today ${newMemberName}? `, chatId, chatName, newMemberName);
+        bot.telegram.sendMessage(chatId, `Hi ${newMemberName}. ${config.greeting_message}`); // Send new user greeting message to Telegram chat
+      } else if (ctx.message.text) { // message handler
+        await ctx.sendChatAction('typing'); // Send a typing indicator
+        const chatId = ctx.message.chat.id;
+        const chatName = ctx.message.chat.title;
+        const newMembers = ctx.message.new_chat_members;
+        const user = ctx.message.from; // User info from Telegram
+        const message = ctx.message.text; 
+        logger.info(`Received user message from ${user.first_name} on [${namespace.name} channel]: ${message}`);
+        namespace.emit('user message', message, chatId, chatName, user.first_name); // Send the message to all connected clients in the namespace
+      }
     });
 
     // Handle AI messages from the bot
