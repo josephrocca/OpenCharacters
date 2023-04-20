@@ -1,5 +1,5 @@
 # Running OpenCharacters on your own machine
-Note that when you load up OpenCharacters via the usual URL, it *is running locally on your machine* - there is no server other than the `github.io` server that sends you the HTML/JavaScript files. Once the page has loaded, it's running completely locally on your machine, other than the requests to the OpenAI API, which are unavoidably non-local either way.
+Note that when you load up OpenCharacters via the usual URL, it *is running locally on your machine* - there is no server other than the `github.io` server that sends you the HTML/JavaScript files. Once the page has loaded, it's running completely locally on your machine, other than the requests to the OpenAI API, which are unavoidably non-local either way, unless you're using [a non-OpenAI local model](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-models.md).
 
 But if you want to also *serve* the HTML/JavaScript files from your own machine, you can use this guide. This might be handy if you want to completely opt-in to any updates to OpenCharacters, instead of receiving updates automatically when I update this code repository.
 

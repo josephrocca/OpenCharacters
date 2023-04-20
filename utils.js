@@ -84,8 +84,8 @@ export async function prompt2(specs, opts={}) {
           ` : ""}
         </div>
         <div style="text-align:center; margin-top:1rem; ${opts.cancelButtonText === null ? "" : `display:flex; justify-content:space-between;`}">
-          ${opts.cancelButtonText === null ? "" : `<button class="cancel" style="padding: 0.25rem;">${opts.cancelButtonText ?? "Cancel"}</button>`}
-          <button class="submit" style="padding: 0.25rem;">${opts.submitButtonText || "Submit"}</button>
+          ${opts.cancelButtonText === null ? "" : `<button class="cancel" style="padding: 0.25rem;">${opts.cancelButtonText ?? "cancel"}</button>`}
+          <button class="submit" style="padding: 0.25rem;">${opts.submitButtonText || "submit"}</button>
         </div>
       </div>
       <style>
@@ -384,11 +384,12 @@ export function cosineDistance(vector1, vector2) {
   return 1 - (dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2)));
 }
 
-export function createLoadingModal(initialContent) {
+export function createLoadingModal(initialContent, parentElement) {
+  if(!parentElement) parentElement = document.body;
   let loadingModalCtn = document.createElement("div");
   loadingModalCtn.innerHTML = `<style>
     .loadingModalCtn-856246272937 {
-      position: fixed;
+      position: absolute;
       top: 0;
       left: 0;
       width: 100%;
@@ -415,7 +416,7 @@ export function createLoadingModal(initialContent) {
   contentEl.innerHTML = initialContent || "";
   loadingModalCtn.appendChild(contentEl);
   loadingModalCtn.classList.add("loadingModalCtn-856246272937");
-  document.body.appendChild(loadingModalCtn);
+  parentElement.appendChild(loadingModalCtn);
   return {
     updateContent: function(content) {
       contentEl.innerHTML = content;
@@ -431,8 +432,10 @@ export function createLoadingModal(initialContent) {
 
 // this function crawls deeply through the overrides object and applies values to `obj` in the same "position" within the object - either overriding existing values, or creating new key/value pairs if they don't exist
 export function applyObjectOverrides({object, overrides}) {
-  for (let key in overrides) {
-    if (typeof overrides[key] === "object" && overrides[key] !== null) {
+  for(let key in overrides) {
+    if(Array.isArray(overrides[key])) {
+      object[key] = structuredClone(overrides[key]); // arrays are treated as "final" values - we don't go "into" them
+    } else if(typeof overrides[key] === "object" && overrides[key] !== null) {
       if (!object.hasOwnProperty(key) || typeof object[key] !== "object" || object[key] === null) {
         object[key] = {};
       }
@@ -554,11 +557,16 @@ export function addBackgroundToElement(element) {
 }
 
 
-
-
-
-
-
+export function importStylesheet(src) {
+  return new Promise(function (resolve, reject) {
+    let link = document.createElement('link');
+    link.href = src;
+    link.rel = 'stylesheet';
+    link.onload = () => resolve(link);
+    link.onerror = () => reject(new Error(`Style load error for ${src}`));
+    document.head.append(link);
+  });
+}
 
 
 
