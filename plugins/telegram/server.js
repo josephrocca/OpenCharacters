@@ -36,6 +36,13 @@ const botConfig = yaml.load(yamlString) // Parse the YAML string into an object
 
 // Set up Telegram bot with Telegraf
 const { Telegraf } = require('telegraf'); // Telegraf for Telegram bot integration
+const { encode } = require('punycode');
+
+// Escape Markdown characters so Telegram doesn't complain
+function escapeMarkdownV2(text) {
+  const ESCAPE_CHARACTERS = /[_*[\]()~>#\+\-=|{}.!]/g;
+  return text.replace(ESCAPE_CHARACTERS, '\\$&');
+}
 
 // We will create a bot for each character in the bot-config file
 for (const [character, config] of Object.entries(botConfig)) {
@@ -51,6 +58,10 @@ for (const [character, config] of Object.entries(botConfig)) {
   // Launch the Telegram bot
   bot.launch();
   logger.info(`Launched Telegram bot for ${character} with token ${botToken}`);
+
+  // Enable graceful stop
+  process.once('SIGINT', () => bot.stop('SIGINT'));
+  process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
   // Create a dynamic namespace for each character
   //const namespaces = io.of(/^\/[\w\-]+$/);
@@ -77,7 +88,6 @@ for (const [character, config] of Object.entries(botConfig)) {
         const chatId = ctx.message.chat.id;
         const chatName = ctx.message.chat.title;
         const newMemberName = ctx.message.new_chat_member.first_name;
-        //namespace.emit('user message', `${newMemberName}: has joined the group, please great ${newMemberName} by their first name.  Then let them know who you are and how you can help. Say something like: Hello! My name is Alva and I'm an AI assistant designed to assist you with any questions or tasks you may have. How can I be of help today ${newMemberName}? `, chatId, chatName, newMemberName);
         bot.telegram.sendMessage(chatId, `Hi ${newMemberName}. ${config.greeting_message}`); // Send new user greeting message to Telegram chat
       } else if (ctx.message.text) { // message handler
         await ctx.sendChatAction('typing'); // Send a typing indicator
@@ -92,13 +102,12 @@ for (const [character, config] of Object.entries(botConfig)) {
     });
 
     // Handle AI messages from the bot
-    socket.on('ai message', (message, chatId) => {
+    socket.on('ai message', async (message, chatId) => {
       logger.info(`Received ai message [${namespace.name} channel]: ${message} ${chatId}}`);
-      //namespace.emit('ai message', message);
-      //const chatId = botConfig[namespace.name.substring(1)].chat_id // Get the chat ID based on the namespace
+      //namespace.emit('ai message', message); // For testing with local-chat.html
       logger.info('Send message to telegram chatId ' + chatId)
-      bot.telegram.sendMessage(chatId, `${message}`); // Send the message to Telegram
-      //}
+      const escapedMessage = escapeMarkdownV2(message);
+      bot.telegram.sendMessage(chatId, {text: escapedMessage, parse_mode: 'MarkdownV2'});
     });
 
     // Handle user messages from the client
