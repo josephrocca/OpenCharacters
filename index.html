@@ -1338,22 +1338,18 @@
         const thread = (await db.threads.where("id").equals(threadId).toArray())[0];
         const character = (await db.characters.where("id").equals(thread.characterId).toArray())[0];
 
-        for(let message of displayedMessages) {
-          if(message.characterId === -1) {
-            message.character = await getUserCharacterObj(threadId);
-          } else if(message.characterId === -2) {
-            message.character = await getSystemCharacterObj();
-          } else {
-            message.character = character;
-          }
-        }
+        let characterIdToCharacterObj = {
+          "-1": await getUserCharacterObj(threadId),
+          "-2": await getSystemCharacterObj(),
+          [character.id]: character,
+        };
 
         // get top element in feed
         let topEl = $.messageFeed.querySelector(".message");
         // get scroll distance from top element
         let scrollDistanceFromTopEl = topEl.getBoundingClientRect().top - $.messageFeed.getBoundingClientRect().top;
 
-        let messageEls = await Promise.all(displayedMessages.map(m => createMessageElement(m)));
+        let messageEls = await Promise.all(displayedMessages.map(m => createMessageElement(m, {character:characterIdToCharacterObj[m.characterId]})));
         messageEls.reverse();
         for(let el of messageEls) {
           $.messageFeed.prepend(el);
@@ -4300,7 +4296,11 @@ OVERALL SUMMARY:
 
         let thread = await db.threads.get(messageObj.threadId);
 
-        let character = opts.character || await db.characters.get(messageObj.characterId);
+        let character = opts.character;
+
+        if(!character && messageObj.characterId === -1) character = await getUserCharacterObj(messageObj.threadId)
+        if(!character && messageObj.characterId === -2) character = await getSystemCharacterObj();
+        if(!character && messageObj.characterId >= 0) character = await db.characters.get(messageObj.characterId);
 
         let tmp = document.createElement("div");
         let currentVariantNumber = messageObj.variants.findIndex(v => v === null) + 1;
