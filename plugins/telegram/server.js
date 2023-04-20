@@ -96,7 +96,6 @@ for (const [character, config] of Object.entries(botConfig)) {
     socket.on('ai message', async (message, chatId) => {
       try {
         logger.info(`Received ai message [${namespace.name} channel]: ${message} ${chatId}}`);
-        logger.info('Send message to telegram chatId ' + chatId)
         const escapedMessage = escapeMarkdownV2(message);
         bot.telegram.sendMessage(chatId, {text: escapedMessage, parse_mode: 'MarkdownV2'});
       } catch (error) {
