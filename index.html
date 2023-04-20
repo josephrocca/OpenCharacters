@@ -757,6 +757,7 @@
           delete character.systemMessage;
         }
         if(character.folderPath === undefined) character.folderPath = "";
+        // if(character.publicId === undefined) character.publicId = "";
         // WARNING: If you add something here, you'll likely have to edit:
         //  - characterDetailsPrompt (characterDetailsPrompt should return a valid character object - addCharacter only adds creationTime and lastMessageTime, so characterDetailsPrompt should fill in everything else, even if it's not visible in the editor)
         //  - getUserCharacterObj
@@ -1123,6 +1124,7 @@
           sum += costs.prompt * entry.tokens.prompt/1000;
           sum += costs.completion * entry.tokens.completion/1000;
         }
+        if(isNaN(sum)) debugger;
         return sum;
       }
 
@@ -1187,19 +1189,25 @@
 
         displayedMessages = await renderMessagesForReader({messages:displayedMessages, reader:"user", threadId});
 
-        for(let message of displayedMessages) {
-          if(message.characterId === -1) {
-            message.character = userCharacter;
-          } else if(message.characterId === -2) {
-            message.character = systemCharacter;
-          } else {
-            message.character = character;
-          }
-        }
+        let characterIdToCharacterObj = {
+          "-1": userCharacter,
+          "-2": systemCharacter,
+          [character.id]: character,
+        };
+
+        // for(let message of displayedMessages) {
+        //   if(message.characterId === -1) {
+        //     message.character = userCharacter;
+        //   } else if(message.characterId === -2) {
+        //     message.character = systemCharacter;
+        //   } else {
+        //     message.character = character;
+        //   }
+        // }
 
         $.messageFeed.dataset.characterId = character.id;
         $.messageFeed.innerHTML = "";
-        let messageEls = await Promise.all(displayedMessages.map(m => createMessageElement(m)));
+        let messageEls = await Promise.all(displayedMessages.map(m => createMessageElement(m, {character:characterIdToCharacterObj[m.characterId]})));
         for(let el of messageEls) {
           $.messageFeed.appendChild(el);
         }
@@ -2006,10 +2014,14 @@
         let folderPath = $.chatThreads.dataset.currentFolderPath;
         const thread = await addThread({name:defaultThreadName, characterId, folderPath});
 
+        const character = await db.characters.get(characterId);
         let userCharacter = await getUserCharacterObj(thread.id);
 
+        let userName = thread.userCharacter.name ?? userCharacter.name;
+        let characterName = thread.character.name ?? character.name;
+        let systemName = "System";
+
         // add initial messages
-        const character = await db.characters.get(characterId);
         for(let m of character.initialMessages) {
           let characterId;
           if(m.author === "user") characterId = -1;
@@ -2023,8 +2035,8 @@
 
           if(m.hiddenFrom) data.hiddenFrom = m.hiddenFrom;
           
-          data.message = data.message.replaceAll("{{user}}", userCharacter.name);
-          data.message = data.message.replaceAll("{{char}}", character.name);
+          data.message = data.message.replaceAll("{{user}}", userName);
+          data.message = data.message.replaceAll("{{char}}", characterName);
 
           let messageObj = createMessageObj(data);
           await addMessageToDb(messageObj)
@@ -2285,7 +2297,7 @@
       }
 
 
-      function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime, expectsReply, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed, scene, avatar, customData, wrapperStyle, order}) {
+      function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime, expectsReply, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed, scene, avatar, name, customData, wrapperStyle, order}) {
         if(threadId === undefined || message === undefined || characterId === undefined) throw new Error(`createMessageObj: threadId, message, and characterId are required: ${threadId}, ${message}, ${characterId}`);
         return {
           threadId,
@@ -2299,6 +2311,7 @@
           summaryHashUsed: summaryHashUsed ?? null,
           memoryQueriesUsed: memoryQueriesUsed ?? [],
           messageIdsUsed: messageIdsUsed ?? [],
+          name: name ?? null,
           scene: scene ?? null,
           avatar: avatar ?? {},
           customData: customData ?? {},
@@ -2578,7 +2591,8 @@
         if(upToMessageId === undefined) upToMessageId = originalMessages.at(-1).id;
         originalMessages = originalMessages.slice(0, originalMessages.findIndex(m => m.id === upToMessageId)+1);
 
-        let remainingMessages = await prepareMessagesForBot({messages:originalMessages, aiCharacter, userCharacter, onProgressMessage});
+        let originalMessagesPreparedForBot = await prepareMessagesForBot({messages:originalMessages, aiCharacter, userCharacter, onProgressMessage});
+        let remainingMessages = originalMessagesPreparedForBot.slice(0);
 
         const tokenLimitForSummaryAndMessages = await getTokenLimitForSummaryAndMessages(aiCharacter, thread);
 
@@ -2809,7 +2823,6 @@ OVERALL SUMMARY:
             addToSummaryLog(`<b>compressed summary:</b> ${summary}`);
           }
           
-          // add button to latest message to allow them to edit summary
           summaryObj = await db.summaries.get(hash);
 
           // get size difference between summary and original messages
@@ -2824,6 +2837,20 @@ OVERALL SUMMARY:
           prevInstructionHash = hash;
           i++;
         }
+
+        // it's possible that there are no remainingMessages due to the summarization happening to consume them all in the final batch.
+        // in this case we add some messages back until we reach the token limit.
+        // it means that there will be overlap between the summary and the messages, but that's fine.
+        if(remainingMessages.length === 0) {
+          let messagesToMaybeAdd = originalMessagesPreparedForBot.slice(0);
+          while(1) {
+            let currentTokenCount = await countTokens(prevSummary||"", modelName) + await countTokensInMessages(remainingMessages, modelName);
+            if(currentTokenCount >= tokenLimitForSummaryAndMessages) break;
+            if(remainingMessages.length > 3) break;
+            remainingMessages.unshift(messagesToMaybeAdd.pop());
+          }
+        }
+
         // NOTE: prevSummary can be undefined - i.e. no summaries were needed to get messages under the tokenLimitForSummaryAndMessages limit
         return {summary:prevSummary, instructionHash:prevInstructionHash, remainingMessages}; // remainingMessages = unsummarized messages (the ones that follow the summary)
       }
@@ -2840,6 +2867,8 @@ OVERALL SUMMARY:
         if(messages.length === 0) return [];
 
         let threadId = messages[0].threadId;
+
+        let thread = await db.threads.get(threadId);
 
         for(let m of messages) {
           m.message = m.message.replace(/<!--hidden-from-ai-start-->.+?<!--hidden-from-ai-end-->/gs, "");
@@ -2860,9 +2889,9 @@ OVERALL SUMMARY:
           else if(m.characterId === -2) role = "system";
 
           let name;
-          if(m.characterId === userCharacter.id) name = userCharacter.name;
-          else if(m.characterId === aiCharacter.id) name = aiCharacter.name;
-          else if(m.characterId === -2) name = systemName;
+          if(m.characterId === userCharacter.id) name = m.name ?? thread.userCharacter.name ?? userCharacter.name;
+          else if(m.characterId === aiCharacter.id) name = m.name ?? thread.character.name ?? aiCharacter.name;
+          else if(m.characterId === -2) name = m.name ?? systemName;
           name = name.replaceAll(" ", "_");
           name = name.replace(/[^A-Za-z0-9_\-]/g, ""); // <-- we need to replace invalid characters here since the name could have been set with custom code, and in that case it wouldn't have been validated as happens when name is set in the character editor UI
 
@@ -2902,7 +2931,7 @@ OVERALL SUMMARY:
           return messages;
         }`;
 
-        let functionArg = {messages:messagesToCustomCodeFormat({messages, aiCharacter, userCharacter})};
+        let functionArg = {messages:await messagesToCustomCodeFormat({messages, aiCharacter, userCharacter})};
         let renderedMessagesInCustomCodeFormat = await sendCustomCodeIframeMessage(threadId, {type:"function", functionText, functionArg});
 
         let renderedMessages = messagesFromCustomCodeFormat({messages:renderedMessagesInCustomCodeFormat, originalMessages:messages, aiCharacter, threadId});
@@ -2914,13 +2943,17 @@ OVERALL SUMMARY:
         return renderedMessages;
       }
 
-      function messagesToCustomCodeFormat({messages, aiCharacter, userCharacter}) {
+      async function messagesToCustomCodeFormat({messages, aiCharacter, userCharacter, thread}) {
+        if(messages.length === 0) return [];
+        if(!thread) {
+          thread = await db.threads.get(messages[0].threadId);
+        }
         messages = JSON.parse(JSON.stringify(messages));
         messages = messages.map((m, i) => {
           let author, name;
-          if(m.characterId == aiCharacter.id) { author = "ai"; name = aiCharacter.name; }
-          if(m.characterId == -1) { author = "user"; name = userCharacter.name; }
-          if(m.characterId == -2) { author = "system"; name = "System"; }
+          if(m.characterId == aiCharacter.id) { author = "ai"; name = m.name ?? thread.character.name ?? aiCharacter.name; }
+          if(m.characterId == -1) { author = "user"; name = m.name ?? thread.userCharacter.name ?? userCharacter.name; }
+          if(m.characterId == -2) { author = "system"; name = m.name ?? "System"; }
           let hiddenFrom = m.hiddenFrom || [];
           // note: we need to pass `id` to custom code because it's used in stuff like renderMessagesForReader - we could map the ids to "public" ones, but it's probably not necessary
           return {id:m.id, author, content:m.message, hiddenFrom, expectsReply:m.expectsReply, name, scene:m.scene, avatar:m.avatar, customData:m.customData, wrapperStyle:m.wrapperStyle};
@@ -3026,14 +3059,22 @@ OVERALL SUMMARY:
           roleInstruction = thread.character.roleInstruction;
         }
 
-        let tokenLimit = availableModels[thread.modelName].maxSequenceLength;
+        let maxTokenLimit = availableModels[thread.modelName].maxSequenceLength;
+        let tokenLimit = maxTokenLimit;
         // TODO: let user set aiCharacter.tokenLimit (via oc.character.tokenLimit) here to override this if it's smaller than the model's max token limit
-        tokenLimit -= Math.round(tokenLimit*0.10); // buffer due to token count being an estimate
+        
+        // buffer due to token count being an estimate
+        if(thread.modelName === "gpt-4") {
+          tokenLimit -= Math.round(maxTokenLimit*0.10);
+        } else {
+          tokenLimit -= Math.round(maxTokenLimit*0.05); // for non-gpt-4 models we have the proper tokenizer
+        }
+
         tokenLimit -= await countTokens(roleInstruction, thread.modelName); // allow for system message tokens
         tokenLimit -= await countTokens( "("+(reminderMessage||"")+")" , thread.modelName); // allow for reminder message tokens
-        tokenLimit -= Math.round(tokenLimit*0.15); // allow for bot response
+        tokenLimit -= Math.round(maxTokenLimit*0.15); // allow for bot response
         if(character.associativeMemoryMethod !== "none") {
-          tokenLimit -= Math.round(tokenLimit*retrievedMemoriesTokenLimitFraction); // allow for retrieved memories
+          tokenLimit -= Math.round(maxTokenLimit*retrievedMemoriesTokenLimitFraction); // allow for retrieved memories
         }
         return tokenLimit;
       }
@@ -3116,6 +3157,10 @@ OVERALL SUMMARY:
           system: "system",
         };
 
+        let userName = thread.userCharacter.name ?? userCharacter.name;
+        let characterName = thread.character.name ?? aiCharacter.name;
+        let systemName = "System";
+
         let roleInstruction = aiCharacter.roleInstruction?.trim();
         if(thread.character.roleInstruction?.trim()) roleInstruction = thread.character.roleInstruction?.trim();
 
@@ -3123,16 +3168,16 @@ OVERALL SUMMARY:
           let messages = parseMessagesFromTextFormat(roleInstruction);
           if(messages === null) {
             let content = roleInstruction;
-            content = content.replaceAll("{{user}}", userCharacter.name);
-            content = content.replaceAll("{{char}}", aiCharacter.name);
+            content = content.replaceAll("{{user}}", userName);
+            content = content.replaceAll("{{char}}", characterName);
             messagesArr.unshift({role:"system", content});
           } else {
             let messagesToAdd = [];
             for(let message of messages) {
               if(message.hiddenFrom?.includes("ai")) continue; // doesn't really make sense to hide from ai in reminder message - this is just to be consistent
               let content = message.content;
-              content = content.replaceAll("{{user}}", userCharacter.name);
-              content = content.replaceAll("{{char}}", aiCharacter.name);
+              content = content.replaceAll("{{user}}", userName);
+              content = content.replaceAll("{{char}}", characterName);
               messagesToAdd.push({role:authorToRoleMap[message.author], content});
               // can't just unshift on to messagesArr here because messages would be in wrong order
             }
@@ -3147,15 +3192,15 @@ OVERALL SUMMARY:
           let messages = parseMessagesFromTextFormat(reminderMessage);
           if(messages === null) {
             let content = reminderMessage;
-            content = content.replaceAll("{{user}}", userCharacter.name);
-            content = content.replaceAll("{{char}}", aiCharacter.name);
+            content = content.replaceAll("{{user}}", userName);
+            content = content.replaceAll("{{char}}", characterName);
             messagesArr.push({role:"system", content, _isReminder:true});
           } else {
             for(let message of messages) {
               if(message.hiddenFrom?.includes("ai")) continue; // doesn't really make sense to hide from ai in reminder message - this is just to be consistent
               let content = message.content;
-              content = content.replaceAll("{{user}}", userCharacter.name);
-              content = content.replaceAll("{{char}}", aiCharacter.name);
+              content = content.replaceAll("{{user}}", userName);
+              content = content.replaceAll("{{char}}", characterName);
               messagesArr.push({role:authorToRoleMap[message.author], content, _isReminder:true});
             }
           }          
@@ -3184,7 +3229,7 @@ OVERALL SUMMARY:
           // NOTE: I replace newlines in messages with spaces because I *think* the AI was getting confused about the structure of the messages
           const messagesToTextFormat = (messages) => messages.filter(m => !m._isReminder).slice(-10).map(m => `[[${m.name || "System"}]]: ${m.content.replace(/\n/g, " ")}`).join("\n\n");
           
-          let mostRecentMessage = messagesArr.filter(m => m.role === "user").at(-1);
+          let mostRecentMessage = messagesArr.filter(m => m.role === "user" && !m._isReminder).at(-1);
           if(!mostRecentMessage) mostRecentMessage = messagesArr.at(-1);
 
           let searchQueries = [];
@@ -3305,7 +3350,7 @@ OVERALL SUMMARY:
 
           console.log("memoryBatches:", memoryBatches.slice(0));
           if(memoryBatches.length > 0) {
-            const createMemoriesMessageContent = () => `Some potentially helpful things/facts/happenings to take note of:\n\nA memory or a piece of world lore:\n${memoryBatches.map(b => b.memories.map(m => "* "+m.text).join("\n")).join("\n\nAnother memory or a piece of world lore:\n")}`;
+            const createMemoriesMessageContent = () => `Some potentially helpful things/facts/happenings to take note of:\n\nA memory or a piece of world lore:\n${memoryBatches.map(b => b.memories.map(m => m.text).join(" → ")).join("\n\nAnother memory or a piece of world lore:\n")}`;
             // drop worst batches until we're under token limit allocated to memories:
             while(await countTokens(createMemoriesMessageContent(), modelName) > retrievedMemoriesTokenLimitFraction * availableModels[modelName].maxSequenceLength) {
               memoryBatches.pop();
@@ -3494,8 +3539,9 @@ OVERALL SUMMARY:
           }
 
         } else {
-          let promptIntro = `You are ${aiCharacter.name}. You're talking to '${userCharacter.name}'. Some messages are "System" messages which do not originate from either party.\n\n` + messagesArr[0].content + "\n\nThe chat begins now:\n\n\n\n";
-          let prompt = promptIntro + messagesArr.slice(1).map(m => (m.role=="user"?`[${userCharacter.name}]: `:m.role=="system"?"[SYSTEM]: ":`[${aiCharacter.name}]: `)+m.content).join("\n\n") + `\n\n[${aiCharacter.name}]:`;
+
+          let promptIntro = `You are ${characterName}. You're talking to '${userName}'. Some messages are "System" messages which do not originate from either party.\n\n` + messagesArr[0].content + "\n\nThe chat begins now:\n\n\n\n";
+          let prompt = promptIntro + messagesArr.slice(1).map(m => (m.role=="user"?`[${m.name ?? userName}]: `:m.role=="system"?`[SYSTEM]: `:`[${m.name ?? characterName}]: `)+m.content).join("\n\n") + `\n\n[${characterName}]:`;
           
           // davinci *requires* max_tokens else it defaults to 16 (unlike turbo which defaults to infinity)
           let max_tokens = Math.round((availableModels[modelName].maxSequenceLength - await countTokens(prompt, modelName)) * 0.85); // *0.85 because countTokens is an estimate
@@ -3505,7 +3551,7 @@ OVERALL SUMMARY:
             prompt,
             // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted roleInstruction and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
             temperature: aiCharacter.temperature ?? 0.7,
-            stop: [`\n[${userCharacter.name}]:`, `\n[SYSTEM]:`],
+            stop: [`\n[${userName}]:`, `\n[SYSTEM]:`],
             max_tokens,  // see note above
           };
           if(aiCharacter.topP) data.top_p = aiCharacter.topP;
@@ -3945,9 +3991,8 @@ OVERALL SUMMARY:
 
           const character = await db.characters.get(characterId);
           let messageObj = createMessageObj({threadId, message:"...", characterId});
-          messageObj.character = character;
           
-          let messageEl = await addMessageToFeed(messageObj, {skipReaderRendering:true});
+          let messageEl = await addMessageToFeed(messageObj, {character, skipReaderRendering:true});
           messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
           messageEl.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
 
@@ -3987,7 +4032,7 @@ OVERALL SUMMARY:
             messageObj.id = await addMessageToDb(messageObj);
 
             let shouldScrollDown = messageFeedIsNearBottom();
-            await addMessageToFeed(messageObj, {inPlaceOf:messageEl})
+            await addMessageToFeed(messageObj, {character, inPlaceOf:messageEl})
             if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
             
             messageEl.dataset.canDelete = "true";
@@ -4085,12 +4130,13 @@ OVERALL SUMMARY:
         }
         
         let userCharacter = await getUserCharacterObj(threadId);
-        if(!messageObj.character) {
-          if(messageObj.characterId === -1) messageObj.character = userCharacter;
-          else if(messageObj.characterId === -2) messageObj.character = await getSystemCharacterObj();
-          else messageObj.character = await db.characters.get(messageObj.characterId);
+        let character = opts.character;
+        if(!character) {
+          if(messageObj.characterId === -1) character = userCharacter;
+          else if(messageObj.characterId === -2) character = await getSystemCharacterObj();
+          else character = await db.characters.get(messageObj.characterId);
         }
-        let el = await createMessageElement(messageObj);
+        let el = await createMessageElement(messageObj, {character});
         
         if(opts.inPlaceOf) {
           opts.inPlaceOf.replaceWith(el);
@@ -4240,15 +4286,13 @@ OVERALL SUMMARY:
         messageEl.classList.remove("hiddenFromUser");
       }
 
-      async function createMessageElement(messageObj) {
+      async function createMessageElement(messageObj, opts={}) {
+
+        if(messageObj.character) debugger;
 
         let thread = await db.threads.get(messageObj.threadId);
 
-        // sometimes the message comes "hydrated" with a character for performance reasons (i.e. get characters from db *once*, add reference to all messages)
-        // but we don'te require it because that's just a performance optimisation, so we grab it here if needed:
-        if(!messageObj.character) {
-          messageObj.character = await db.characters.get(messageObj.characterId);
-        }
+        let character = opts.character || await db.characters.get(messageObj.characterId);
 
         let tmp = document.createElement("div");
         let currentVariantNumber = messageObj.variants.findIndex(v => v === null) + 1;
@@ -4266,22 +4310,22 @@ OVERALL SUMMARY:
           variantCtnCss = "display:none; position:fixed; padding: 0.125rem;";
         }
 
-        let avatarUrl = messageObj.character.avatar.url;
+        let avatarUrl = character.avatar.url;
         if(thread.character.avatar.url) avatarUrl = thread.character.avatar.url;
         if(messageObj.avatar?.url) avatarUrl = messageObj.avatar.url;
 
-        let avatarShape = messageObj.character.avatar.shape;
+        let avatarShape = character.avatar.shape;
         if(thread.character.avatar.shape) avatarShape = thread.character.avatar.shape;
         if(messageObj.avatar?.shape) avatarShape = messageObj.avatar.shape;
 
-        let avatarSize = messageObj.character.avatar.size;
+        let avatarSize = character.avatar.size;
         if(thread.character.avatar.size) avatarSize = thread.character.avatar.size;
         if(messageObj.avatar?.size !== undefined) avatarSize = messageObj.avatar.size;
 
         let wrapperStyle = messageObj.wrapperStyle ?? "";
 
         // fall back to ai character's settings where appropriate:
-        if(messageObj.character.id < 0) {
+        if(character.id < 0) {
           let thread = await db.threads.get(messageObj.threadId);
           let aiCharacter = await db.characters.get(thread.characterId);
 
@@ -4303,6 +4347,11 @@ OVERALL SUMMARY:
           avatarHeight *= 1.5;
         }
 
+        let characterName;
+        if(messageObj.characterId === -1) characterName = messageObj.name ?? thread.userCharacter.name ?? character.name;
+        if(messageObj.characterId === -2) characterName = messageObj.name ?? "System";
+        if(messageObj.characterId >= 0) characterName = messageObj.name ?? thread.character.name ?? character.name;
+
         tmp.innerHTML = `
           <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-order="${sanitizeHtml(messageObj.order)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" style="${sanitizeHtml(wrapperStyle)}; position:relative;">
             <div style="text-align:center;"><button class="showHiddenMessageButton" style="cursor:pointer; font-size:0.65rem;">Show hidden message</button></div>
@@ -4313,11 +4362,11 @@ OVERALL SUMMARY:
               <div class="avatar" style="${avatarUrl ? `background-image:url(${sanitizeHtml(avatarUrl)})` : ""};width:${sanitizeHtml(avatarWidth)}px; min-width:${sanitizeHtml(avatarWidth)}px; height:${sanitizeHtml(avatarHeight)}px; border-radius:${sanitizeHtml(avatarBorderRadius)};"></div>
               <div style="padding-left:0.5rem; min-width: 0; width:100%;">
                 <div class="info" style="flex-grow:1; display:flex; font-size:80%;">
-                  <div class="characterName" style="font-weight:bold;">${sanitizeHtml(messageObj.character.name)}</div>
+                  <div class="characterName" style="font-weight:bold;">${sanitizeHtml(characterName)}</div>
                   <div class="time" style="font-size:0.8rem; opacity:0.5; margin-left:0.5rem; display: flex; align-items: center;">${getDateTimeString(messageObj.creationTime)}</div>
                   <div class="editButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
                   <div class="deleteButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
-                  <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: ${messageObj.character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
+                  <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: ${character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
                   <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); ${sanitizeHtml(variantCtnCss)}">
                     <span class="prevMessageVariantButton emojiButton">◄</span>
                     <span class="currentVariantNumber">${sanitizeHtml(currentVariantNumber)}<span style="opacity:0.5">/${sanitizeHtml(messageObj.variants.length)}</span></span>
@@ -4452,12 +4501,6 @@ OVERALL SUMMARY:
             } else {
               message = message.replace(/^\/ai /, "");
               await doBotReplyIfNeeded({forceReply:true, replyInstruction:message});
-              // const characterId = parseInt($.messageFeed.dataset.characterId);
-              // const character = await db.characters.get(characterId);
-              // let messageObj = createMessageObj({threadId, message, characterId});
-              // messageObj.character = character;
-              // messageObj.id = await addMessageToDb(messageObj);
-              // let el = await addMessageToFeed(messageObj);
             }
 
           } else if(message.trim().startsWith("/user")) {
@@ -4661,10 +4704,11 @@ OVERALL SUMMARY:
             let id = await addMessageToDb(messageObj);
             messageObj.id = id;
             
-            if(messageObj.characterId === -1) messageObj.character = await getUserCharacterObj(threadId);
-            if(messageObj.characterId === -2) messageObj.character = await getSystemCharacterObj();
+            let character;
+            if(messageObj.characterId === -1) character = await getUserCharacterObj(threadId);
+            if(messageObj.characterId === -2) character = await getSystemCharacterObj();
 
-            await addMessageToFeed(messageObj);
+            await addMessageToFeed(messageObj, {character});
             
             $.messageInput.value = "";
             $.messageInput.style.height = "";
@@ -5438,7 +5482,7 @@ OVERALL SUMMARY:
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
         messages.sort((a,b) => a.order - b.order);
         // console.log("@@@@@@@@@@@ getDataForCustomCode: messages before formatting for custom code: ", messages);
-        let formattedMessages = messagesToCustomCodeFormat({messages, aiCharacter:threadCharacter, userCharacter});
+        let formattedMessages = await messagesToCustomCodeFormat({messages, aiCharacter:threadCharacter, userCharacter});
         let data = {
           thread: {
             messages: formattedMessages,
@@ -5635,9 +5679,9 @@ OVERALL SUMMARY:
         let threadId = parseInt($.messageFeed.dataset.threadId);
 
         let messageObj = createMessageObj({threadId, message:"...", characterId:-1});
-        messageObj.character = await getUserCharacterObj(threadId); // <-- this is the 'user character', not the characterToReplyWith because the character is "typing the reply", but it's as if the user wrote it. Might change this later when I allow multiple characters per thread.
+        let character = await getUserCharacterObj(threadId); // <-- this is the 'user character', not the characterToReplyWith because the character is "typing the reply", but it's as if the user wrote it. Might change this later when I allow multiple characters per thread.
         
-        let messageEl = await addMessageToFeed(messageObj, {skipReaderRendering:true});
+        let messageEl = await addMessageToFeed(messageObj, {character, skipReaderRendering:true});
         messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
         
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
@@ -5671,7 +5715,7 @@ OVERALL SUMMARY:
           messageObj.id = await addMessageToDb(messageObj);
 
           let shouldScrollDown = messageFeedIsNearBottom();
-          await addMessageToFeed(messageObj, {inPlaceOf:messageEl});
+          await addMessageToFeed(messageObj, {character, inPlaceOf:messageEl});
           if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
           await triggerMessageAddedCustomCodeEvent(threadId);
@@ -5909,10 +5953,14 @@ OVERALL SUMMARY:
         await db.misc.put({key: "userAvatarUrl", value: userAvatarUrl});
         await db.misc.put({key: "openAiApiKey", value: openAiApiKey});
         await db.misc.put({key: "customModelConfigs", value: customModelConfigs});
-        // update the user's name and avatar in the message feed:
-        let threadId = parseInt($.messageFeed.dataset.threadId);
-        await renderMessageFeed(threadId);
+        
         await updateModelList();
+
+        // update the user's name and avatar in the message feed:
+        if($.messageFeed.offsetHeight > 0) {
+          let threadId = parseInt($.messageFeed.dataset.threadId);
+          await renderMessageFeed(threadId);
+        }
       });
 
       async function getCharacterHash(characterObj) {
