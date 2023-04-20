@@ -2502,10 +2502,10 @@
 
         let modelTokenLimit = availableModels[modelName].maxSequenceLength;
 
-        let i = 0;
+        let compressionStep = 0;
         let textArr = [currentText]; // just for debugging
         while(await countTokens(currentText, modelName) > tokenLimit) {
-          if(onProgressMessage) onProgressMessage({message:`compressing text (${i})`});
+          if(onProgressMessage) onProgressMessage({message:`compressing text (${compressionStep})`});
 
           // split text into chunks no longer than modelTokenLimit/2, with some overlap between chunks
           let textChunks = [];
@@ -2535,11 +2535,19 @@
             let messages = [{role: "system", content: "You are a helpful writing assistant. You respond with exactly the text that the user requests - nothing more, nothing less."}];
             let resultText;
             if(chunkI === 0) {
-              messages.push({role: "user", content: `Please respond with the following text, almost verbatim, but slightly shorter:\n\n------\n\n${chunk}${textChunks.length > 1 ? "..." : ""}\n\n------\n\nYour response should start with "NEW TEXT:" and should repeat the above text verbatim, but **SLIGHTLY** shorter. Don't cut out ANY details at all.`});
+              if(compressionStep < 2) { 
+                messages.push({role: "user", content: `Please respond with the following text, almost verbatim, but slightly shorter:\n\n------\n\n${chunk}${textChunks.length > 1 ? "..." : ""}\n\n------\n\nYour response should start with "NEW TEXT:" and should repeat the above text verbatim, but **SLIGHTLY** shorter. Don't cut out ANY details at all.`});
+              } else {
+                messages.push({role: "user", content: `Please respond with a summary of the following text:\n\n------\n\n${chunk}${textChunks.length > 1 ? "..." : ""}\n\n------\n\nYour response should start with "NEW TEXT:" and should be a bit shorter. Make sure to include ALL important details in the summary. The summary MUST NOT be short. It must be a LONG, HIGHLY-DETAILED summary.`});
+              }
               resultText = await getChatCompletion({messages, modelName, temperature:0.7, threadId});
               resultText = resultText.trim().replace(/^NEW TEXT: ?/, "").trim();
             } else {
-              messages.push({role: "user", content: `I'm rewriting a document to make it slightly shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding the "NEXT PART" section to the end of it. Add every single sentence/paragraph/etc. from "NEXT PART" to the "SO FAR" text, almost verbatim, except with slighly shorter (e.g. drop superfluous words to shorten sentences). Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR: ${newText.slice(0, 70)}..." and add the "NEXT PART" text to the end of it, almost verbatim, but with each individual sentence reworded to be more concise.`});
+              if(compressionStep < 2) { 
+                messages.push({role: "user", content: `I'm rewriting a document to make it slightly shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding the "NEXT PART" section to the end of it. Add every single sentence/paragraph/etc. from "NEXT PART" to the "SO FAR" text, almost verbatim, except with slighly shorter (e.g. drop superfluous words to shorten sentences). Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR: ${newText.slice(0, 70)}..." and add the "NEXT PART" text to the end of it, almost verbatim, but with each individual sentence reworded to be more concise.`});
+              } else {
+                messages.push({role: "user", content: `I'm rewriting a document to make it a bit shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding a summarized version of the "NEXT PART" section to the end of it. Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR:" and add a summarized version of the "NEXT PART" text to the end of it. Make sure to include ALL important details in the new "SO FAR:" section.`});
+              }
               resultText = await getChatCompletion({messages, modelName, temperature:0.7, threadId});
               resultText = resultText.trim().replace(/^SO FAR: ?/, "").trim();
             }
@@ -2556,8 +2564,8 @@
             textArr.push(text);
             console.log(`compressed text (${await countTokens(currentText, modelName)} tokens): ${currentText}`);
           }
-          i++;
-          if(i >= 10 && i%10 === 0) {
+          compressionStep++;
+          if(compressionStep >= 10 && compressionStep%10 === 0) {
             await prompt2({
               display:{html:`<div style="white-space:pre-wrap;">For some reason the summarizer is struggling to summarize your text. If you close this message it will continue trying to compress the summary, but be aware that it may use a lot of API credits if it's caught in a loop. Refresh the page if you'd like to stop, or click close to continue. This could be a bug in OpenCharacters, so please report it on Github or Discord if this happens regularly. It should happen very rarely if at all. You can manually edit the summary by typing <b>/sum</b> in the chat. Here's the sequence of compression steps it has taken so far:\n\n${textArr.map((t, i) => `<b>Summary ${i}:</b>\n${t}`).join("\n\n")}</div>`, type:"none"},
             }, { submitButtonText: "close", cancelButtonText: null });
@@ -2715,7 +2723,7 @@ OVERALL SUMMARY:
             if(i > 0) { // if i>0, then we have prevSummary 
               let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
               // NOTE: Dedent doesn't work here because messageBatchText is multi-line, so the second line is not indented and thus prevents the dedenting
-              messageBatchSummarizationInstruction = `Here's what has recently happened:\n\n------\n${messageBatchText}\n------\n\nHere's a summary of what happened previously:\n\n------${prevSummary}\n------\n\nPlease reply with a new version of this summary that ALSO includes what has recently happened. Include ALL the KEY details. DO NOT MISS ANY IMPORTANT DETAILS. You MUST include all the details that were in the previous summary in your response. Your response should start with "${prevSummary.split(" ").slice(0, 5).join(" ")}" and it should compress all the important details into a new summary. It's okay for the summary to be LONG if needed.`.trim();
+              messageBatchSummarizationInstruction = `Here's what has recently happened:\n\n------\n${messageBatchText}\n------\n\nHere's a summary of what happened previously:\n\n------\n${prevSummary}\n------\n\nPlease reply with a new version of this summary that ALSO includes what has recently happened. Include ALL the KEY details. DO NOT MISS ANY IMPORTANT DETAILS. You MUST include all the details that were in the previous summary in your response. Your response should start with "${prevSummary.split(" ").slice(0, 5).join(" ")}" and it should compress all the important details into a new summary. It's okay for the summary to be LONG if needed.`.trim();
             } else {
               let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
               // NOTE: Dedent doesn't work here because messageBatchText is multi-line, so the second line is not indented and thus prevents the dedenting
