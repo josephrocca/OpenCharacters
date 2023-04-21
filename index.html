@@ -147,6 +147,11 @@
         margin-top: 0.5rem;
       }
 
+      #chatThreads .threadFolder {
+        display: flex;
+        justify-content: space-between;
+      }
+
       #chatThreads .thread .favStar, #chatThreads .thread .changeFolderPath {
         position: absolute;
         font-size: 80%;
@@ -294,11 +299,11 @@
       #messageFeed .message:hover .bottomButtons {
         display: flex;
       }
-      #messageFeed .message .emojiButton {
+      .emojiButton {
         opacity:0.5;
         cursor:pointer;
       }
-      #messageFeed .message .emojiButton:hover {
+      .emojiButton:hover {
         opacity:1;
       }
 
@@ -368,6 +373,10 @@
         grid-template-columns: repeat(auto-fill, 280px);
         grid-gap: 0.5rem;
         justify-content: center;
+      }
+      #characterFoldersList .characterFolder {
+        display: flex;
+        justify-content: space-between;
       }
       #characterSelection .character {
         user-select:none;
@@ -481,7 +490,7 @@
     <audio id="musicPlayer" style="display:none;"></audio>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=26";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=27";
 
       let JSON5;
       (async function() {
@@ -664,7 +673,7 @@
 
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(49).stores({
+      db.version(50).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -674,7 +683,7 @@
         // - import code
 
         // NOTE: The properties listed here are just the INDEXES, not *all* the columns/properties.
-        characters: "++id,modelName,fitMessagesInContextMethod,temperature,creationTime,lastMessageTime",
+        characters: "++id,modelName,fitMessagesInContextMethod,uuid,creationTime,lastMessageTime",
         threads: "++id,name,characterId,creationTime,lastMessageTime,lastViewTime",
         messages: "++id,threadId,characterId,creationTime,order", // characterId is -1 for user, and for system it is -2.
         misc: "key", // key=>value
@@ -757,6 +766,7 @@
           delete character.systemMessage;
         }
         if(character.folderPath === undefined) character.folderPath = "";
+        if(character.uuid === undefined) character.uuid = null;
         // if(character.publicId === undefined) character.publicId = "";
         // WARNING: If you add something here, you'll likely have to edit:
         //  - characterDetailsPrompt (characterDetailsPrompt should return a valid character object - addCharacter only adds creationTime and lastMessageTime, so characterDetailsPrompt should fill in everything else, even if it's not visible in the editor)
@@ -991,7 +1001,7 @@
             foldersHtml += `<div class="threadFolder" data-folder-path="${sanitizeHtml(currentFolderPath.split("/").slice(0, -1).join("/"))}">🔙 up one level</div>`;
           }
           foldersHtml += currentSubfolderNames.map(name => {
-            return `<div class="threadFolder" data-folder-path="${sanitizeHtml(currentFolderPath ? currentFolderPath+"/"+name : name)}">📁 ${sanitizeHtml(name)}</div>`;
+            return `<div class="threadFolder" data-folder-path="${sanitizeHtml(currentFolderPath ? currentFolderPath+"/"+name : name)}">📁 ${sanitizeHtml(name)} <span class="editFolderName emojiButton" style="font-size:0.7rem; display:flex; align-items:center;">✏️</span></div>`;
           }).join("");
         }
         // $.chatThreadFolders.innerHTML = foldersHtml;
@@ -1021,6 +1031,31 @@
           let threadCardForActiveThread = $.chatThreads.querySelector(`.thread[data-thread-id="${$.messageFeed.dataset.threadId}"]`);
           if(threadCardForActiveThread) threadCardForActiveThread.classList.add("selected");
         }
+
+        $.chatThreads.querySelectorAll(".editFolderName").forEach(btn => {
+          btn.addEventListener("click", async function(e) {
+            e.stopPropagation();
+            const folderPath = btn.closest(".threadFolder").dataset.folderPath;
+            let newFolderPath;
+            if(folderPath.split("/").length === 1) {
+              newFolderPath = prompt(`Edit the name of this folder:`, folderPath);
+            } else {
+              newFolderPath = prompt(`Edit the name of this folder by changing '${folderPath.split("/").at(-1)}' to something else, or move all items inside the '${folderPath.split("/").at(-1)}' folder to a new location by editing the whole folder path:`, folderPath);
+            }
+            if(newFolderPath === null) return;
+            newFolderPath = newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
+            // each thread has a folderPath property, which is a string like "folder1/folder2/folder3" or just "" (empty string) if it's in the root folder
+            await db.threads.toCollection().modify(function(thread) {
+              // we need to move all threads that start with folderPath to newFolderPath
+              if(thread.folderPath === folderPath) {
+                thread.folderPath = newFolderPath;
+              } else if(thread.folderPath.startsWith(folderPath+"/")) {
+                thread.folderPath = newFolderPath + thread.folderPath.slice(folderPath.length);
+              }
+            });
+            await renderThreadList();
+          });
+        });
 
         $.chatThreads.querySelectorAll(".thread").forEach(thread => {
           thread.addEventListener("click", async function() {
@@ -1184,6 +1219,7 @@
         const character = (await db.characters.where("id").equals(thread.characterId).toArray())[0];
         let userCharacter = await getUserCharacterObj(threadId);
         let systemCharacter = await getSystemCharacterObj();
+        let showInlineReminder = (await db.misc.get("showInlineReminder"))?.value || "yes";
 
         let displayedMessages = messages.slice(-numMessagesPerDisplayBatch);
 
@@ -1256,7 +1292,7 @@
           observer.observe(triggerEl);
         }
 
-        await updateInlineReminderMessage({aiCharacter:character, thread});
+        await updateInlineReminderMessage({aiCharacter:character, thread, showInlineReminder});
         await updateThreadScene();
 
         doBotReplyIfNeeded(); // we shouldn't `await` this because thread is already rendered.
@@ -1463,6 +1499,13 @@
           thread = opts.thread;
         }
 
+        let showInlineReminder;
+        if(!opts.showInlineReminder) {
+          showInlineReminder = (await db.misc.get("showInlineReminder"))?.value || "yes";
+        } else {
+          showInlineReminder = opts.showInlineReminder;
+        }
+
         let reminderMessage = character.reminderMessage || "";
         let usingThreadReminderMessage = false;
         if(typeof thread.character.reminderMessage === "string") {
@@ -1486,6 +1529,10 @@
         }
 
         let el = createInlineReminderMessage(reminderMessage);
+
+        if(showInlineReminder === "no") {
+          el.style.display = "none";
+        }
 
         let shouldScrollDown = messageFeedIsNearBottom();
           
@@ -1531,7 +1578,7 @@
           foldersHtml += `<div class="characterFolder" data-folder-path="${sanitizeHtml(currentFolderPath.split("/").slice(0, -1).join("/"))}">🔙 up one level</div>`;
         }
         foldersHtml += currentSubfolderNames.map(name => {
-          return `<div class="characterFolder" data-folder-path="${sanitizeHtml(currentFolderPath ? currentFolderPath+"/"+name : name)}">📁 ${sanitizeHtml(name)}</div>`;
+          return `<div class="characterFolder" data-folder-path="${sanitizeHtml(currentFolderPath ? currentFolderPath+"/"+name : name)}">📁 ${sanitizeHtml(name)} <span class="editFolderName emojiButton" style="font-size:0.7rem; display:flex; align-items:center;">✏️</span></div>`;
         }).join("");
 
         $.characterFoldersList.innerHTML = foldersHtml;
@@ -1782,6 +1829,31 @@
           characterFolderEl.addEventListener("click", async function(e) {
             e.stopPropagation();
             $.characterFoldersList.dataset.currentFolderPath = characterFolderEl.dataset.folderPath;
+            await renderCharacterList();
+          });
+        });
+
+        $.characterFoldersList.querySelectorAll(".editFolderName").forEach(btn => {
+          btn.addEventListener("click", async function(e) {
+            e.stopPropagation();
+            const folderPath = btn.closest(".characterFolder").dataset.folderPath;
+            let newFolderPath;
+            if(folderPath.split("/").length === 1) {
+              newFolderPath = prompt(`Edit the name of this folder:`, folderPath);
+            } else {
+              newFolderPath = prompt(`Edit the name of this folder by changing '${folderPath.split("/").at(-1)}' to something else, or move all items inside the '${folderPath.split("/").at(-1)}' folder to a new location by editing the whole folder path:`, folderPath);
+            }
+            if(newFolderPath === null) return;
+            newFolderPath = newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
+            // each character has a folderPath property, which is a string like "folder1/folder2/folder3" or just "" (empty string) if it's in the root folder
+            await db.characters.toCollection().modify(function(character) {
+              // we need to move all characters that start with folderPath to newFolderPath
+              if(character.folderPath === folderPath) {
+                character.folderPath = newFolderPath;
+              } else if(character.folderPath.startsWith(folderPath+"/")) {
+                character.folderPath = newFolderPath + character.folderPath.slice(folderPath.length);
+              }
+            });
             await renderCharacterList();
           });
         });
@@ -2118,14 +2190,20 @@
       // If you change this, update stuff in prepareMessagesForBot too
       const characterNameValidationPattern = "^[A-Za-z0-9_\\- ]{1,64}$"; // needed due to OpenAI API limitations
 
-      async function characterDetailsPrompt(defaultValues={}) {
+      async function characterDetailsPrompt(defaultValues={}, opts={}) {
         defaultValues = JSON.parse(JSON.stringify(defaultValues));
+
+        let existingCharacter;
+        if(opts.editingExistingCharacter) {
+          existingCharacter = await db.characters.get({uuid:defaultValues.uuid});
+        }
         
         let initialMessagesText;
         if(defaultValues.initialMessages) initialMessagesText = generateTextFormatFromMessages(defaultValues.initialMessages);
         else initialMessagesText = "";
         
         const result = await prompt2({
+          header: { html: opts.editingExistingCharacter ? `<div style="border-radius:3px;font-size: 0.8rem;padding: 0.5rem;border: 1px solid var(--border-color);">You're currently <b>editing</b> an existing character named '${existingCharacter.name}'.</div>` : "", type:"none" },
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:characterNameValidationPattern },
           roleInstruction: { label: "Instruction/role/personality (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message defines the personality or 'role' that the AI will take during the chat. Every request to the API will include this as the first message. If you later decide to edit this, all existing and new threads will be immediately updated. This message does not get summarized by the summarization algorithm - it will always be present as the first message.", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.roleInstruction || "" },
           reminderMessage: { label: "Reminder message - an invisible system message that is placed before every AI response (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message is inserted as a reminder at the end of the chat right before each AI response. This will always be the last/most-recent message that the AI sees when writing its response. If you later decide to edit this, all existing and new threads will be immediately updated. This message is not seen/summarized by the summarization algorithm - it will always be present as the final message.", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
@@ -2199,6 +2277,12 @@
         result.streamingResponse = true;
 
         result.folderPath = defaultValues.folderPath ?? "";
+
+        if(existingCharacter) {
+          result.uuid = existingCharacter.uuid;
+        } else {
+          result.uuid = defaultValues.uuid ?? null;
+        }
 
         // If it contains [AI], [SYSTEM], or [USER], but doesn't *start* with one of those, warn them that it's being treated as one big system message
         if(/(^|\s)\[(AI|SYSTEM|USER)\]:/.test(result.reminderMessage) && !/^\[(AI|SYSTEM|USER)\]:/.test(result.reminderMessage.trim())) {
@@ -5910,10 +5994,12 @@ OVERALL SUMMARY:
         let userAvatarUrlOriginal = (await db.misc.get("userAvatarUrl"))?.value || "";
         let openAiApiKeyOriginal = (await db.misc.get("openAiApiKey"))?.value || "";
         let customModelConfigsOriginal = (await db.misc.get("customModelConfigs"))?.value || [];
+        let showInlineReminderOriginal = (await db.misc.get("showInlineReminder"))?.value || "yes";
         const result = await prompt2({
           userName: {label: "Your name:", type: "textLine", defaultValue: userNameOriginal},
           userAvatarUrl: {label: "Your avatar URL:", type: "textLine", placeholder: "(optional)", defaultValue: userAvatarUrlOriginal},
           openAiApiKey: {label: "OpenAI API secret key (<a href='https://platform.openai.com/account/api-keys' target='_blank'>from here</a>):", type: "textLine", placeholder:"sk-...", defaultValue: openAiApiKeyOriginal},
+          showInlineReminder: {hidden:true, label: "Show 'inline' reminder edit button:", type: "select", options:[{value:"yes"}, {value:"no"}], defaultValue: showInlineReminderOriginal},
           customModelConfigs: {hidden:true, cssText:"white-space:pre; font-family:monospace;", label: "Custom model configs (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-models.md' target='_blank'>follow this guide</a>):", type: "text", placeholder:`{name:"...", endpointUrl:"..."}\n{name:"...", endpointUrl:"...", apiKey:"..."}\n...`, defaultValue: customModelConfigsOriginal.map(o => JSON5.stringify(o)).join("\n")},
         }, {showHiddenInputsText: "show advanced settings"});
         if(!result) return;
@@ -5956,11 +6042,14 @@ OVERALL SUMMARY:
           }
         }
 
+        let showInlineReminder = result.showInlineReminder;
+
         // save to db
         await db.misc.put({key: "userName", value: userName});
         await db.misc.put({key: "userAvatarUrl", value: userAvatarUrl});
         await db.misc.put({key: "openAiApiKey", value: openAiApiKey});
         await db.misc.put({key: "customModelConfigs", value: customModelConfigs});
+        await db.misc.put({key: "showInlineReminder", value: showInlineReminder});
         
         await updateModelList();
 
@@ -5976,6 +6065,7 @@ OVERALL SUMMARY:
         delete char.id;
         delete char.creationTime;
         delete char.lastMessageTime;
+        delete char.uuid;
         for(let key in char) {
           if(key.startsWith("$")) { // special `dexie-export-import` properties start with `$` (only exists in exported json data)
             delete char[key];
@@ -6429,10 +6519,27 @@ OVERALL SUMMARY:
           // UPGRADES (should be the same as the dexie db.upgrade code):
           upgradeCharacterFromOldVersion(character);
 
-          let result = await characterDetailsPrompt(character);
+          let uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+          if(character.uuid && !uuidRegex.test(character.uuid)) {
+            alert("The character you're trying to load has an invalid UUID. It will be imported without a UUID. Please see correct UUID format here:\n\nhttps://en.wikipedia.org/wiki/Universally_unique_identifier");
+            delete character.uuid;
+          }
+
+          let editingExistingCharacter = false;
+          if(character.uuid && await db.characters.get({uuid:character.uuid})) {
+            editingExistingCharacter = true;
+          }
+
+          let result = await characterDetailsPrompt(character, {editingExistingCharacter});
           if(result) {
-            const character = await addCharacter(result);
-            await createNewThreadWithCharacterId(character.id);
+            if(editingExistingCharacter) {
+              await db.characters.where({uuid:character.uuid}).modify(result);
+              const editedCharacter = await db.characters.get({uuid:character.uuid});
+              await createNewThreadWithCharacterId(editedCharacter.id);
+            } else {
+              const newCharacter = await addCharacter(result);
+              await createNewThreadWithCharacterId(newCharacter.id);
+            }
           }
         }
         ignoreHashChange = true;
