@@ -28,6 +28,11 @@ const logger = winston.createLogger({
   ],
 });
 
+// Set up a global error handler
+process.on('uncaughtException', (err) => {
+  logger.error('Unhandled exception: ', err);
+});
+
 // Load bot info from bot-config.yaml file
 const botConfigs = yaml.load(fs.readFileSync('bot-config.yml', 'utf8')); // Load and parse bot config file
 logger.info('Loaded bot-config file');
@@ -41,10 +46,25 @@ function escapeMarkdownV2(text) {
   return text.replace(ESCAPE_CHARACTERS, '\\$&');
 }
 
-// Set up a global error handler
-process.on('uncaughtException', (err) => {
-  logger.error('Unhandled exception: ', err);
-});
+// Split messages into chunks of 4096 characters or less to avoid Telegram's message length limit
+function splitMessage(msg) {
+  logger.info(`Splitting message of length ${msg.length}`);
+  const max_size = 4096;
+  const amount_sliced = Math.ceil(msg.length / max_size);
+  let start = 0;
+  let end = max_size;
+  let chunk;
+  const chunks = [];
+
+  for (let i = 0; i < amount_sliced; i++) {
+    chunk = msg.slice(start, end);
+    chunks.push(chunk);
+    start += max_size;
+    end += max_size;
+  }
+
+  return chunks;
+}
 
 // Loop through each bot in the bot-config file
 for (const [botName, botConfig] of Object.entries(botConfigs)) {
@@ -72,7 +92,18 @@ for (const [botName, botConfig] of Object.entries(botConfigs)) {
         try {
           logger.info(`Received ai messages [${ns.name} namespace]: ${msg}`);
           let escapedMessage = escapeMarkdownV2(msg);
-          bot.telegram.sendMessage(chatId, {text: escapedMessage, parse_mode: 'MarkdownV2'});
+          if (escapedMessage.length <= 4096) {
+            // Send the message as is
+            logger.info(`Sending message to Telegram chat ${chatId}`);
+            bot.telegram.sendMessage(chatId, {text: escapedMessage, parse_mode: 'MarkdownV2'});
+          } else {
+            // Split the message into chunks and send each chunk separately
+            const chunks = splitMessage(escapedMessage);
+            for (const chunk of chunks) {
+              logger.info(`Sending message to Telegram chat ${chatId}`);
+              bot.telegram.sendMessage(chatId, {text: chunk, parse_mode: 'MarkdownV2'});
+            }
+          }
         } catch (err) {
           logger.error('Error handling AI message: ' + err);
           bot.telegram.sendMessage(chatId, 'Sorry, I am having trouble processing your request. Please try again later.');
@@ -96,10 +127,11 @@ for (const [botName, botConfig] of Object.entries(botConfigs)) {
         bot.telegram.sendMessage(chatId, `Hi ${newMemberName}. ${botConfig.greeting_msg}`); // Send new user greeting msg to Telegram chat
       } else if (ctx.message.text) { // Message handler
         await ctx.sendChatAction('typing'); // Send a typing indicator
-        if (ctx.message.chat.titleName == null) // If private chat, set chat name to "Private Chat"
+        if (ctx.message.chat.titleName == null) { // If private chat, set chat name to "Private Chat"
           var chatName = "Private Chat";
-        else
+        } else {
           var chatName = ctx.message.chat.titleName;
+        };
         let user = ctx.message.from.first_name; // Sender info from Telegram
         let msg = ctx.message.text; 
         logger.info(`Received user message from ${user} on [${chatId} chat]: ${msg}`);
