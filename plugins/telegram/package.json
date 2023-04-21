@@ -1,5 +1,13 @@
 {
+  "name": "oc-telegram-bot-plugin",
+  "version": "0.3.0",
+  "description": "Plugin for OpenCharacters that allows users to integrate with Telegram via the bot API.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
+    "dotenv": "^16.0.3",
     "events": "^3.3.0",
     "express": "^4.18.2",
     "fs": "^0.0.1-security",
@@ -10,5 +18,16 @@
     "telegraf": "^4.12.2",
     "winston": "^3.8.2",
     "yaml": "^2.2.1"
-  }
+  },
+  "engines": {
+    "node": "^14.x"
+  },
+  "repository": {
+    "url": "https://github.com/joseph-holland/OpenCharacters"
+  },
+  "license": "MIT",
+  "keywords": [
+    "opencharacters",
+    "telegram"
+  ]
 }

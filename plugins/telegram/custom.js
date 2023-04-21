@@ -6,8 +6,6 @@ import("https://cdn.socket.io/4.6.0/socket.io.esm.min.js").then(io => {
   console.log(`Connected to ${namespace}`);
 
   socket.on('user message', function(message, chatId, chatName, user) {
-    if (chatName == null)
-      var chatName = "Private Chat";
     console.log(`Received user message from ${user} in [${chatName} / ${chatId}]: ${message}`);
 
     oc.thread.customData.chatId = chatId;
