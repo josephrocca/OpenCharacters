@@ -6125,12 +6125,11 @@ OVERALL SUMMARY:
         let singleThreadImportId = null;
 
         try {
-
           try {
             let json = JSON.parse(await new Blob([file]).text());
-            if(!json.formatName && json.type === "application/json" && json.uri?.starsWith("file:///")) {
-              alert("The file you provided is invalid. It's likely you tried to upload it to Discord, or something like that, and instead of actually uploading the file itself, it uploaded a *reference* to the file. I'm not sure why Discord does this, but you might want to try a different method of transferring the file. To check if your file is valid, you can open it up with a text editor and check that it starts with: {\"formatName\":\"dexie\"");
-              return "fail";
+            if(!json.formatName && json.type === "application/json" && json.uri?.startsWith("file:///")) {
+              alert("The file you provided is invalid. It's likely you tried to upload it to Discord, or something like that, and instead of actually uploading the file itself, Discord uploaded a *reference* to the file. I'm not sure why Discord does this, but you might want to try a different method of transferring the file. To check if your file is valid, you can open it up with a text editor and check that it starts with: {\"formatName\":\"dexie\", ...");
+              return "finished";
             }
           } catch(e) {
             return "fail";
