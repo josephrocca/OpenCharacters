@@ -32,38 +32,42 @@ export async function prompt2(specs, opts={}) {
 
   let ctn = document.createElement("div");
   let sections = "";
+  let structuredSectionsI = 0;
   let i = 0;
   for(let [key, spec] of Object.entries(specs)) {
     if(spec.type == "select") {
       sections += `
-        <section data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
-          <div style="margin:0.125rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
+        <section class="structuredInputSection" data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
+          <div class="sectionLabel" style="${structuredSectionsI === 0 ? "margin-top:0;" : ""}">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
               <select data-spec-key="${sanitizeHtml(key)}" value="${sanitizeHtml(spec.defaultValue)}" style="width:100%;height:100%; padding:0.25rem;">${spec.options.map(o => `<option value="${sanitizeHtml(o.value)}" ${o.value === spec.defaultValue ? "selected" :""}>${sanitizeHtml(o.content) || sanitizeHtml(o.value)}</option>`).join("")}</select>
             </div>
           </div>
         </section>`;
+      structuredSectionsI++;
     } else if(spec.type == "textLine") {
       sections += `
-        <section data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
-          <div style="margin:0.125rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
+        <section class="structuredInputSection" data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
+          <div class="sectionLabel" style="${structuredSectionsI === 0 ? "margin-top:0;" : ""}">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
               <input data-initial-focus="${spec.focus === true ? "yes" : "no"}" data-spec-key="${sanitizeHtml(key)}" value="${sanitizeHtml(spec.defaultValue)}" style="width:100%;height:100%; border: 1px solid lightgrey; border-radius: 3px; padding: 0.25rem;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}" ${spec.validationPattern ? `pattern="${sanitizeHtml(spec.validationPattern)}"` : ""}>
             </div>
           </div>
         </section>`;
+      structuredSectionsI++;
     } else if(spec.type == "text") {
       sections += `
-        <section data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
-          <div style="margin:0.125rem 0; margin-top:${i==0 ? 0 : 1}rem; font-size:85%;">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
+        <section class="structuredInputSection" data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
+          <div class="sectionLabel" style="${structuredSectionsI === 0 ? "margin-top:0;" : ""}">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
               <textarea data-initial-focus="${spec.focus === true ? "yes" : "no"}" data-spec-key="${sanitizeHtml(key)}" ${spec.height === "fit-content" ? `data-height="fit-content"` : ``} style="width:100%; ${spec.height === "fit-content" ? "" : `height:${sanitizeHtml(spec.height)}`}; min-height:${spec.minHeight ?? "4rem"}; max-height:${spec.maxHeight ?? "50vh"}; border: 1px solid lightgrey; border-radius: 3px; padding:0.25rem; ${spec.cssText || ""};" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
             </div>
           </div>
         </section>`;
+      structuredSectionsI++;
     } else if(spec.type == "none") {
       sections += `
         <section data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
@@ -89,6 +93,11 @@ export async function prompt2(specs, opts={}) {
         </div>
       </div>
       <style>
+        .promptModalInnerContainer .sectionsContainer > section .sectionLabel {
+          margin:0.125rem 0;
+          margin-top: 1rem;
+          font-size:85%;
+        }
         .promptModalInnerContainer .sectionsContainer input:invalid {
           background-color: lightpink;
         }
