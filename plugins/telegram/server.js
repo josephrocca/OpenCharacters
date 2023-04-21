@@ -24,7 +24,7 @@ const logger = winston.createLogger({
   transports: [
     new winston.transports.Console(),
     new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/debug.log', level: 'debug' })
+    new winston.transports.File({ filename: 'logs/info.log', level: 'info' })
   ],
 });
 
@@ -79,7 +79,8 @@ for (const [botName, botConfig] of Object.entries(botConfigs)) {
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
   // Create a namespace for each chatId
-  for (chatId of botConfig.chat_ids) {
+  for (chat of botConfig.chat_ids) {
+    const chatId = Object.keys(chat)[0];
     const ns = io.of(`/${chatId}`);
     logger.info(`Created namespace ${ns.name}`);
 
@@ -116,7 +117,7 @@ for (const [botName, botConfig] of Object.entries(botConfigs)) {
   bot.on('message', async (ctx) => {
     logger.debug(JSON.stringify(ctx, null, 2));
     let chatId = ctx.message.chat.id;
-    if (!botConfig.chat_ids.includes(chatId.toString())) return; // Ignore messages from other chats
+    if (!botConfig.chat_ids.some(chat => Object.keys(chat)[0] === chatId.toString())) return; // Ignore messages from other chats
     await ctx.sendChatAction('typing'); // Send a typing indicator
     try {
       if (ctx.message.new_chat_member) { // New member handler

@@ -43,10 +43,12 @@ Chat id can be found by sending a message to the bot in Telegram, then opening: 
 ---
 char_name1:
   bot_token: '0000000000:XXXXXXXYYYYYYZZZZZZZ'
+  greeting_message: 'I am char_name1. How can help you with your queries.'
     chat_ids:
     - '-9012345678'
+        thread_name: 'Char_Name1 thread1'
     - '101234567890'
-  greeting_message: 'I am char_name1. How can help you with your queries.'
+        thread_name: 'Char_Name2 thread2'
 ```
 
 Next add the custom javascript to the character's advanced options custom js code. You can find the code in the file custom.js. Copy and paste the contents of the custom.js into the "Custom JavaScript code" field. This code can sit alongside any other custom code you have set up.  Currently importing in the form `await import("./plugins/telegram/custom.js")` does not work.
