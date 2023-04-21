@@ -125,7 +125,7 @@ for (const [botName, botConfig] of Object.entries(botConfigs)) {
         await ctx.sendChatAction('typing'); // Send a typing indicator
         let chatName = ctx.message.chat.title;
         let newMemberName = ctx.message.new_chat_member.first_name;
-        bot.telegram.sendMessage(chatId, `Hi ${newMemberName}. ${botConfig.greeting_msg}`); // Send new user greeting msg to Telegram chat
+        bot.telegram.sendMessage(chatId, `Hi ${newMemberName}. ${botConfig.greeting_message}`); // Send new user greeting msg to Telegram chat
       } else if (ctx.message.text) { // Message handler
         await ctx.sendChatAction('typing'); // Send a typing indicator
         if (ctx.message.chat.titleName == null) { // If private chat, set chat name to "Private Chat"
