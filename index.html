@@ -929,7 +929,7 @@
 
       // This renders the list of threads in the left column.
       async function renderThreadList(opts={}) {
-        let threads = await db.threads.orderBy("lastViewTime").reverse().toArray();
+        let threads = await db.threads.orderBy("lastMessageTime").reverse().toArray();
 
         if(threads.length >= 3) {
           showEl($.threadSearchCtn);
@@ -2844,8 +2844,8 @@ OVERALL SUMMARY:
               await delay(3000);
             }
             numSummariesGenerated++;
-            if(numSummariesGenerated === 100) {
-              alert("Seems like the summary might be caught in a loop? This could be a bug - or you've only recently enabled summaries on a very long thread, or you've edited an early message in a long thread so a lot of summaries need to be computed.");
+            if(numSummariesGenerated === 10) {
+              alert("The summary system might be caught in a loop? This could be a bug - or it may just be that you've only recently enabled summaries on a very long thread, or you've edited an early message in a long thread so a lot of summaries need to be computed. If you click OK, it will continue, but please watch it to ensure it doesn't infinitely loop.");
             }
             if(aiCharacter.associativeMemoryMethod === "v1") {
               let [ memoriesText, summaryText ] = result.split(/OVERALL SUMMARY:|NEW OVERALL SUMMARY:/);
@@ -2904,7 +2904,7 @@ OVERALL SUMMARY:
           // Compress summary if needed.
           // Note this is *outside* of the above `if` block because user will be able to adjust maxTokenCountOfSummary, and we want to re-compute/compress summaries if they change that value.
           // (this also helps with backwards-compat since maxTokenCountOfSummary previously didn't exist, we so we may need to compress some old summaries)
-          if(await countTokens(summary, modelName) > maxTokenCountOfSummary) {
+          while(await countTokens(summary, modelName) > maxTokenCountOfSummary) {
             addToSummaryLog(`<b>summary to compress:</b> ${summary}`);
             summary = await compressText({text:summary, tokenLimit:maxTokenCountOfSummary, modelName, onProgressMessage, threadId});
             await db.summaries.where({hash}).modify({summary});
