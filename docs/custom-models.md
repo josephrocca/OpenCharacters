@@ -36,7 +36,9 @@ The model selector at the top of the thread should show your new model.
 * `tokenPricing` (optional) - an object like `{prompt:0.002, completion:0.002}` with prices per 1k tokens
 * `maxSequenceLength` (optional) - this will be fetched from Hugging Face automatically, but you should include it if you're using a non-Hugging Face model or if the value can't be found automatically
 * `apiKey` (optional) - just in case you're using a service that requires an API key
-* `type` (optional) - either `chat-completion` if the API accepts `messages` as an input or `completion` for APIs that accept `prompt` as an input. This will be automatically inferred from the URL (`v1/completions` vs `v1/chat/completions`)
+* `type` (optional) - if not provided, this will be automatically inferred from the URL (`v1/completions` vs `v1/chat/completions`)
+  * use `chat-completion` if the API accepts `messages` as an input
+  * use `completion` if the APIs accepts `prompt` as an input
 
 
 ### Alternatives to Basaran
