@@ -1,24 +1,25 @@
 console.log("Running Telegram integration custom code");
 
-import { io } from "https://cdn.socket.io/4.6.0/socket.io.esm.min.js";
+import("https://cdn.socket.io/4.6.0/socket.io.esm.min.js").then(io => {
+  const namespace = oc.character.name.toLowerCase();
+  const socket = io.default(`http://127.0.0.1:3000/${namespace}`);
+  console.log(`Connected to ${namespace}`);
 
-// Create message namespace just for this character/bot
-const namespace = oc.character.name.toLowerCase();
-const socket = io(`http://127.0.0.1:4000/${namespace}`);
+  socket.on('user message', function(message, chatId, chatName, user) {
+    console.log(`Received user message from ${user} in [${chatName} / ${chatId}]: ${message}`);
 
-socket.on('user message', function(msg) {
-  console.log("user message", msg);
-
-  oc.thread.messages.push({
-    author: "user",
-    content: msg
+    oc.thread.customData.chatId = chatId;
+    oc.thread.messages.push({
+      author: "user",
+      content: `${user}: ${message}`,
+      name: user
+    });
   });
-});
 
-oc.thread.on("MessageAdded", async function() {
-  let lastMessage = oc.thread.messages.at(-1);
-  if(lastMessage.author !== "ai") return; // only send AI messages
-
-  console.log("ai message", lastMessage.content);
-  socket.emit('ai message', lastMessage.content);
+  oc.thread.on("MessageAdded", async function() {
+    let lastMessage = oc.thread.messages.at(-1);
+    if(lastMessage.author !== "ai") return; // only send AI messages
+    console.log("ai message", lastMessage.content, oc.thread.customData.chatId);
+    socket.emit('ai message', lastMessage.content, oc.thread.customData.chatId);
+  });
 });
