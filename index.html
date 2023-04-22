@@ -2904,7 +2904,7 @@ OVERALL SUMMARY:
           // Compress summary if needed.
           // Note this is *outside* of the above `if` block because user will be able to adjust maxTokenCountOfSummary, and we want to re-compute/compress summaries if they change that value.
           // (this also helps with backwards-compat since maxTokenCountOfSummary previously didn't exist, we so we may need to compress some old summaries)
-          while(await countTokens(summary, modelName) > maxTokenCountOfSummary) {
+          if(await countTokens(summary, modelName) > maxTokenCountOfSummary) {
             addToSummaryLog(`<b>summary to compress:</b> ${summary}`);
             summary = await compressText({text:summary, tokenLimit:maxTokenCountOfSummary, modelName, onProgressMessage, threadId});
             await db.summaries.where({hash}).modify({summary});
