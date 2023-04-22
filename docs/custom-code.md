@@ -72,6 +72,8 @@ You can also access and edit character data via `oc.character.propertyName`. Her
     * `presencePenalty`
     * `stopSequences`
     * `modelName`
+    * `customData` - an object/dict where you can store arbitrary data
+      * `PUBLIC` - a special sub-property of `customData` that will be shared within character sharing URLs
  * `thread`
    * `messages` - an **array** of messages, where **each message** has:
      * `content` - the message text - it can include HTML, and is rendered as [markdown](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax) by default (see `oc.messageRenderingPipeline`)
@@ -102,6 +104,12 @@ You can also access and edit character data via `oc.character.propertyName`. Her
      * `reminderMessage`
      * `roleInstruction`
    * `userCharacter` - thread-specific user character overrides
+     * `name`
+     * `avatar`
+       * `url`
+       * `size`
+       * `shape`
+   * `systemCharacter` - thread-specific system character overrides
      * `name`
      * `avatar`
        * `url`
