@@ -6503,7 +6503,9 @@ OVERALL SUMMARY:
         let thread = allThreads[0];
         $.chatThreads.dataset.currentFolderPath = thread.folderPath;
         await renderThreadList();
-        $.chatThreads.querySelector(`.thread[data-thread-id="${thread.id}"]`).click();
+        let el = $.chatThreads.querySelector(`.thread[data-thread-id="${thread.id}"]`);
+        if(!el) el = $.chatThreads.querySelector(`.thread`); // in case we don't show all threads, eventually, and last viewed thread is not visible (since we sort by 'last messaged' in renderThreadList)
+        el.click();
       }
 
       // parse url hash as json
