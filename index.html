@@ -419,7 +419,10 @@
         <!-- <div id="chatThreadFolders" data-current-folder-path=""></div> -->
         <div id="chatThreads" data-current-folder-path=""></div>
         <div id="appOptions">
-          <button id="settingsButton" class="appOptionButton">⚙️ settings</button>
+          <div style="display:flex;">
+            <button id="settingsButton" class="appOptionButton">⚙️ settings</button>
+            <!-- <button id="statsButton" class="appOptionButton" style="margin-left: 0.5rem; width: 2rem;">📊</button> -->
+          </div>
           <div style="display: flex;">
             <button id="clearDataButton" class="appOptionButton" style="width: 4rem;">🗑️</button>
             <button id="exportDataButton" class="appOptionButton" style="margin-left: 0.5rem; margin-right: 0.5rem;">💾 export</button>
@@ -673,7 +676,7 @@
 
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(50).stores({
+      db.version(51).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -767,14 +770,16 @@
         }
         if(character.folderPath === undefined) character.folderPath = "";
         if(character.uuid === undefined) character.uuid = null;
+        if(character.customData === undefined) character.customData = {};
+        if(character.systemCharacter === undefined) character.systemCharacter = {avatar:{}};
         // if(character.publicId === undefined) character.publicId = "";
         // WARNING: If you add something here, you'll likely have to edit:
         //  - characterDetailsPrompt (characterDetailsPrompt should return a valid character object - addCharacter only adds creationTime and lastMessageTime, so characterDetailsPrompt should fill in everything else, even if it's not visible in the editor)
         //  - getUserCharacterObj
         //  - getSystemCharacterObj
         //  - characterPropertiesVisibleToCustomCode
+        //  - addThread - for things like `character.scene` where it's copied over to the thread at the start, and custom code can only edit it from there
         //  - the "share link" creation code (if you add any other private/user-specific data like id, lastMessageTime, etc.)
-        // NOTE: I'm not adding customData to characters yet, because we'd need to have private and public (shared in link) silos, and I haven't thought enough about that yet
         return character;
       }
 
@@ -798,7 +803,7 @@
 
       async function upgradeThreadFromOldVersion(thread, opts={}) {
         if(thread.isFav === undefined) thread.isFav = false;
-        if(thread.userCharacter === undefined) thread.userCharacter = {}; // this overrides the default user character object (for this specific thread)
+        if(thread.userCharacter === undefined) thread.userCharacter = {avatar:{}}; // this overrides the default user character object (for this specific thread)
         if(thread.lastViewTime === undefined) thread.lastViewTime = thread.lastMessageTime;
         if(thread.customCodeWindow === undefined) thread.customCodeWindow = {visible:false, width:null}; 
         if(thread.customData === undefined) thread.customData = {}; 
@@ -814,8 +819,12 @@
         }
         if(thread.folderPath === undefined) thread.folderPath = ""; 
         if(thread.character === undefined) thread.character = {avatar:{}}; 
+        if(thread.systemCharacter === undefined) thread.systemCharacter = {avatar:{}}; // this overrides the default user character object (for this specific thread)
         // WARNING: If you add something here, you may need to edit:
         // - addThread
+        // - window.oc.thread.<...>  (during declaration of window.oc object, with Object.seal if property is an object)
+        // - getDataForCustomCode  (sending data to custom code)
+        // - updateDbWithNewDataFromCustomCode (receiving data from custom code)
         return thread;
       }
       
@@ -1218,7 +1227,7 @@
         messages.sort((a,b) => a.order - b.order);
         const character = (await db.characters.where("id").equals(thread.characterId).toArray())[0];
         let userCharacter = await getUserCharacterObj(threadId);
-        let systemCharacter = await getSystemCharacterObj();
+        let systemCharacter = await getSystemCharacterObj(threadId);
         let showInlineReminder = (await db.misc.get("showInlineReminder"))?.value || "yes";
 
         let displayedMessages = messages.slice(-numMessagesPerDisplayBatch);
@@ -1376,7 +1385,7 @@
 
         let characterIdToCharacterObj = {
           "-1": await getUserCharacterObj(threadId),
-          "-2": await getSystemCharacterObj(),
+          "-2": await getSystemCharacterObj(threadId),
           [character.id]: character,
         };
 
@@ -1869,6 +1878,10 @@
             delete character.id;
             delete character.creationTime;
             delete character.lastMessageTime;
+            for(let key in character.customData) {
+              if(key === "PUBLIC") continue; // data within oc.character.customData.PUBLIC is shared within share links - all other data is not
+              delete character.customData[key];
+            }
             let urlHashData = encodeURIComponent(JSON.stringify({addCharacter:character})).replace(/[!'()*]/g, function(c) {
               return '%' + c.charCodeAt(0).toString(16); // since encodeURIComponent doesn't encode some characters (like parentheses) and I think they mess up markdown links
             });
@@ -2077,6 +2090,7 @@
       }
 
       const defaultThreadName = "Unnamed Thread";
+      const defaultSystemName = "System";
 
       async function createNewThreadWithCharacterId(characterId) {
         let folderPath = $.chatThreads.dataset.currentFolderPath;
@@ -2087,7 +2101,6 @@
 
         let userName = thread.userCharacter.name ?? userCharacter.name;
         let characterName = thread.character.name ?? character.name;
-        let systemName = "System";
 
         // add initial messages
         for(let m of character.initialMessages) {
@@ -2208,21 +2221,23 @@
           roleInstruction: { label: "Instruction/role/personality (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message defines the personality or 'role' that the AI will take during the chat. Every request to the API will include this as the first message. If you later decide to edit this, all existing and new threads will be immediately updated. This message does not get summarized by the summarization algorithm - it will always be present as the first message.", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.roleInstruction || "" },
           reminderMessage: { label: "Reminder message - an invisible system message that is placed before every AI response (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message is inserted as a reminder at the end of the chat right before each AI response. This will always be the last/most-recent message that the AI sees when writing its response. If you later decide to edit this, all existing and new threads will be immediately updated. This message is not seen/summarized by the summarization algorithm - it will always be present as the final message.", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
           initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md" target='blank'>here</a>.`, infoTooltip:"During the initialization of every new thread with this character, these messages will be created and placed at the start of the thread. Note that the summarization algorithm will eventually summarize these messages - so they won't stay around forever (unlike the instruction and reminder messages, which *do* stay around forever). Also note that if you edit the initial messages, only *new* threads will have the updated initial messages. In other words, once a chat thread has been created, the initial messages that are added to a thread during init 'belong' to that thread, not to the character.", type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
-          modelName: { label: "Model name:", infoTooltip:"GPT-4 is really smart, but expensive (about 15x price of gpt-3.5-turbo), and you need to have have access via the GPT-4 waitlist. If you use gpt-3.5-turbo and set the 'temperature' option (see advanced settings) to 1, then apparently (according to community members) it's pretty close to DaVinci in terms of creativity and overall quality. DaVinci is overpriced given its performance - GPT-4 is significantly better and only ~1.5x the price.", type:"select", options:[{content:"good, cheap (currently: gpt-3.5-turbo)", value:"good"}, {content:"great, but *expensive* (currently: davinci, or gpt-4 *if* you have access)", value:"great"}, ...broadlyAvailableModels.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => ({value:m.name, content:m.shortLabel}))], defaultValue: defaultValues.modelName || "good" },
           avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatar?.url || "" },
+          modelName: { hidden:true, label: "Model name:", infoTooltip:"GPT-4 is really smart, but expensive (about 15x price of gpt-3.5-turbo), and you need to have have access via the GPT-4 waitlist. If you use gpt-3.5-turbo and set the 'temperature' option (see advanced settings) to 1, then apparently (according to community members) it's pretty close to DaVinci in terms of creativity and overall quality. DaVinci is overpriced given its performance - GPT-4 is significantly better and only ~1.5x the price.", type:"select", options:[{content:"good, cheap (currently: gpt-3.5-turbo)", value:"good"}, {content:"great, but *expensive* (currently: davinci, or gpt-4 *if* you have access)", value:"great"}, ...broadlyAvailableModels.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => ({value:m.name, content:m.shortLabel}))], defaultValue: defaultValues.modelName || "good" },
+          fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
+          associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Persistent, 'infinite' character memory:", infoTooltip:"This increases the cost by up to 2x and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod ?? "none" },
+          associativeMemoryEmbeddingModelName: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Memory embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory (text) into a list of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[...broadlyAvailableModels.filter(m => m.type === "text-embedding").map(m => ({value:m.name, content:m.name}))], defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "text-embedding-ada-002" },
           avatarSize: { hidden:true, label: "Avatar size, as a multiple of the default size.", type:"textLine", defaultValue: defaultValues.avatar?.size ?? "1" },
           avatarShape: { hidden:true, label: "Avatar shape:", type:"select", options:[{value:"square"}, {value:"circle"}, {value:"portrait"}], defaultValue: defaultValues.avatar?.shape ?? "square" },
           sceneBackgroundUrl: { hidden:true, label: "Chat background image/video URL (jpg, webp, webm, mp4, etc.)", type:"textLine", defaultValue: defaultValues.scene?.background?.url ?? "" },
           sceneMusicUrl: { hidden:true, label: "Chat background music/audio URL (mp3, webm, mp4, etc.)", infoTooltip:"Permission is always requested from the user before playing audio - i.e. music will not autoplay because that could annoy some users. You can use a video file for audio - the visuals will obviously not be shown.", type:"textLine", defaultValue: defaultValues.scene?.music?.url ?? "" },
           userCharacterName: { hidden:true, label: "User's name. This overrides the user's default username when chatting with this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.name || "" },
           userCharacterAvatarUrl: { hidden:true, label: "User's avatar. This overrides the user's default avatar when chatting to this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.avatar?.url || "" },
-          fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
-          associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Persistent, 'infinite' character memory:", infoTooltip:"This increases the cost by up to 2x and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod ?? "none" },
-          associativeMemoryEmbeddingModelName: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Memory embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory (text) into a list of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[...broadlyAvailableModels.filter(m => m.type === "text-embedding").map(m => ({value:m.name, content:m.name}))], defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "text-embedding-ada-002" },
           // initialThreadMemories: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Initial thread-specific memories. The character will create memories based on the chat, but you can add some starter memories/lore here.", infoTooltip:"Manually-written memories can be used as 'dynamic' instruction/role/reminders that engage when relevant. This saves you from having to pack too much text into your instruction/reminder, which will 'eat up' your context, which means the AI will be able to see fewer recent messages, and summarization will have to be done more often.", type:"text", defaultValue: defaultValues.associativeMemoryEmbeddingModelName ?? "" },
           temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", infoTooltip:"People seem to get good results between 0.7 and 1.2 - higher values may sacrifice some 'correctness' but should result in more 'imagination'.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.85 },
           customCode: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
-        }, {submitButtonText: "save character", showHiddenInputsText: "show advanced options"});
+          systemCharacterName: { hidden:true, label: "System's name:", type:"textLine", defaultValue: defaultValues.systemCharacter?.name || "" },
+          systemCharacterAvatarUrl: { hidden:true, label: "System's avatar:", type:"textLine", defaultValue: defaultValues.systemCharacter?.avatar?.url || "" },
+        }, {submitButtonText: opts.submitButtonText || "save character", showHiddenInputsText: "show advanced options"});
         
         if(!result) return;
         
@@ -2272,11 +2287,19 @@
         delete result.userCharacterName;
         if(result.userCharacterAvatarUrl.trim()) result.userCharacter.avatar.url = result.userCharacterAvatarUrl;
         delete result.userCharacterAvatarUrl;
+        
+        // system character object overrides:
+        result.systemCharacter = {avatar:{}};
+        if(result.systemCharacterName.trim()) result.systemCharacter.name = result.systemCharacterName;
+        delete result.systemCharacterName;
+        if(result.systemCharacterAvatarUrl.trim()) result.systemCharacter.avatar.url = result.systemCharacterAvatarUrl;
+        delete result.systemCharacterAvatarUrl;
 
         // this is not editable in the UI, but it's needed for a valid character obj
         result.streamingResponse = true;
 
         result.folderPath = defaultValues.folderPath ?? "";
+        result.customData = defaultValues.customData ?? "";
 
         if(existingCharacter) {
           result.uuid = existingCharacter.uuid;
@@ -2475,7 +2498,7 @@
           creationTime: Date.now(),
           lastMessageTime: Date.now(),
           lastViewTime: Date.now(),
-          userCharacter: {
+          userCharacter: { // note: we don't use await getUserCharacterObj because that is for *existing* threads (requires threadId as input param)
             name: (await db.misc.get("userName"))?.value || defaultUserName,
             avatar: {
               url: (await db.misc.get("userAvatarUrl"))?.value || "",
@@ -2483,6 +2506,7 @@
               size: null,
             },
           },
+          systemCharacter: {name:defaultSystemName, avatar:{}},
           character: {avatar:{}}, // thread-specific ai character overrides
           modelName,
           customCodeWindow: {visible:false, width:null},
@@ -2494,6 +2518,8 @@
 
         // when a thread is first created, we copy across the character's userCharacter as a starting point for the `thread.userCharacter` - after that, the `aiCharacter.userCharacter` is not relevant to the thread (i.e. thread's userCharacter can diverge from the character's 'template' userCharacter)
         applyObjectOverrides({object:threadObj.userCharacter, overrides:aiCharacter.userCharacter});
+        // same for systemCharacter
+        applyObjectOverrides({object:threadObj.systemCharacter, overrides:aiCharacter.systemCharacter});
 
         await db.threads.add(threadObj);
         return threadObj;
@@ -2945,7 +2971,7 @@ OVERALL SUMMARY:
 
       
 
-      const systemName = "System"; // name for the role:system messages (needed for non-chat models like davinci-003 e.g. "System: Sammy has joined the chat")
+      // const systemName = "System"; // name for the role:system messages (needed for non-chat models like davinci-003 e.g. "System: Sammy has joined the chat")
 
 
 
@@ -2979,7 +3005,7 @@ OVERALL SUMMARY:
           let name;
           if(m.characterId === userCharacter.id) name = m.name ?? thread.userCharacter.name ?? userCharacter.name;
           else if(m.characterId === aiCharacter.id) name = m.name ?? thread.character.name ?? aiCharacter.name;
-          else if(m.characterId === -2) name = m.name ?? systemName;
+          else if(m.characterId === -2) name = m.name ?? thread.systemCharacter.name ?? defaultSystemName;
           name = name.replaceAll(" ", "_");
           name = name.replace(/[^A-Za-z0-9_\-]/g, ""); // <-- we need to replace invalid characters here since the name could have been set with custom code, and in that case it wouldn't have been validated as happens when name is set in the character editor UI
 
@@ -3041,7 +3067,7 @@ OVERALL SUMMARY:
           let author, name;
           if(m.characterId == aiCharacter.id) { author = "ai"; name = m.name ?? thread.character.name ?? aiCharacter.name; }
           if(m.characterId == -1) { author = "user"; name = m.name ?? thread.userCharacter.name ?? userCharacter.name; }
-          if(m.characterId == -2) { author = "system"; name = m.name ?? "System"; }
+          if(m.characterId == -2) { author = "system"; name = m.name ?? thread.systemCharacter.name ?? defaultSystemName; }
           let hiddenFrom = m.hiddenFrom || [];
           // note: we need to pass `id` to custom code because it's used in stuff like renderMessagesForReader - we could map the ids to "public" ones, but it's probably not necessary
           return {id:m.id, author, content:m.message, hiddenFrom, expectsReply:m.expectsReply, name, scene:m.scene, avatar:m.avatar, customData:m.customData, wrapperStyle:m.wrapperStyle};
@@ -3247,7 +3273,7 @@ OVERALL SUMMARY:
 
         let userName = thread.userCharacter.name ?? userCharacter.name;
         let characterName = thread.character.name ?? aiCharacter.name;
-        let systemName = "System";
+        let systemName = thread.systemCharacter.name ?? defaultSystemName;
 
         let roleInstruction = aiCharacter.roleInstruction?.trim();
         if(thread.character.roleInstruction?.trim()) roleInstruction = thread.character.roleInstruction?.trim();
@@ -3787,7 +3813,7 @@ OVERALL SUMMARY:
 
           let aiName = messages.find(m => m.role === "ai")?.name ?? "Assistant";
           let userName = messages.find(m => m.role === "user")?.name ?? "User";
-          let systemName = messages.find(m => m.role === "system")?.name ?? "System";
+          let systemName = messages.find(m => m.role === "system")?.name ?? defaultSystemName;
           let messagesFinal = JSON.parse(JSON.stringify(messages));
           for(let m of messagesFinal) {
             if(m.role === "ai" && !m.name) m.name = aiName;
@@ -4221,7 +4247,7 @@ OVERALL SUMMARY:
         let character = opts.character;
         if(!character) {
           if(messageObj.characterId === -1) character = userCharacter;
-          else if(messageObj.characterId === -2) character = await getSystemCharacterObj();
+          else if(messageObj.characterId === -2) character = await getSystemCharacterObj(threadId);
           else character = await db.characters.get(messageObj.characterId);
         }
         let el = await createMessageElement(messageObj, {character});
@@ -4383,7 +4409,7 @@ OVERALL SUMMARY:
         let character = opts.character;
 
         if(!character && messageObj.characterId === -1) character = await getUserCharacterObj(messageObj.threadId)
-        if(!character && messageObj.characterId === -2) character = await getSystemCharacterObj();
+        if(!character && messageObj.characterId === -2) character = await getSystemCharacterObj(messageObj.threadId);
         if(!character && messageObj.characterId >= 0) character = await db.characters.get(messageObj.characterId);
 
         let tmp = document.createElement("div");
@@ -4441,7 +4467,7 @@ OVERALL SUMMARY:
 
         let characterName;
         if(messageObj.characterId === -1) characterName = messageObj.name ?? thread.userCharacter.name ?? character.name;
-        if(messageObj.characterId === -2) characterName = messageObj.name ?? "System";
+        if(messageObj.characterId === -2) characterName = messageObj.name ?? thread.systemCharacter.name ?? character.name;
         if(messageObj.characterId >= 0) characterName = messageObj.name ?? thread.character.name ?? character.name;
 
         tmp.innerHTML = `
@@ -4540,7 +4566,7 @@ OVERALL SUMMARY:
 
       async function getUserCharacterObj(threadId) {
         // set defaults:
-        let chararcterObj = {
+        let characterObj = {
           id: -1,
           name: (await db.misc.get("userName"))?.value || defaultUserName,
           // avatarUrl: (await db.misc.get("userAvatarUrl"))?.value || "",
@@ -4558,20 +4584,28 @@ OVERALL SUMMARY:
         };
         // override with character and then thread-specific settings:
         let thread = await db.threads.get(threadId);
-        applyObjectOverrides({object:chararcterObj, overrides:thread.userCharacter});
+        applyObjectOverrides({object:characterObj, overrides:thread.userCharacter});
 
-        return chararcterObj;
+        return characterObj;
       }
-      async function getSystemCharacterObj() {
-        return {
+
+
+
+      async function getSystemCharacterObj(threadId) {
+        let characterObj = {
           id: -2,
-          name: "System",
+          name: defaultSystemName,
           avatar: {
             url: null,
             shape: null, // null => default to character setting
             size: null,
           },
         };
+        // override with character and then thread-specific settings:
+        let thread = await db.threads.get(threadId);
+        applyObjectOverrides({object:characterObj, overrides:thread.systemCharacter});
+
+        return characterObj;
       }
 
       let instructionForNextBotReply = null; // this is a mildly hacky but convenient global alternative to passing replyInstruction to doBotReplyIfNeeded, because that is triggered in various places so it's hard to "thread" the instruction through the various functions that end up calling it (e.g. triggerMessageAddedCustomCodeEvent --> renderMessageThread --> doBotReplyIfNeeded)
@@ -4635,6 +4669,8 @@ OVERALL SUMMARY:
                 defaultValue = result.messagesText;
                 alert("Invalid message formating. Should start with either '[SYSTEM]:' or '[USER]:' or '[AI]:' (without the quotes).");
               } else {
+                let loadingModal = createLoadingModal("Please wait...");
+                let i = 0;
                 for(let message of messages) {
                   let messageCharacterId;
                   if(message.author === "ai") messageCharacterId = characterId;
@@ -4647,8 +4683,11 @@ OVERALL SUMMARY:
                   }
                   let messageObj = createMessageObj({threadId, message:message.content, characterId:messageCharacterId, hiddenFrom:message.hiddenFrom || []});
                   messageObj.id = await addMessageToDb(messageObj);
-                  let el = await addMessageToFeed(messageObj);
+                  i++;
+                  if(i % 10 === 0) loadingModal.updateContent(`Please wait... (${i}/${messages.length})`);
                 }
+                await renderMessageFeed(threadId);
+                loadingModal.delete();
                 break;
               }
             }
@@ -4798,7 +4837,7 @@ OVERALL SUMMARY:
             
             let character;
             if(messageObj.characterId === -1) character = await getUserCharacterObj(threadId);
-            if(messageObj.characterId === -2) character = await getSystemCharacterObj();
+            if(messageObj.characterId === -2) character = await getSystemCharacterObj(threadId);
 
             await addMessageToFeed(messageObj, {character});
             
@@ -4839,9 +4878,10 @@ OVERALL SUMMARY:
         // maxTokens: "maxTokens",
         stopSequences: "stopSequences",
         modelName: "modelName",
-        // note: we DO NOT expose `character.userCharacter` - custom code instead edits thread.userCharacter, which is a copy of character.userCharacter that's created at the start of a new thread
+        // note: we DO NOT expose `character.userCharacter` (and same for character.systemCharacter) - custom code instead edits thread.userCharacter, which is a copy of character.userCharacter that's created at the start of a new thread
         // scene: "scene", // not exposing `scene` yet because I think it should probably be like userCharacter - i.e. instantiated as a thread property. but devs can edit scene by adding to messages anyway so no rush here.
         streamingResponse: "streamingResponse",
+        customData: "customData",
       };
 
       
@@ -4937,6 +4977,14 @@ OVERALL SUMMARY:
               thread: Object.seal({
                 messages: [],
                 userCharacter: Object.seal({
+                  name: undefined,
+                  avatar: Object.seal({
+                    url: undefined,
+                    size: undefined,
+                    shape: undefined,
+                  }),
+                }),
+                systemCharacter: Object.seal({
                   name: undefined,
                   avatar: Object.seal({
                     url: undefined,
@@ -5579,6 +5627,7 @@ OVERALL SUMMARY:
           thread: {
             messages: formattedMessages,
             userCharacter: thread.userCharacter,
+            systemCharacter: thread.systemCharacter,
             customData: thread.customData,
             character: thread.character,
           },
@@ -5730,20 +5779,30 @@ OVERALL SUMMARY:
           // let newMessages = await db.messages.where("threadId").equals(threadId).toArray();
           // debugger;
         }
-        if(receivedData.thread?.userCharacter) {
+        
+        
+        {
           let thread = await db.threads.get(threadId);
-          applyObjectOverrides({object:thread.userCharacter, overrides:receivedData.thread.userCharacter});
-          await db.threads.put(thread);
-        }
-        if(receivedData.thread?.character) {
-          let thread = await db.threads.get(threadId);
-          applyObjectOverrides({object:thread.character, overrides:receivedData.thread.character});
-          await db.threads.put(thread);
-        }
-        if(receivedData.thread?.customData) {
-          let thread = await db.threads.get(threadId);
-          thread.customData = receivedData.thread.customData;
-          await db.threads.put(thread);
+          let changed = false;
+          if(receivedData.thread?.userCharacter) {
+            applyObjectOverrides({object:thread.userCharacter, overrides:receivedData.thread.userCharacter});
+            changed = true;
+          }
+          if(receivedData.thread?.systemCharacter) {
+            applyObjectOverrides({object:thread.systemCharacter, overrides:receivedData.thread.systemCharacter});
+            changed = true;
+          }
+          if(receivedData.thread?.character) {
+            applyObjectOverrides({object:thread.character, overrides:receivedData.thread.character});
+            changed = true;
+          }
+          if(receivedData.thread?.customData) {
+            thread.customData = receivedData.thread.customData;
+            changed = true;
+          }
+          if(changed) {
+            await db.threads.put(thread);
+          }
         }
 
 
@@ -5986,6 +6045,40 @@ OVERALL SUMMARY:
         await renderCharacterList();
         $.messageFeed.innerHTML = "";
       });
+
+
+      // $.statsButton.addEventListener("click", async function() {
+      //   let entries = await db.usageStats.toArray();
+      //   let dayToSpendMap = {};
+      //   for(let entry of entries) {
+      //     entry.daysSinceEpoch = Math.floor(entry.dateHour / (1000 * 60 * 60 * 24));
+      //   }
+      //   let spent = usageStatsEntriesToCost(entries);
+
+      //   await prompt2({
+      //     chart: {html: "", type: "none"}
+      //   });
+
+      //   let Chart = await import('https://cdn.jsdelivr.net/npm/chart.js@4.2.1/+esm').then(m => m.default);
+      //   const chart = new Chart(ctx, {
+      //     type: 'line',
+      //     data: {
+      //       datasets: [{
+      //         data: entries.map(),
+      //       }],
+      //     },
+      //     options: {
+      //       scales: {
+      //         x: {
+      //           type: 'time',
+      //           time: {
+      //             unit: 'day'
+      //           }
+      //         }
+      //       }
+      //     }
+      //   });
+      // });
 
 
       $.settingsButton.addEventListener("click", async function() {
@@ -6504,7 +6597,7 @@ OVERALL SUMMARY:
         $.chatThreads.dataset.currentFolderPath = thread.folderPath;
         await renderThreadList();
         let el = $.chatThreads.querySelector(`.thread[data-thread-id="${thread.id}"]`);
-        if(!el) el = $.chatThreads.querySelector(`.thread`); // in case we don't show all threads, eventually, and last viewed thread is not visible (since we sort by 'last messaged' in renderThreadList)
+        if(!el) el = $.chatThreads.querySelector(`.thread`); // in case the 'last viewed' thread is in a different folder to the 'last messaged' thread (renderThreadList shows last messaged thread)
         el.click();
       }
 
@@ -6531,7 +6624,7 @@ OVERALL SUMMARY:
             editingExistingCharacter = true;
           }
 
-          let result = await characterDetailsPrompt(character, {editingExistingCharacter});
+          let result = await characterDetailsPrompt(character, {editingExistingCharacter, submitButtonText:"save edits"});
           if(result) {
             if(editingExistingCharacter) {
               await db.characters.where({uuid:character.uuid}).modify(result);
