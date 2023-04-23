@@ -3611,6 +3611,9 @@ OVERALL SUMMARY:
                 processLine(line);
               }
             }
+            if(signals.stop === true) {
+              break;
+            }
           }
           triggerStreamingMessageChunkCustomCodeEvent(threadId, {text:prevText, index:chunkI-1, last:true, streamId});
           return result;
@@ -4131,10 +4134,11 @@ OVERALL SUMMARY:
           messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
           messageEl.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
 
-          let signals = {stop:false};
+          let signals = {stop:false, wasDeleted:false};
           messageEl.querySelector(".info .deleteButton").addEventListener("click", async e => {
             e.preventDefault(); e.stopPropagation();
             signals.stop = true;
+            signals.wasDeleted = true;
             botIsCurrentlyReplying = false;
             messageEl.remove();
             await updateInlineReminderMessage();
@@ -4149,8 +4153,12 @@ OVERALL SUMMARY:
           $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
             e.preventDefault(); e.stopPropagation();
             signals.stop = true;
-            botIsCurrentlyReplying = false;
-            messageEl.remove();
+            // we don't set botIsCurrentlyReplying=false here because getBotReply will return "successfully", except with a partially-streamed message
+            if(!character.streamingResponse) {
+              messageEl.remove();
+              signals.wasDeleted = true;
+              botIsCurrentlyReplying = false
+            }
             await updateInlineReminderMessage();
             $.statusNotifier.innerHTML = "";
             hideEl($.statusNotifier);
@@ -4164,8 +4172,8 @@ OVERALL SUMMARY:
           hideEl($.statusNotifier);
           $.statusNotifier.innerHTML = "";
 
-          if(signals.stop) { // user deleted message
-            botIsCurrentlyReplying = false;
+          if(signals.wasDeleted || message === undefined) {
+            // we don't need to set botIsCurrentlyReplying=false here because it's done in delete handler, and setting it here would disrupt other calls to this function since it's global
             return;
           }
 
@@ -6213,6 +6221,9 @@ OVERALL SUMMARY:
           }
           if(!config.tokenPricing) {
             config.tokenPricing = {prompt:0, completion:0};
+          }
+          if(!config.apiKey && config.endpointUrl.startsWith("https://api.openai.com")) {
+            config.apiKey = "<OPENAI>";
           }
         }
 
