@@ -1123,14 +1123,28 @@
         $.chatThreads.querySelectorAll(".exportButton").forEach(btn => {
           btn.addEventListener("click", async function(e) {
             e.stopPropagation();
+
+            const result = await prompt2({
+              exportType: {label: "export type:", type: "select", options:[{value:"json", content:"whole thread, including character (recommended)"}, {value:"text", content:"message text only (in [AI]/[USER] format - use '/import' command to import)"}]},
+            }, {submitButtonText:"export"});
+            if(!result) return;
+
             const threadId = parseInt(btn.closest(".thread").dataset.threadId);
             let json = await getThreadJSONById(threadId);
 
             let thread = await db.threads.get(threadId);
             let character = await db.characters.get(thread.characterId);
 
-            let filename = encodeURIComponent(`${thread.name} - ${character.name}`.replaceAll(" ", "_")) + ".json";
-            downloadText(JSON.stringify(json), filename);
+            if(result.exportType === "text") {
+              let filename = encodeURIComponent(`${thread.name} - ${character.name}`.replaceAll(" ", "_")) + ".txt";
+              let text = json.data.data.find(t => t.tableName === "messages").rows.sort((a,b) => a.order-b.order).map(m => {
+                return (m.characterId === -1 ? "[USER]: " : m.characterId === -2 ? "[SYSTEM]: " : "[AI]: ") + m.message;
+              }).join("\n\n");
+              downloadText(text, filename);
+            } else {
+              let filename = encodeURIComponent(`${thread.name} - ${character.name}`.replaceAll(" ", "_")) + ".json";
+              downloadText(JSON.stringify(json), filename);
+            }
           });
         });
 
@@ -2384,6 +2398,10 @@
           if(!m.hiddenFrom) m.hiddenFrom = [];
           // note: currently expectsReply is not supported in initial messages
           delete m.parameters;
+        }
+
+        for(let m of messages) {
+          m.content = m.content.trim(); // to allow messages to be separated by multiple newlines, and to allow a space after [AI]:/[USER]:/[SYSTEM]:
         }
 
         return messages;
@@ -4117,6 +4135,7 @@ OVERALL SUMMARY:
           messageEl.querySelector(".info .deleteButton").addEventListener("click", async e => {
             e.preventDefault(); e.stopPropagation();
             signals.stop = true;
+            botIsCurrentlyReplying = false;
             messageEl.remove();
             await updateInlineReminderMessage();
           });
@@ -4126,9 +4145,24 @@ OVERALL SUMMARY:
           }
           instructionForNextBotReply = null; // TODO: refactor various calls to doBotReplyIfNeeded (e.g. at end of renderMessageFeed) so we don't need it and can easily just pass replyInstruction without all the threading-through-multiple-functions issues
 
+          $.statusNotifier.innerHTML = "<button style='font-size: 0.9rem;'>🛑 stop response</button>";
+          $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
+            e.preventDefault(); e.stopPropagation();
+            signals.stop = true;
+            botIsCurrentlyReplying = false;
+            messageEl.remove();
+            await updateInlineReminderMessage();
+            $.statusNotifier.innerHTML = "";
+            hideEl($.statusNotifier);
+          });
+          showEl($.statusNotifier);
+
           const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
           const {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, replyInstruction, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl), signals});
           messageEl.querySelector(".statusMessage").innerHTML = "";
+
+          hideEl($.statusNotifier);
+          $.statusNotifier.innerHTML = "";
 
           messageObj.memoryIdBatchesUsed = memoryIdBatchesUsed;
           messageObj.summaryHashUsed = summaryHashUsed;
