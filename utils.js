@@ -70,8 +70,8 @@ export async function prompt2(specs, opts={}) {
       structuredSectionsI++;
     } else if(spec.type == "none") {
       sections += `
-        <section data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
-          ${spec.html}
+        <section data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" data-requires-element-insert="${typeof spec.html === "string" ? "no" : "yes"}" style="${spec.hidden === true ? "display:none" : ""};">
+          ${typeof spec.html === "string" ? spec.html : ""}
         </section>`;
     }
     i++;
@@ -138,6 +138,11 @@ export async function prompt2(specs, opts={}) {
       updateInputVisibilies();
     };
   }
+
+  let elementObjects = Object.values(specs).filter(s => s.html && typeof s.html !== "string").map(s => s.html);
+  ctn.querySelectorAll('.sectionsContainer [data-requires-element-insert=yes]').forEach((el, i) => {
+    el.append(elementObjects[i]);
+  });
 
   setTimeout(() => {
     // add scrollFade if sectionsContainer has scroll
