@@ -3282,7 +3282,7 @@ OVERALL SUMMARY:
         }
 
         if(signals.stop === true) {
-          return undefined;
+          return {};
         }
 
         const authorToRoleMap = {
@@ -3515,7 +3515,7 @@ OVERALL SUMMARY:
         }
 
         if(signals.stop === true) {
-          return undefined;
+          return {};
         }
 
         for(let message of messagesArr) {
@@ -4164,15 +4164,15 @@ OVERALL SUMMARY:
           hideEl($.statusNotifier);
           $.statusNotifier.innerHTML = "";
 
-          messageObj.memoryIdBatchesUsed = memoryIdBatchesUsed;
-          messageObj.summaryHashUsed = summaryHashUsed;
-          messageObj.memoryQueriesUsed = memoryQueriesUsed;
-          messageObj.messageIdsUsed = messageIdsUsed;
-
           if(signals.stop) { // user deleted message
             botIsCurrentlyReplying = false;
             return;
           }
+
+          messageObj.memoryIdBatchesUsed = memoryIdBatchesUsed;
+          messageObj.summaryHashUsed = summaryHashUsed;
+          messageObj.memoryQueriesUsed = memoryQueriesUsed;
+          messageObj.messageIdsUsed = messageIdsUsed;
           
           // if `message` is not a string, it means the bot failed to reply, so delete the message
           if(typeof message !== "string") {
@@ -4525,7 +4525,7 @@ OVERALL SUMMARY:
                   <div class="time" style="font-size:0.8rem; opacity:0.5; margin-left:0.5rem; display: flex; align-items: center;">${getDateTimeString(messageObj.creationTime)}</div>
                   <div class="editButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
                   <div class="deleteButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
-                  <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: ${character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔄</div>
+                  <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: ${character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔁</div>
                   <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); ${sanitizeHtml(variantCtnCss)}">
                     <span class="prevMessageVariantButton emojiButton">◄</span>
                     <span class="currentVariantNumber">${sanitizeHtml(currentVariantNumber)}<span style="opacity:0.5">/${sanitizeHtml(messageObj.variants.length)}</span></span>
