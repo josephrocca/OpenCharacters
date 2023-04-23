@@ -493,7 +493,7 @@
     <audio id="musicPlayer" style="display:none;"></audio>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=27";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=28";
 
       let JSON5;
       (async function() {
@@ -2424,14 +2424,16 @@
         };
       }
 
-      async function addMessageToDb(messageObj) {
+      async function addMessageToDb(messageObj, opts={}) {
 
         messageObj = JSON.parse(JSON.stringify(messageObj));
         delete messageObj.character; // just in case I'm sloppy somewhere
 
-        let messages = await db.messages.where({threadId:messageObj.threadId}).toArray();
-        messages.sort((a,b) => a.order - b.order);
-        messageObj.order = messages.length > 0 ? messages.at(-1).order + 1 : 0;
+        if(messageObj.order === undefined) {
+          let messages = await db.messages.where({threadId:messageObj.threadId}).toArray();
+          messages.sort((a,b) => a.order - b.order);
+          messageObj.order = messages.length > 0 ? messages.at(-1).order + 1 : 0;
+        }
 
         let id = await db.messages.add(messageObj);
         // update the thread's lastMessageTime.
@@ -3338,7 +3340,7 @@ OVERALL SUMMARY:
 
         let memories = await db.memories.where({threadId, status:"current"}).toArray();
         if(aiCharacter.associativeMemoryMethod === "v1" && memories.length > 0) {
-          onProgressMessage({message:"processing memories..."});
+          onProgressMessage({message:"gen mem queries..."});
 
           // NOTE: I replace newlines in messages with spaces because I *think* the AI was getting confused about the structure of the messages
           const messagesToTextFormat = (messages) => messages.filter(m => !m._isReminder).slice(-10).map(m => `[[${m.name || "System"}]]: ${m.content.replace(/\n/g, " ")}`).join("\n\n");
@@ -3373,6 +3375,7 @@ OVERALL SUMMARY:
           const scoreThreshold = 0; // this is zero now because we subtract the average inverseDistance from the score when computing the score
           console.log("memory score threshold:", scoreThreshold);
 
+          onProgressMessage({message:"calc mem relevance..."});
           for(let memory of memories) {
             if(memory._relevanceScore === undefined) memory._relevanceScore = 0;
             let i = 0;
@@ -4254,6 +4257,10 @@ OVERALL SUMMARY:
         
         if(opts.inPlaceOf) {
           opts.inPlaceOf.replaceWith(el);
+        } else if(opts.insertAfter) {
+          opts.insertAfter.after(el);
+        } else if(opts.insertBefore) {
+          opts.insertBefore.before(el);
         } else {
           // otherwise we append:
           let shouldScrollDown = messageFeedIsNearBottom();
@@ -4530,12 +4537,53 @@ OVERALL SUMMARY:
       async function messageEditButtonClickHandler(e) {
         e.preventDefault();
         e.stopPropagation();
-        const messageId = parseInt(this.closest(".message").dataset.id);
+        let messageEl = this.closest(".message");
+        const messageId = parseInt(messageEl.dataset.id);
         const originalMessage = await db.messages.get(messageId);
+        let threadId = originalMessage.threadId;
+        const thread = await db.threads.get(threadId);
+
+        let insertNewMessageEl = document.createElement("div");
+        insertNewMessageEl.style.cssText = "margin-top: 1rem;";
+        insertNewMessageEl.innerHTML = `<span style="font-size:85%;">insert new message:</span> <button class="insertAbove">above</button> <button class="insertBelow">below</button>`;
+        async function insertMessageHandler(aboveOrBelow) {
+          const result = await prompt2({
+            content: {label: "message:", type: "text", height:"fit-content", focus:true},
+            author: {label: "author:", type: "select", options:[{value:"user"}, {value:"ai"}, {value:"system"}], defaultValue: "user"},
+            hiddenFrom: {hidden:true, label: "hidden from:", type: "select", options:[{value:"user"}, {value:"ai"}, {content:"both", value:"user,ai"}, {content:"neither", value:""}], defaultValue: originalMessage.hiddenFrom.join(",")},
+          });
+          if(!result) return;
+          let characterId = result.author === "user" ? -1 : result.author === "system" ? -2 : thread.characterId;
+          let messageObj = createMessageObj({threadId, message:result.content, characterId, hiddenFrom:result.hiddenFrom.split(",")});
+          
+          let messages = await db.messages.where({threadId}).toArray();
+          messages.sort((a,b) => a.order - b.order);
+          let messageIndex = messages.findIndex(m => m.id === messageId);
+          let prevOrder, nextOrder;
+          if(aboveOrBelow === "above") {
+            prevOrder = messageIndex > 0 ? messages[messageIndex-1].order : messages[messageIndex].order-1;
+            nextOrder = originalMessage.order;
+          } else {
+            prevOrder = originalMessage.order;
+            nextOrder = messageIndex < messages.length-1 ? messages[messageIndex+1].order : messages[messageIndex].order+1;
+          }
+          messageObj.order = (prevOrder + nextOrder) / 2;
+          messageObj.id = await addMessageToDb(messageObj);
+          
+          let opts = {};
+          if(aboveOrBelow === "above") opts.insertBefore = messageEl;
+          else opts.insertAfter = messageEl;
+
+          await addMessageToFeed(messageObj, opts);
+        }
+        insertNewMessageEl.querySelector(".insertAbove").addEventListener("click", insertMessageHandler.bind(null, "above"));
+        insertNewMessageEl.querySelector(".insertBelow").addEventListener("click", insertMessageHandler.bind(null, "below"));
+
         const result = await prompt2({
-          message: {label: "Message:", type: "text", height:"fit-content", defaultValue: originalMessage.message, focus:true},
-          hiddenFrom: {label: "Hidden from:", type: "select", options:[{value:"user"}, {value:"ai"}, {content:"both", value:"user,ai"}, {content:"neither", value:""}], defaultValue: originalMessage.hiddenFrom.join(",")},
-        });
+          message: {label: "message:", type: "text", height:"fit-content", defaultValue: originalMessage.message, focus:true},
+          hiddenFrom: {hidden:true, label: "hidden from:", type: "select", options:[{value:"user"}, {value:"ai"}, {content:"both", value:"user,ai"}, {content:"neither", value:""}], defaultValue: originalMessage.hiddenFrom.join(",")},
+          insertMessage: {hidden:true, html: insertNewMessageEl, type: "none"},
+        }, {submitButtonText:"save"});
         if(!result) return;
         result.hiddenFrom = result.hiddenFrom.split(",").filter(x => x);
         await db.messages.update(messageId, result);
@@ -4543,7 +4591,6 @@ OVERALL SUMMARY:
         let newMessage = await db.messages.get(messageId);
 
         let shouldScrollDown = messageFeedIsNearBottom();
-        let messageEl = this.closest(".message");
         await addMessageToFeed(newMessage, {inPlaceOf:messageEl});
         if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
       }
