@@ -167,7 +167,7 @@ Sometimes you may want to display different text to the user than what the AI se
 ```js
 oc.messageRenderingPipeline.push(function({message, reader}) {
   if(reader === "user") message.content += "🌸"; // user will see all messages with a flower emoji appended
-  if(reader === "user") message.content = message.content.replaceAll("wow", "WOW"); // ai will see a version of the message with all instances of "wow" capitalized
+  if(reader === "ai") message.content = message.content.replaceAll("wow", "WOW"); // ai will see a version of the message with all instances of "wow" capitalized
 });
 ```
 
