@@ -132,10 +132,9 @@ oc.thread.on("MessageAdded", async function () {
   let lastMessage = messages.at(-1);
   if(lastMessage.author === "user") {
     let urlsInLastMessage = [...lastMessage.content.matchAll(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g)].map(m => m[0]);
-    if(urlsInLastMessage.length === 0) return messages;
-    // just grab contents for last URL
+    if(urlsInLastMessage.length === 0) return;
     if(!window.Readability) window.Readability = await import("https://esm.sh/@mozilla/readability@0.4.4?no-check").then(m => m.Readability);
-    let url = "https://www.bbc.com/news/world-us-canada-65380349";
+    let url = urlsInLastMessage.at(-1); // we use the last URL in the message, if there are multiple
     let text = await fetch(url).then(r => r.text());
     let doc = new DOMParser().parseFromString(text, "text/html");
     let article = new Readability(doc).parse();
