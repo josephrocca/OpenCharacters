@@ -46,3 +46,20 @@ The model selector at the top of the thread should show your new model.
 If you know of any API wrappers for Anthropic, Cohere, etc. models that make them OpenAI API-compatible, then please let me know here on Github or on the Discord and I can make sure the custom model system works with them. It should work with any API endpoint that's compatible with OpenAI's completion APIs.
 
 Note that, if you do end up finding an API wrapper, you'll still want to use the correct Hugging Face repo name to load the tokenizer - e.g. [`Cohere/Command-nightly`](https://huggingface.co/Cohere/Command-nightly) contains the `tokenizer.json` needed for the Cohere APIs.
+
+
+### Swapping out OpenAI API for an exact duplicate/proxy
+
+There are some services which duplicate OpenAI's APIs *exactly* because they're actually just proxying it. For these, you can run the following code after page load using a browser extension like GreaseMonkey:
+```js
+let proxyHandler = {
+  apply: async function (target, thisArg, argumentsList) {
+    let url = argumentsList[0];
+    if(url.startsWith("https://api.openai.com")) url = url.replace("api.openai.com", "api.example.com");
+    return target.call(thisArg, proxiedUrl, ...argumentsList.slice(1));
+  },
+};
+let originalFetch = window.fetch;
+window.fetch = new Proxy(fetch, proxyHandler);
+```
+You just need to replace `api.example.com` with whatever the URL of you proxy is.
