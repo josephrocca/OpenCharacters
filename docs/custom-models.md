@@ -62,4 +62,4 @@ let proxyHandler = {
 let originalFetch = window.fetch;
 window.fetch = new Proxy(fetch, proxyHandler);
 ```
-You just need to replace `api.example.com` with whatever the URL of you proxy is.
+You just need to replace `api.example.com` with whatever the URL of your proxy is.
