@@ -56,7 +56,7 @@ let proxyHandler = {
   apply: async function (target, thisArg, argumentsList) {
     let url = argumentsList[0];
     if(url.startsWith("https://api.openai.com")) url = url.replace("api.openai.com", "api.example.com");
-    return target.call(thisArg, proxiedUrl, ...argumentsList.slice(1));
+    return target.call(thisArg, url, ...argumentsList.slice(1));
   },
 };
 let originalFetch = window.fetch;
