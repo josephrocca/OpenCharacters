@@ -3544,7 +3544,7 @@ OVERALL SUMMARY:
         }
 
         async function handleStreamingResponse(reader) {
-          let result = "";
+          result = ""; // `result` comes from parent scope
           let chunkI = 0;
           let prevText = null;
           let textBuffer = "";
@@ -3598,7 +3598,7 @@ OVERALL SUMMARY:
             }
             if(chunkI === 0 && res?.value.trim().startsWith("{")) { // errors don't start with 'data'
               let json = JSON.parse(res.value);
-              alert("Error streaming message:\n\n"+JSON.stringify(json.error, null, 2));
+              if(!signals.stop) alert("Error streaming message:\n\n"+JSON.stringify(json.error, null, 2));
               break;
             } else {
               textBuffer += res.value;
@@ -3624,12 +3624,21 @@ OVERALL SUMMARY:
         if(!modelType) throw new Error("modelType is undefined for model "+modelName);
         let getStreamingResponse = aiCharacter.streamingResponse;
 
-        let result;
+        let result = undefined;
         let apiTokenUsage;
 
         let headers = {"Content-Type": "application/json"};
         if(apiKey) headers.authorization = `Bearer ${apiKey}`;
         if(apiKey) headers["api-key"] = apiKey; // some non-OpenAI APIs require this (e.g. Azure)
+
+        let abortController = new AbortController();
+        let abortSignal = abortController.signal;
+        let abortCheckInterval = setInterval(() => {
+          if(signals.stop) {
+            abortController.abort();
+            clearInterval(abortCheckInterval);
+          }
+        }, 100);
 
         if(modelType === "chat-completion") {
 
@@ -3653,22 +3662,33 @@ OVERALL SUMMARY:
               headers,
               body: JSON.stringify(data),
               method: "POST",
-            }).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
-            const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
-            result = await handleStreamingResponse(reader);
-
-            apiTokenUsage.completion += await countTokens(result, modelName);
-            apiTokenUsage.total += await countTokens(result, modelName);
+              signal: abortSignal,
+            }).catch(e => {
+              if(!signals.stop) alert("getBotReply > modelType:chat > fetch:\n\n"+e.stack);
+            });
+            
+            if(response) { // <-- e.g. request was aborted by user
+              const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
+              await handleStreamingResponse(reader).catch(e => {  // this appends chunks to the `result` variable
+                if(!signals.stop) alert("getBotReply > modelType:chat > handleStreamingResponse:\n\n"+e.stack);
+              });
+              apiTokenUsage.completion += await countTokens(result, modelName);
+              apiTokenUsage.total += await countTokens(result, modelName);
+            }
+            
           } else {
             let json = await fetch(modelObj.endpointUrl, {
               method: 'POST',
               headers,
               body: JSON.stringify(data),
-            }).then(r => r.json()).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
+              signal: abortSignal,
+            }).then(r => r.json()).catch(e => {
+              if(!signals.stop) alert("getBotReply > modelType:chat > fetch:\n\n"+e.stack);
+            });
 
             if(json?.error) {
               console.error(json.error);
-              alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+              if(!signals.stop) alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
             }
             if(json?.usage) {
               apiTokenUsage = {prompt:json?.usage.prompt_tokens, completion:json?.usage.completion_tokens, total:json?.usage.total_tokens};
@@ -3706,22 +3726,33 @@ OVERALL SUMMARY:
               headers,
               body: JSON.stringify(data),
               method: "POST",
-            }).catch(e => alert("getBotReply > modelType:chat > fetch: \n\n"+e.stack));
-            const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
-            result = await handleStreamingResponse(reader);
+              signal: abortSignal,
+            }).catch(e => {
+              if(!signals.stop) alert("getBotReply > modelType:chat > fetch:\n\n"+e.stack);
+            });
+            
+            if(response) { // <-- e.g. request was aborted by user
+              const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
+              result = await handleStreamingResponse(reader).catch(e => {  // this appends chunks to the `result` variable
+                if(!signals.stop) alert("getBotReply > modelType:chat > handleStreamingResponse:\n\n"+e.stack);
+              });
+              apiTokenUsage.completion += await countTokens(result, modelName);
+              apiTokenUsage.total += await countTokens(result, modelName);
+            }
 
-            apiTokenUsage.completion += await countTokens(result, modelName);
-            apiTokenUsage.total += await countTokens(result, modelName);
           } else {
             let json = await fetch(modelObj.endpointUrl, {
               method: "POST",
               headers,
               body: JSON.stringify(data),
-            }).then(r => r.json()).catch(e => alert("getBotReply > modelType:general > fetch: \n\n"+e.stack));
+              signal: abortSignal,
+            }).then(r => r.json()).catch(e => {
+              if(!signals.stop) alert("getBotReply > modelType:general > fetch:\n\n"+e.stack);
+            });
             
             if(json?.error) {
               console.error(json.error);
-              alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
+              if(!signals.stop) alert(`Error during getBotReply:\n` + (openAiErrorTypeToReadableError[json.error.type] ? openAiErrorTypeToReadableError[json.error.type] : JSON.stringify(json.error, null, 2)+"\n\nPlease screenshot this error and share on our Discord server or Github."));
             }
 
             if(json?.usage) {
@@ -3738,9 +3769,11 @@ OVERALL SUMMARY:
         onProgressMessage({message:"finished"});
 
         // sometimes the gpt-turbo / chat models prefix messages with "characterName:"
-        if(result.startsWith(`${aiCharacter.name}:`)) {
+        if(result && result.startsWith(`${aiCharacter.name}:`)) {
           result = result.slice(aiCharacter.name.length+1).trim();
         }
+
+        clearInterval(abortCheckInterval);
 
         return {message:result, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed};
       }
@@ -4154,7 +4187,7 @@ OVERALL SUMMARY:
             e.preventDefault(); e.stopPropagation();
             signals.stop = true;
             // we don't set botIsCurrentlyReplying=false here because getBotReply will return "successfully", except with a partially-streamed message
-            if(!character.streamingResponse) {
+            if(!character.streamingResponse || (character.streamingResponse && streamingChunkCount === 0)) {
               messageEl.remove();
               signals.wasDeleted = true;
               botIsCurrentlyReplying = false
@@ -4165,8 +4198,19 @@ OVERALL SUMMARY:
           });
           showEl($.statusNotifier);
 
+          let streamingChunkCount = 0;
+          function onStreamingReplyChunk(c) {
+            handleStreamingReplyChunk(c, messageEl);
+            streamingChunkCount++;
+          }
+
           const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-          const {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, replyInstruction, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl), signals});
+          const {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, replyInstruction, onProgressMessage, onStreamingReplyChunk, signals}).catch(e => {
+            if(e.name !== "AbortError") {
+              alert("There was an error during doBotReplyIfNeeded:\n\n"+e.stack);
+            }
+            return {};
+          });
           messageEl.querySelector(".statusMessage").innerHTML = "";
 
           hideEl($.statusNotifier);
@@ -4200,9 +4244,11 @@ OVERALL SUMMARY:
           }
 
         } catch(e) {
-          console.error(e);
-          alert(e.stack);
-          botIsCurrentlyReplying = false;
+          if(e.name !== "AbortError") { // AbortError is thrown by AbortController.abort() when user clicks "stop response" - for some reason I can't catch it
+            console.error(e);
+            alert(e.stack);
+            botIsCurrentlyReplying = false;
+          }
         }
         
         autoNameThreadIfNeeded(threadId);
@@ -5952,7 +5998,7 @@ OVERALL SUMMARY:
         $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
           e.preventDefault(); e.stopPropagation();
           signals.stop = true;
-          if(!characterToReplyWith.streamingResponse) {
+          if(!characterToReplyWith.streamingResponse || (characterToReplyWith.streamingResponse && streamingChunkCount === 0)) {
             messageEl.remove();
             signals.wasDeleted = true;
           }
@@ -5960,10 +6006,21 @@ OVERALL SUMMARY:
           hideEl($.statusNotifier);
         });
         showEl($.statusNotifier);
+
+        let streamingChunkCount = 0;
+        function onStreamingReplyChunk(c) {
+          handleStreamingReplyChunk(c, messageEl);
+          streamingChunkCount++;
+        }
         
         // the "aiCharacter" is the one that replies 
         const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-        let {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl), signals});
+        let {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, onProgressMessage, onStreamingReplyChunk, signals}).catch(e => {
+          if(e.name !== "AbortError") {
+            alert("There was an error during doBotReplyInPlaceOfUser:\n\n"+e.stack);
+          }
+          return {};
+        });
         messageEl.querySelector(".statusMessage").innerHTML = "";
 
         hideEl($.statusNotifier);
