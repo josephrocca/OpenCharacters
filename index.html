@@ -664,7 +664,7 @@
           }
           if (newScrollTop > messageFeedScrollTop) { // they scrolled down, so hide menu if their mouse isn't in trigger area
             lastMessageFeedScrollWasUp = false;
-            if(!isMouseInTriggerArea) {
+            if(!isMouseInTriggerArea || isMobile) {
               hideMessageFeedTopMenu();
             }
           }
@@ -2187,7 +2187,7 @@
         // to prevent flash for fast-loading threads:
         let loadingModalCreationTimeout = setTimeout(() => {
           loadingModal = createLoadingModal("Loading...", $.middleColumn);
-        }, 1200);
+        }, 200);
         
         document.querySelectorAll("#chatThreads .thread").forEach(el => el.classList.remove("selected"));
         const threadEl = $.chatThreads.querySelector(`.thread[data-thread-id="${threadId}"]`);
@@ -4581,13 +4581,13 @@ OVERALL SUMMARY:
             <div class="messageWrap">
               <div class="avatar" style="${avatarUrl ? `background-image:url(${sanitizeHtml(avatarUrl)})` : ""};width:${sanitizeHtml(avatarWidth)}px; min-width:${sanitizeHtml(avatarWidth)}px; height:${sanitizeHtml(avatarHeight)}px; border-radius:${sanitizeHtml(avatarBorderRadius)};"></div>
               <div style="padding-left:0.5rem; min-width: 0; width:100%;">
-                <div class="info" style="flex-grow:1; display:flex; font-size:80%;">
+                <div class="info" style="flex-grow:1; display:flex; font-size:80%; align-items:center;">
                   <div class="characterName" style="font-weight:bold;">${sanitizeHtml(characterName)}</div>
-                  <div class="time" style="font-size:0.8rem; opacity:0.5; margin-left:0.5rem; display: flex; align-items: center;">${getDateTimeString(messageObj.creationTime)}</div>
+                  <!-- <div class="time" style="font-size:0.8rem; opacity:0.5; margin-left:0.5rem; display: flex; align-items: center;">${getDateTimeString(messageObj.creationTime)}</div> -->
                   <div class="editButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
                   <div class="deleteButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
                   <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: ${character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔁</div>
-                  <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); ${sanitizeHtml(variantCtnCss)}">
+                  <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); min-width:max-content; ${sanitizeHtml(variantCtnCss)}">
                     <span class="prevMessageVariantButton emojiButton">◄</span>
                     <span class="currentVariantNumber">${sanitizeHtml(currentVariantNumber)}<span style="opacity:0.5">/${sanitizeHtml(messageObj.variants.length)}</span></span>
                     <span class="nextMessageVariantButton emojiButton">►</span>
