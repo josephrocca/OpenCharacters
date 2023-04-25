@@ -2751,11 +2751,13 @@
         // get total tokens in all messages
         let initialTokenCount = await countTokensInMessages(remainingMessages, modelName);
         let currentTokenCount = initialTokenCount;
+        let numTokensToSummarize; // we don't know this until we've looped through and found the first hash with no matching summary in our database
         let prevSummary;
         let prevSummaryObj;
         let prevInstructionHash;
         let i = 0;
         let numSummariesGenerated = 0; // <-- i.e. where we didn't have an existing matching summary
+        let alreadyWarnedAboutLoop = false;
         // while the total token count is too high, grab batches of old messages, and summarize them
         while(currentTokenCount > tokenLimitForSummaryAndMessages) {
           let progess = 1 - ((currentTokenCount-tokenLimitForSummaryAndMessages) / (initialTokenCount-tokenLimitForSummaryAndMessages));
@@ -2874,6 +2876,9 @@ OVERALL SUMMARY:
           let summaryObj = await db.summaries.get(hash);
           let summary = summaryObj?.summary;
           if(!summary) {
+            if(numTokensToSummarize === null) {
+              numTokensToSummarize = currentTokenCount;
+            }
             let result;
             while(1) {
               result = await getChatCompletion({
@@ -2890,8 +2895,9 @@ OVERALL SUMMARY:
               await delay(3000);
             }
             numSummariesGenerated++;
-            if(numSummariesGenerated === 10) {
-              alert("The summary system might be caught in a loop? This could be a bug - or it may just be that you've only recently enabled summaries on a very long thread, or you've edited an early message in a long thread so a lot of summaries need to be computed. If you click OK, it will continue, but please watch it to ensure it doesn't infinitely loop.");
+            if(!alreadyWarnedAboutLoop && numSummariesGenerated > 5*(numTokensToSummarize/messageTokensToConsumePerSummary)) { // the 5* is because it's very unlikely that each summary only consumed 1/5 of messageTokensToConsumePerSummary
+              alert("The summary system might be caught in a loop? This could be a bug. If you click OK, it will continue, but please watch it to ensure it doesn't infinitely loop and spend lots of API credits.");
+              alreadyWarnedAboutLoop = true;
             }
             if(aiCharacter.associativeMemoryMethod === "v1") {
               let [ memoriesText, summaryText ] = result.split(/OVERALL SUMMARY:|NEW OVERALL SUMMARY:/);
