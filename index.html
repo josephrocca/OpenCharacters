@@ -4076,7 +4076,7 @@ OVERALL SUMMARY:
 
       let lastBotReplyTime = 0;
       let botIsCurrentlyReplying = false;
-      async function doBotReplyIfNeeded({forceReply=false, replyInstruction=null}={}) {
+      async function doBotReplyIfNeeded({forceReply=false, replyInstruction=null, signals=null, result={}}={}) {
         while(Date.now()-lastBotReplyTime < 1000) {
           await delay(200); // don't reply too fast in case of infinite bot reply loop (e.g. due to custom code stuff)
         }
@@ -4134,7 +4134,7 @@ OVERALL SUMMARY:
           messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
           messageEl.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
 
-          let signals = {stop:false, wasDeleted:false};
+          if(!signals) signals = {stop:false, wasDeleted:false};
           messageEl.querySelector(".info .deleteButton").addEventListener("click", async e => {
             e.preventDefault(); e.stopPropagation();
             signals.stop = true;
@@ -4187,6 +4187,7 @@ OVERALL SUMMARY:
             messageEl.remove();
           } else {
             messageObj.message = message;
+            result.message = message;
 
             messageObj.id = await addMessageToDb(messageObj);
 
@@ -4727,7 +4728,7 @@ OVERALL SUMMARY:
             if(instruction) {
               characterToReplyWith.reminderMessage = `(The next message will be written from the perspective of '${characterToReplyWith.name}' and will conform to this user-provided instruction: "${instruction}")`;
             }
-            await doBotReplyInPlaceOfUser(characterToReplyWith);
+            await doBotReplyInPlaceOfUser({characterToReplyWith});
             await doBotReplyIfNeeded();
           } else if(message.trim() === "/sum") {
             // first ensure summary is up to date:
@@ -5462,20 +5463,6 @@ OVERALL SUMMARY:
 
         <\/script>
 
-        <!-- some code for helping devs with custom code bugs/problems: -->
-        <script type="module">
-          await new Promise(r => setTimeout(r, 1000));
-
-          let customCodeScriptElementText = document.querySelector(".customCodeScriptElement").textContent;
-
-          if(!window.__customCodeInitializationSTARTED_846298638) { // if it hasn't *started* after 1 second, it's almost certainly a parsing bug
-            let staticImportRegex = ${/(^|\s)import(\s+(\*\s+as\s+\w+|{[^}]*})?\s+from)?\s*['"][^'"]+\.js['"]\s*;?/.toString()};
-            if(staticImportRegex.test(customCodeScriptElementText)) {
-              console.warn("It looks like your character's custom code may have static import statements like:\\n\\nimport 'foo.js';  or  import { abc } from 'foo.js';\\n\\nIf so, please change them to dynamic imports like this:\\n\\nawait import('foo.js');  or  let { abc } = await import('foo.js');\\n\\nFor technical reasons, static imports are not supported in custom code.");
-            }
-          }
-        <\/script>
-
         <!-- note: this must be a separate code block from above, because otherwise static imports are initialised before window.oc exists -->
         <script type="module" class="customCodeScriptElement">
           window.__customCodeInitializationSTARTED_846298638 = true;
@@ -5504,6 +5491,21 @@ OVERALL SUMMARY:
           }
           window.__customCodeInitializationIsComplete_846298638 = true;
         <\/script>
+
+        <!-- some code for helping devs with custom code bugs/problems: -->
+        <script type="module">
+          await new Promise(r => setTimeout(r, 100));
+
+          let customCodeScriptElementText = document.querySelector(".customCodeScriptElement").textContent;
+
+          if(!window.__customCodeInitializationSTARTED_846298638) { // if it hasn't *started* after 1 second, it's almost certainly a parsing bug
+            let staticImportRegex = ${/(^|\s)import(\s+(\*\s+as\s+\w+|{[^}]*})?\s+from)?\s*['"][^'"]+\.js['"]\s*;?/.toString()};
+            if(staticImportRegex.test(customCodeScriptElementText)) {
+              console.warn("It looks like your character's custom code may have static import statements like:\\n\\nimport 'foo.js';  or  import { abc } from 'foo.js';\\n\\nIf so, please change them to dynamic imports like this:\\n\\nawait import('foo.js');  or  let { abc } = await import('foo.js');\\n\\nFor technical reasons, static imports are not supported in custom code.");
+            }
+          }
+        <\/script>
+
         </body>
         </html>`); // need to escape the closing script tag so it doesn't close the script tag that this code is within
         
@@ -5552,7 +5554,7 @@ OVERALL SUMMARY:
 
       async function updateCustomCodeIframeVisibility() {
         let visibleThreadId = null;
-        if($.messageFeed.offsetWidth > 0) visibleThreadId = parseInt($.messageFeed.dataset.threadId);
+        if($.messageFeed.offsetWidth > 0 && $.messageFeed.dataset.threadId !== undefined) visibleThreadId = parseInt($.messageFeed.dataset.threadId);
         let visibleThread = null;
         if(visibleThreadId !== null) visibleThread = await db.threads.get(visibleThreadId);
 
@@ -5914,16 +5916,27 @@ OVERALL SUMMARY:
 
       $.sendButton.addEventListener("click", sendButtonClickHandler);
 
-      async function doBotReplyInPlaceOfUser(characterToReplyWith) {
+      async function doBotReplyInPlaceOfUser({characterToReplyWith, signals=null, result={}}={}) {
         let threadCharacter = await db.characters.get(parseInt($.messageFeed.dataset.characterId));
         let threadId = parseInt($.messageFeed.dataset.threadId);
 
         let messageObj = createMessageObj({threadId, message:"...", characterId:-1});
+        messageObj.name = characterToReplyWith.name;
+        messageObj.avatar = JSON.parse(JSON.stringify(characterToReplyWith.avatar));
+
         let character = await getUserCharacterObj(threadId); // <-- this is the 'user character', not the characterToReplyWith because the character is "typing the reply", but it's as if the user wrote it. Might change this later when I allow multiple characters per thread.
         
         let messageEl = await addMessageToFeed(messageObj, {character, skipReaderRendering:true});
         messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
         
+        if(!signals) signals = {stop:false, wasDeleted:false};
+        messageEl.querySelector(".info .deleteButton").addEventListener("click", async e => {
+          e.preventDefault(); e.stopPropagation();
+          signals.stop = true;
+          signals.wasDeleted = true;
+          messageEl.remove();
+        });
+
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
         messages.sort((a,b) => a.order - b.order);
         
@@ -5934,11 +5947,31 @@ OVERALL SUMMARY:
             message.characterId = characterToReplyWith.id;
           }
         }
+
+        $.statusNotifier.innerHTML = "<button style='font-size: 0.9rem;'>🛑 stop response</button>";
+        $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
+          e.preventDefault(); e.stopPropagation();
+          signals.stop = true;
+          if(!characterToReplyWith.streamingResponse) {
+            messageEl.remove();
+            signals.wasDeleted = true;
+          }
+          $.statusNotifier.innerHTML = "";
+          hideEl($.statusNotifier);
+        });
+        showEl($.statusNotifier);
         
         // the "aiCharacter" is the one that replies 
         const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-        let {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl)});
+        let {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl), signals});
         messageEl.querySelector(".statusMessage").innerHTML = "";
+
+        hideEl($.statusNotifier);
+        $.statusNotifier.innerHTML = "";
+
+        if(signals.wasDeleted || message === undefined) {
+          return;
+        }
 
         messageObj.memoryIdBatchesUsed = memoryIdBatchesUsed;
         messageObj.summaryHashUsed = summaryHashUsed;
@@ -5951,6 +5984,7 @@ OVERALL SUMMARY:
           return false;
         } else {
           messageObj.message = message;
+          result.message = message;
 
           messageObj.id = await addMessageToDb(messageObj);
 
@@ -5964,96 +5998,115 @@ OVERALL SUMMARY:
       }
 
       let alreadyAutoReplying = false;
-      let stopAutoReplying = false;
       $.replyWithButton.addEventListener("click", async function() {
-        if(alreadyAutoReplying) { // user clicked "stop"
-          $.replyWithButton.innerHTML = "stopping...";
-          $.replyWithButton.disabled = true;
-          stopAutoReplying = true;
+        if(alreadyAutoReplying) {
           return;
         }
         alreadyAutoReplying = true;
-        $.replyWithButton.innerHTML = "🛑 stop";
         $.sendButton.disabled = true;
+        $.replyWithButton.disabled = true;
+
+        let threadId = parseInt($.messageFeed.dataset.threadId);
 
         let availableVoiceNames = speechSynthesis.getVoices().map(v => v.name).sort((a,b) => a.toLowerCase().includes("english") ? -1 : 1);
 
         // get list of characters, sorting by lastMessageTime
         const characters = await db.characters.orderBy("lastMessageTime").reverse().toArray();
-        const result = await prompt2({
+        const promptResult = await prompt2({
           characterId: {label: "Choose a character to reply with:", type: "select", options:characters.map(c => ({content:`${c.name} #${c.id}`, value:c.id}))},
           repeat: {label: "How many replies?", type: "textLine", defaultValue: "10"},
           textToSpeechVoicesEnabled: {label: "Text-to-Speech Voices?", type: "select", options: [{content: "Disabled", value: "disabled"}, {content: "Enabled", value: "enabled"}]},
-          threadCharVoiceName: {label: "Existing chatacter voice:", type: "select", options:availableVoiceNames.map(v => ({content: v, value: v})) },
-          otherCharVoiceName: {label: "Reply-with character voice:", type: "select", options:availableVoiceNames.map(v => ({content: v, value: v})) },
+          threadCharVoiceName: {show:d=>d.textToSpeechVoicesEnabled==="enabled", label: "Existing chatacter voice:", type: "select", options:availableVoiceNames.map(v => ({content: v, value: v})) },
+          otherCharVoiceName: {show:d=>d.textToSpeechVoicesEnabled==="enabled", label: "Reply-with character voice:", type: "select", options:availableVoiceNames.map(v => ({content: v, value: v})) },
         });
+        if(!promptResult) return;
+      
+        let ttsEnabled = promptResult.textToSpeechVoicesEnabled === "enabled";
+        let threadCharVoiceName = promptResult.threadCharVoiceName;
+        let otherCharVoiceName = promptResult.otherCharVoiceName;
 
-        if(result) {
-          let ttsEnabled = result.textToSpeechVoicesEnabled === "enabled";
-          let threadCharVoiceName = result.threadCharVoiceName;
-          let otherCharVoiceName = result.otherCharVoiceName;
+        let characterToReplyWith = await db.characters.get(parseInt(promptResult.characterId));
+        let repeat = parseInt(promptResult.repeat);
+        let i = 0;
+        let signals, result;
+        while(i < repeat) {
+          signals = {stop:false, wasDeleted:false};
+          result = {};
+          let success = await doBotReplyInPlaceOfUser({characterToReplyWith, signals, result});
+          if(!success) break;
 
-          let characterToReplyWith = await db.characters.get(parseInt(result.characterId));
-          let repeat = parseInt(result.repeat);
-          let threadId = parseInt($.messageFeed.dataset.threadId);
-          let i = 0;
-          while(i < repeat) {
-            if(stopAutoReplying) {
-              break;
-            }
-
-            let success = await doBotReplyInPlaceOfUser(characterToReplyWith);
-            if(!success) break;
-
-            if(ttsEnabled) {
-              // chrome has a bug that occurs if you try to speak text that's too long
-              // so we split message up into sentences and speak each one
-              let sentences = message.match(/[^\.!\?]+[\.!\?]+/g).map(s => s.trim());
-              for(let sentence of sentences) {
-                let result = await textToSpeech({text: sentence, voiceName: otherCharVoiceName}).catch(e => {
-                  console.error(e);
-                  alert("There was an error with speech synthesis. You may need to close this tab and re-open it (not just refresh) if you're using Chrome due to a weird bug that sometimes causes this.\n\n"+e.toString());
-                  return false;
-                });
-                if(result === false) break;
-              }
-            }
-
-            await delay(100);
-
-            await doBotReplyIfNeeded();
-
-            // wait for the other bot to respond
-            while(1) {
-              await delay(100);
-              let messages = await db.messages.where("threadId").equals(parseInt($.messageFeed.dataset.threadId)).toArray();
-              messages.sort((a,b) => a.order - b.order);
-              // get characterId of this thread
-              let thread = await db.threads.get(threadId);
-              let thisThreadCharacterId = thread.characterId;
-              let lastMessage = messages[messages.length-1];
-              if(lastMessage.characterId === thisThreadCharacterId) {
-                if(ttsEnabled) {
-                  let sentences = lastMessage.message.match(/[^\.!\?]+[\.!\?]+/g);
-                  for(let sentence of sentences) {
-                    let result = await textToSpeech({text: sentence, voiceName: threadCharVoiceName}).catch(e => {
-                      console.error(e);
-                      alert("There was an error with speech synthesis. You may need to close this tab and re-open it (not just refresh) if you're using Chrome due to a weird bug that sometimes causes this.\n\n"+e.toString());
-                      return false;
-                    });
-                    if(result === false) break;
-                  }
-                }
-                break;
-              }
-            }
-
-            i++;
+          if(signals.stop) {
+            break;
           }
+
+          if(threadId !== parseInt($.messageFeed.dataset.threadId)) {
+            break; // if the user clicked into a different thread, stop replying
+          }
+
+          if(ttsEnabled) {
+            // chrome has a bug that occurs if you try to speak text that's too long
+            // so we split message up into sentences and speak each one
+            let sentences = result.message.match(/[^\.!\?]+[\.!\?]+/g)?.map(s => s.trim()) ?? [result.message];
+            for(let sentence of sentences) {
+              let result = await textToSpeech({text: sentence, voiceName: otherCharVoiceName}).catch(e => {
+                console.error(e);
+                alert("There was an error with speech synthesis. You may need to close this tab and re-open it (not just refresh) if you're using Chrome due to a weird bug that sometimes causes this.\n\n"+e.toString());
+                return false;
+              });
+              if(result === false) break;
+            }
+          }
+
+          await delay(100);
+
+          signals = {stop:false, wasDeleted:false};
+          result = {};
+          await doBotReplyIfNeeded({signals, result});
+
+          if(signals.stop) {
+            break;
+          }
+
+          if(ttsEnabled) {
+            let sentences = result.message.match(/[^\.!\?]+[\.!\?]+/g)?.map(s => s.trim()) ?? [result.message];
+            for(let sentence of sentences) {
+              let result = await textToSpeech({text: sentence, voiceName: threadCharVoiceName}).catch(e => {
+                console.error(e);
+                alert("There was an error with speech synthesis. You may need to close this tab and re-open it (not just refresh) if you're using Chrome due to a weird bug that sometimes causes this.\n\n"+e.toString());
+                return false;
+              });
+              if(result === false) break;
+            }
+          }
+
+          // // wait for the other bot to respond
+          // while(1) {
+          //   await delay(100);
+          //   let messages = await db.messages.where("threadId").equals(threadId).toArray();
+          //   messages.sort((a,b) => a.order - b.order);
+          //   // get characterId of this thread
+          //   let thread = await db.threads.get(threadId);
+          //   let thisThreadCharacterId = thread.characterId;
+          //   let lastMessage = messages[messages.length-1];
+          //   if(lastMessage.characterId === thisThreadCharacterId) {
+          //     if(ttsEnabled) {
+          //       let sentences = lastMessage.message.match(/[^\.!\?]+[\.!\?]+/g);
+          //       for(let sentence of sentences) {
+          //         let result = await textToSpeech({text: sentence, voiceName: threadCharVoiceName}).catch(e => {
+          //           console.error(e);
+          //           alert("There was an error with speech synthesis. You may need to close this tab and re-open it (not just refresh) if you're using Chrome due to a weird bug that sometimes causes this.\n\n"+e.toString());
+          //           return false;
+          //         });
+          //         if(result === false) break;
+          //       }
+          //     }
+          //     break;
+          //   }
+          // }
+
+          i++;
         }
-        stopAutoReplying = false;
         alreadyAutoReplying = false;
-        $.replyWithButton.innerHTML = "reply with...";
         $.replyWithButton.disabled = false;
         $.sendButton.disabled = false;
       });
