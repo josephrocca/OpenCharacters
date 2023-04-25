@@ -2662,7 +2662,7 @@
             let resultText;
             if(chunkI === 0) {
               if(compressionStep < 2) { 
-                messages.push({role: "user", content: `Please respond with the following text, almost verbatim, but slightly shorter:\n\n------\n\n${chunk}${textChunks.length > 1 ? "..." : ""}\n\n------\n\nYour response should start with "NEW TEXT:" and should repeat the above text verbatim, but **SLIGHTLY** shorter. Don't cut out ANY details at all.`});
+                messages.push({role: "user", content: `Please respond with the following text, almost verbatim, but slightly shorter:\n\n------\n\n${chunk}${textChunks.length > 1 ? "..." : ""}\n\n------\n\nYour response should start with "NEW TEXT:" and should repeat the above text verbatim, but **SLIGHTLY** shorter. Don't cut out ANY details at all. It should be a VERY LONG, HIGHLY-DETAILED summary, capturing every single detail of the original text. Start your response with "NEW TEXT:". A concise version of *EVERY* individual sentence/paragraph should be included in the summary.`});
               } else {
                 messages.push({role: "user", content: `Please respond with a summary of the following text:\n\n------\n\n${chunk}${textChunks.length > 1 ? "..." : ""}\n\n------\n\nYour response should start with "NEW TEXT:" and should be a bit shorter. Make sure to include ALL important details in the summary. The summary MUST NOT be short. It must be a LONG, HIGHLY-DETAILED summary.`});
               }
@@ -2670,9 +2670,9 @@
               resultText = resultText.trim().replace(/^NEW TEXT: ?/, "").trim();
             } else {
               if(compressionStep < 2) { 
-                messages.push({role: "user", content: `I'm rewriting a document to make it slightly shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding the "NEXT PART" section to the end of it. Add every single sentence/paragraph/etc. from "NEXT PART" to the "SO FAR" text, almost verbatim, except with slighly shorter (e.g. drop superfluous words to shorten sentences). Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR: ${newText.slice(0, 70)}..." and add the "NEXT PART" text to the end of it, almost verbatim, but with each individual sentence reworded to be more concise.`});
+                messages.push({role: "user", content: `I'm rewriting/summarizing a document to make it slightly shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding a more concise version of the "NEXT PART" section to the end of it. Add every single sentence/paragraph/etc. from "NEXT PART" to the "SO FAR" text, almost verbatim, except with slighly shorter (e.g. drop superfluous words and shorten/drop uninformative sentences where possible). Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR: ${newText.slice(0, 70)}..." and integrate a more concise version of the "NEXT PART" text to produce a new, LONGER summary.`});
               } else {
-                messages.push({role: "user", content: `I'm rewriting a document to make it a bit shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding a summarized version of the "NEXT PART" section to the end of it. Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR:" and add a summarized version of the "NEXT PART" text to the end of it. Make sure to include ALL important details in the new "SO FAR:" section.`});
+                messages.push({role: "user", content: `I'm rewriting/summarizing a document to make it a bit shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding a summarized version of the "NEXT PART" section to the end of it. Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR:" and add a summarized version of the "NEXT PART" text to the end of it. Make sure to include ALL important details in the new "SO FAR:" section - it should be LONGER than the existing one.`});
               }
               resultText = await getChatCompletion({messages, modelName, temperature:0.7, threadId});
               resultText = resultText.trim().replace(/^SO FAR: ?/, "").trim();
@@ -2778,6 +2778,7 @@
             if(messageBatchTokenCount+tokens >= messageTokensToConsumePerSummary) {
               // we were forced to add a message to the batch that puts us over the limit (since the batch would otherwise be empty), so we need to compress it:
               m.content = await compressText({text:m.content, tokenLimit:messageTokensToConsumePerSummary, modelName, onProgressMessage, threadId});
+              tokens = await countTokensInMessages([m], modelName);
             }
 
             messageBatchArr.push(m);
@@ -2987,6 +2988,7 @@ OVERALL SUMMARY:
             let currentTokenCount = await countTokens(prevSummary||"", modelName) + await countTokensInMessages(remainingMessages, modelName);
             if(currentTokenCount >= tokenLimitForSummaryAndMessages) break;
             if(remainingMessages.length > 3) break;
+            if(messagesToMaybeAdd.length === 0) break;
             remainingMessages.unshift(messagesToMaybeAdd.pop());
           }
         }
