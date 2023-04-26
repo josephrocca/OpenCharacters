@@ -2548,13 +2548,11 @@
       let modelNameToTokenizerCache = {};
       let gpt3Tokenizer;
       async function getTokenizerByModelName(modelName) {
-        if(!window.AutoTokenizer) {
-          await import("https://cdn.jsdelivr.net/npm/@xenova/transformers@1.4.2/dist/transformers.min.js");
-        }
         if(modelNameToTokenizerCache[modelName]) return modelNameToTokenizerCache[modelName];
 
         let modelObj = availableModels[modelName];
 
+        // TODO: get actual GPT-4 tokenizer
         if(modelName === "gpt-3.5-turbo" || modelName === "text-davinci-003" || modelName === "gpt-4") {
           if(!gpt3Tokenizer) gpt3Tokenizer = createGpt3Tokenizer();
           modelNameToTokenizerCache[modelName] = gpt3Tokenizer;
@@ -2562,6 +2560,10 @@
         }
 
         if(!modelObj.modelUrl) throw new Error("Model doesn't have a modelUrl: "+modelName);
+
+        if(!window.AutoTokenizer) {
+          await import("https://cdn.jsdelivr.net/npm/@xenova/transformers@1.4.2/dist/transformers.min.js");
+        }
 
         let modelUrl = modelObj.modelUrl;
         let tokenizer = await AutoTokenizer.from_pretrained(modelUrl+"/resolve/main");
@@ -4987,10 +4989,10 @@ OVERALL SUMMARY:
             
             $.messageInput.value = "";
             $.messageInput.style.height = "";
-            
+            console.log("AAAAAAAAAA");
             await triggerMessageAddedCustomCodeEvent(threadId);
             await doBotReplyIfNeeded(); // note that we can't just pass the replyInstruction here because doBotReplyIfNeeded can get called in the process of executing triggerMessageAddedCustomCodeEvent, so we use the global instructionForNextBotReply instead
-
+            console.log("BBBBBBBBBB");
           }
         } catch(e) {
           console.error(e);
@@ -4998,6 +5000,27 @@ OVERALL SUMMARY:
           $.messageInput.value = message;
         }
         $.sendButton.disabled = false;
+
+        let messageCount = await db.messages.count();
+        if(await db.threads.count() === 1 && (messageCount === 4 || messageCount === 5)) {
+          alert(`Looks like this is your first thread on OpenCharacters, so here are some quick tips:
+
+1. It's very important that you edit the AI's responses (with the pencil icon) if it says something you don't like - especially for the first few messages of a conversation. This is the most powerful way to control the AI's behavior. Much more powerful than the reminder note or the instruction because the AI will mostly tend to behave as it has previously behaved.
+
+2. Experiment with the reminder note. Tell it to be the best writer/roleplayer in the world, to avoid cliche or repetitive expressions, etc.
+
+3. It can be helpful to "lock" the AI into a specific reply style by adding something like this to the instruction or reminder:
+
+Messages should follow this pattern:
+"Hello!" - dialogue
+[Is she watching me?] - inner thoughts
+*He jumps out of the bushes.* - action
+
+
+4. Look at the instructions and reminders of 'starter characters' for ideas, and visit the #share-guides channel in our Discord server for guides/tips on achieving specific behavior and/or avoiding annoying issues.`);
+        }
+
+        
       } 
 
       function getDateTimeString(utcMs) {
@@ -6290,7 +6313,7 @@ OVERALL SUMMARY:
 
       $.settingsButton.addEventListener("click", async function() {
         // use prompt2 to collect user's name and avatar, using defaults from db.misc
-        let userNameOriginal = (await db.misc.get("userName"))?.value || "You";
+        let userNameOriginal = (await db.misc.get("userName"))?.value || defaultUserName;
         let userAvatarUrlOriginal = (await db.misc.get("userAvatarUrl"))?.value || "";
         let openAiApiKeyOriginal = (await db.misc.get("openAiApiKey"))?.value || "";
         let customModelConfigsOriginal = (await db.misc.get("customModelConfigs"))?.value || [];
