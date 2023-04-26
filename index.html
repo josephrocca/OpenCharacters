@@ -5003,24 +5003,24 @@ OVERALL SUMMARY:
 
         let messageCount = await db.messages.count();
         if(await db.threads.count() === 1 && (messageCount === 4 || messageCount === 5)) {
-          alert(`Looks like this is your first thread on OpenCharacters, so here are some quick tips:
+          await prompt2({message:{type:"none", html:dedent(`
+            <div style="white-space: pre-wrap;"><b>Looks like this is your first thread on OpenCharacters, so here are some quick tips:</b>
 
-1. It's very important that you edit the AI's responses (with the pencil icon) if it says something you don't like - especially for the first few messages of a conversation. This is the most powerful way to control the AI's behavior. Much more powerful than the reminder note or the instruction because the AI will mostly tend to behave as it has previously behaved.
+            <b>1.</b> It's very important that you edit the AI's responses (with the pencil icon) if it says something you don't like - especially for the first few messages of a conversation. This is the most powerful way to control the AI's behavior. Much more powerful than the reminder note or the instruction because the AI will mostly tend to behave as it has previously behaved.
 
-2. Experiment with the reminder note. Tell it to be the best writer/roleplayer in the world, to avoid cliche or repetitive expressions, etc.
+            <b>2.</b> Experiment with the reminder note. Tell it to be the best writer/roleplayer in the world, to avoid cliche or repetitive expressions, etc.
 
-3. It can be helpful to "lock" the AI into a specific reply style by adding something like this to the instruction or reminder:
+            <b>3.</b> It can be helpful to "lock" the AI into a specific reply style by adding something like this to the instruction or reminder:
 
-Messages should follow this pattern:
-"Hello!" - dialogue
-[Is she watching me?] - inner thoughts
-*He jumps out of the bushes.* - action
-
-
-4. Look at the instructions and reminders of 'starter characters' for ideas, and visit the #share-guides channel in our Discord server for guides/tips on achieving specific behavior and/or avoiding annoying issues.`);
+            <div style="opacity:0.5;">Messages should follow this pattern:
+            "Hello!" - dialogue
+            [Is she watching me?] - inner thoughts
+            *He jumps out of the bushes.* - action</div>
+            <b>4.</b> Look at the instructions and reminders of 'starter characters' for ideas, and visit the <a href="https://discord.com/channels/1085784427495432262/1098562307300278433" target="_blank">#share-guides</a> channel in our Discord server for guides/tips on achieving specific behavior and/or avoiding annoying issues.</div>`)}
+          }, {cancelButtonText:null, submitButtonText:"Okay, got it"});
         }
 
-        
+
       } 
 
       function getDateTimeString(utcMs) {
