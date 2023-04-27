@@ -27,6 +27,25 @@ Please rewrite this message to include more emojis. Respond with only the rewrit
 });
 ```
 
+# Prevent character from taking actions on behalf of you during roleplaying
+```js
+oc.thread.on("MessageAdded", async function () {
+  let lastMessage = oc.thread.messages.at(-1);
+
+  if(lastMessage.author === "ai") {
+    let result = await oc.getChatCompletion({
+      messages: [
+        {
+          author: "user",
+          content: `Please edit the following message so that it only contains actions taken by ${lastMessage.name} and not by ${oc.thread.userCharacter.name} or any other characters. Remove actions from characters other than Kara in this message:\n\n---\n${lastMessage.content}\n---\n\nReply with the edited version of the above message which only includes Kara's first action/speech/etc. Your reply must not include follow-on actions by other characters.`,
+        },
+      ],
+    });
+    lastMessage.content = result.trim().replace(/^---|---$/g, "").trim();
+  }
+});
+```
+
 # Append image based on predicted facial expression of the message
 
 This example adds an image/GIF to each message to visually display the facial expression of the character, like in **[this example character][append facial expression image nick wilde]**:
