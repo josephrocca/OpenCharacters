@@ -676,7 +676,7 @@
 
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(57).stores({
+      db.version(60).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -889,20 +889,19 @@
         let memoryIdToIndexMap = {};
         for(let threadId of Object.keys(memoriesByThreadId)) {
           let threadMemories = memoriesByThreadId[threadId];
-          let memory = threadMemories.find(m => m.previousMemoryId === -1 && m.type !== "user-written");
-          if(memory === undefined) { // <-- due to initial bug in conversion code on my part, fall back to id-based ordering
-            threadMemories.sort((a,b) => a.id - b.id);
-            for(let i = 0; i < threadMemories.length; i++) {
-              memoryIdToIndexMap[threadMemories[i].id] = i;
-            }
-          } else {
-            let index = 0;
-            while(memory) {
-              memoryIdToIndexMap[memory.id] = index;
-              index++;
-              memory = threadMemories.find(m => m.previousMemoryId === memory.id);
-            }
+          let memory = threadMemories.find(m => m.previousMemoryId === -1);
+          threadMemories.sort((a,b) => a.id - b.id);
+          for(let i = 0; i < threadMemories.length; i++) {
+            memoryIdToIndexMap[threadMemories[i].id] = i;
           }
+          
+          // this was buggy for some reason:
+          // let index = 0;
+          // while(memory) {
+          //   memoryIdToIndexMap[memory.id] = index;
+          //   index++;
+          //   memory = threadMemories.find(m => m.previousMemoryId === memory.id);
+          // }
         }
 
         return memoryIdToIndexMap;
@@ -3503,6 +3502,7 @@ OVERALL SUMMARY:
 
               if(numNextAdded < numNextToAdd) {
                 let lastMemory = batch.memories.at(-1);
+                if(lastMemory === undefined) debugger;
                 if(lastMemory.index !== maxMemoryIndex) {
                   let nextMemory = memories.find(m => m.index === lastMemory.index+1); // todo: just use array indexing now that we've moved from linked list to index format
                   if(nextMemory === undefined) {
@@ -6807,7 +6807,7 @@ OVERALL SUMMARY:
           }
           if(importedMemories) {
             let memoryIdToIndexMap = null;
-            if(importedMemories[0] && importedMemories[0].nextMemoryId !== undefined) {
+            if(importedMemories.find(m => m.index === undefined)) {
               memoryIdToIndexMap = createMemoryIdToIndexMapFromOldNextPrevMemories(importedMemories);
             }
             for(let memory of importedMemories) {
