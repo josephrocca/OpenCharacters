@@ -72,6 +72,7 @@ You can also access and edit character data via `oc.character.propertyName`. Her
     * `presencePenalty`
     * `stopSequences`
     * `modelName`
+    * `streamingResponse`
     * `customData` - an object/dict where you can store arbitrary data
       * `PUBLIC` - a special sub-property of `customData` that will be shared within character sharing URLs
  * `thread`
