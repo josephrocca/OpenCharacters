@@ -676,7 +676,7 @@
 
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(53).stores({
+      db.version(57).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -721,12 +721,14 @@
 
         let memories = await tx.table("memories").toArray();
         let memoryIdToIndexMap = null;
-        if(memories[0] && memories[0].nextMemoryId !== undefined) {
+        if(memories.find(m => m.index === undefined)) {
+          debugger;
           memoryIdToIndexMap = createMemoryIdToIndexMapFromOldNextPrevMemories(memories);
         }
         await tx.table("memories").toCollection().modify(memory => {
           let opts = {};
           if(memoryIdToIndexMap) opts.index = memoryIdToIndexMap[memory.id];
+          debugger;
           upgradeMemoryFromOldVersion(memory, opts);
         });
         let userWrittenMemories = memories.filter(m => m.type === "user-written");
@@ -736,10 +738,10 @@
             loreEntries.push({ bookId:m.threadId, text:m.text, embedding:m.embedding, triggers:[] });
           }
           await db.lore.bulkAdd(loreEntries);
+          await tx.table("memories").toCollection().modify((entry, ref) => {
+            if(entry.type === "user-written") delete ref.value;
+          });
         }
-        await tx.table("memories").toCollection().modify((entry, ref) => {
-          if(entry.type === "user-written") delete ref.value;
-        });
 
       });
 
@@ -863,7 +865,7 @@
       function upgradeMemoryFromOldVersion(memory, opts={}) {
         if(memory.type === "user-written") return; // these will be moved to the lore table and deleted from the memories table
 
-        if(opts.index !== undefined && memory.nextMemoryId !== undefined && memory.previousMemoryId !== undefined) {
+        if(opts.index !== undefined) {
           delete memory.nextMemoryId;
           delete memory.previousMemoryId;
           memory.index = opts.index;
@@ -871,24 +873,8 @@
         delete memory.type; // no longer need type="generated" because it's the only type (and also a better name would be "chronological" because user's can edit them and add their own)
       }
 
-      // ###
-      // you need to separate lore and memories. Memories are always contiguous, and lore is always isolated.
-      // --> db.memories, db.lore
-      // and each lore entry has a "bookId" rather than a "threadId"
-      // todos:
-      // - deal with any id references if necessary
-      // - before editing, hash memory text, and map back to same ids.
-      //   - if there are duplicates when editing, add a number to the end of the memory or something
-      // - make sure memoryIdBatchesUsed still works
-      // - add an equivalent to memoryIdBatchesUsed for lore entries
-      // - update mem modal to display the lore entries
-      // - enable lore *without* memories (by default!!) (and make sure it works)
-      // - add space to end of memory if there's duplicate. disallow duplicate lore entries
-      // - fix editCharacterById
-      // - if the player tries to add memories when there aren't any yet, there is no summaryHash to put the memories "into"?
 
       function createMemoryIdToIndexMapFromOldNextPrevMemories(memories) {
-        let memoryIdToIndexMap = {};
         // each memory has `nextMemoryId` and `previousMemoryId`, but we need to convert to `index` format.
         // we need to create a map of memory.id -> index
         // but first we need to group all memories by their threadId
@@ -900,15 +886,22 @@
         }
         // now for each thread's memories we follow the `previousMemoryId`/`nextMemoryId` chain to sort them
         // the first memory in the chain will have previousMemoryId==-1, so we get that first, and then crawl through:
-        memoryIdToIndexMap = {};
-        for(let threadId in memoriesByThreadId) {
+        let memoryIdToIndexMap = {};
+        for(let threadId of Object.keys(memoriesByThreadId)) {
           let threadMemories = memoriesByThreadId[threadId];
-          let memory = threadMemories.find(m => m.previousMemoryId === -1);
-          let index = 0;
-          while(memory) {
-            memoryIdToIndexMap[memory.id] = index;
-            index++;
-            memory = threadMemories.find(m => m.previousMemoryId === memory.id);
+          let memory = threadMemories.find(m => m.previousMemoryId === -1 && m.type !== "user-written");
+          if(memory === undefined) { // <-- due to initial bug in conversion code on my part, fall back to id-based ordering
+            threadMemories.sort((a,b) => a.id - b.id);
+            for(let i = 0; i < threadMemories.length; i++) {
+              memoryIdToIndexMap[threadMemories[i].id] = i;
+            }
+          } else {
+            let index = 0;
+            while(memory) {
+              memoryIdToIndexMap[memory.id] = index;
+              index++;
+              memory = threadMemories.find(m => m.previousMemoryId === memory.id);
+            }
           }
         }
 
@@ -2279,7 +2272,7 @@
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
           textEmbeddingModelName: { hidden:true, label: "Text embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory/lore entry (text) into a bunch of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[...broadlyAvailableModels.filter(m => m.type === "text-embedding").map(m => ({value:m.name, content:m.name}))], defaultValue: defaultValues.textEmbeddingModelName ?? "text-embedding-ada-002" },
           /* NOTE: "associativeMemoryMethod" is now a bit of a misnomer - this is now just a switch to enable/disable *automatic* memory creation during summarization. */
-          associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Character auto-generates memories:", infoTooltip:"You can use /mem and /lore commands to manually add memories and lore. If you enable this feature, memories will be created by the character during each summarization step. This increases the cost a bit (maybe +20%) and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. You can manually copy memories and lore over into a new thread if needed.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod ?? "none" },
+          associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Auto-generated character memories:", infoTooltip:"You can use /mem and /lore commands to manually add memories and lore. If you enable this feature, memories will be created by the character during each summarization step. This increases the cost a bit (maybe +20%) and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. You can manually copy memories and lore over into a new thread if needed.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod ?? "none" },
           avatarSize: { hidden:true, label: "Avatar size, as a multiple of the default size.", type:"textLine", defaultValue: defaultValues.avatar?.size ?? "1" },
           avatarShape: { hidden:true, label: "Avatar shape:", type:"select", options:[{value:"square"}, {value:"circle"}, {value:"portrait"}], defaultValue: defaultValues.avatar?.shape ?? "square" },
           sceneBackgroundUrl: { hidden:true, label: "Chat background image/video URL (jpg, webp, webm, mp4, etc.)", type:"textLine", defaultValue: defaultValues.scene?.background?.url ?? "" },
