@@ -1014,7 +1014,7 @@
 
         let lore = json.data.data.find(d => d.tableName === "lore");
         if(lore) {
-          lore.rows = lore.rows.filter(l => keepLoreBookIds(l.bookId));
+          lore.rows = lore.rows.filter(l => keepLoreBookCheck(l.bookId));
         }
 
         if(result.exportUserData === "no") {
