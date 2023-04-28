@@ -5020,6 +5020,7 @@ OVERALL SUMMARY:
                       if(textToMemoryObj.has(text)) {
                         obj = textToMemoryObj.get(text);
                         prevSummaryHash = obj.summaryHash;
+                        obj.index = index;
                       } else {
                         let embedding = textToEmbeddingCache.get(text);
                         // we group new memories under the previous memory hash. a valid summary hash is necessary because it's what we use to 'validate' that memories are 'current' during the summarization process.
