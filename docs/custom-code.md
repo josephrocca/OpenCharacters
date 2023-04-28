@@ -227,13 +227,23 @@ What would you like to do?
 1. <button onclick="oc.thread.messages.push({author:'user', content:'Fight'});">Fight</button>
 2. <button onclick="oc.thread.messages.push({author:'user', content:'Run'});">Run</button>
 ```
-I recommend that you use `oc.messageRenderingPipeline` to turn a custom format into HTML, rather than actually having HTML in your messages (it will use more tokens, and might confuse the AI). So your format might look like this:
+I recommend that you use `oc.messageRenderingPipeline` to turn a custom format into HTML, rather than actually having HTML in your messages (the HTML would use more tokens, and might confuse the AI). So your format might look like this:
 ```html
 What would you like to do?
 1. [[Fight]]
 2. [[Run]]
 ```
-You could prompt/instruct/remind your character to reply in that format. And then you'd add this to your custom code:
+You could prompt/instruct/remind your character to reply in that format with an instruction message that's something similar to this:
+```
+You are a game master. You creatively and engagingly simulate a world for the user. The user takes actions, and you describe the consequences.
+
+Your messages should end with a list of possible actions, and each action should be wrapped in double-square brackets like this:
+
+Actions:
+1. [[Say sorry]]
+2. [[Turn and run]]
+```
+And then you'd add this to your custom code:
 ```js
 oc.messageRenderingPipeline.push(function({message, reader}) {
   if(reader === "user") {
