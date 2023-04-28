@@ -267,7 +267,7 @@ function hello() {
 document.body.innerHTML = `<div onclick="hello()">click me</div>`;
 oc.window.show();
 ```
-This is because all custom code is executed inside a `&lt;script type=module&gt;` so you need to make functions *global* if you want to access them from *outside* the module (e.g. in click handlers). So if you want to the above code to work, you should define the `hello` function like this instead:
+This is because all custom code is executed inside a `<script type=module>` so you need to make functions *global* if you want to access them from *outside* the module (e.g. in click handlers). So if you want to the above code to work, you should define the `hello` function like this instead:
 ```js
 window.hello = function() {
   console.log("hi");
