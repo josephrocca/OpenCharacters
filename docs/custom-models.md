@@ -14,7 +14,7 @@ Run this command in your terminal:
 ```bash
 docker run --rm -p 80:80 -e MODEL=databricks/dolly-v2-3b hyperonym/basaran:0.17.2
 ```
-You can change `databricks/dolly-v2-3b` to any* Hugging Face language model (see [this list](https://huggingface.co/models?pipeline_tag=text-generation)), and you can change `0.16.0` to the latest version from [here](https://hub.docker.com/r/hyperonym/basaran/tags).
+You can change `databricks/dolly-v2-3b` to any* Hugging Face language model (see [this list](https://huggingface.co/models?pipeline_tag=text-generation)), and you can change `0.17.2` to the latest version from [here](https://hub.docker.com/r/hyperonym/basaran/tags).
 
 *[Currently](https://github.com/xenova/transformers.js/issues/93), the model must use the newer "fast tokenizer" format - it should have a `tokenizer.json` file in its Hugging Face repo.
 
