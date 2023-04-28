@@ -254,7 +254,7 @@ oc.messageRenderingPipeline.push(function({message, reader}) {
   }
 });
 ```
-Note that you can't use the `this` keyword within the button onclick handler - it actually just sends the code in the onclick to your custom code iframe and executes it there, so there's no actual element, and thus no `this` or `event`, etc.
+Note that you can't use the `this` keyword within the button onclick handler - it actually just sends the code in the onclick to your custom code iframe and executes it there, so there's no actual element that's firing the onclick from the iframe's perspective, and thus no `this` or `event`, etc.
 
 ## Gotchas
 
