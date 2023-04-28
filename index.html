@@ -2252,7 +2252,7 @@
         $.threadModelSelector.value = thread.modelName;
 
         // thus must come before rendering the message feed because we may need to render the messages with `oc.messageRenderingPipeline`
-        if(!customCodeIframes[threadId] && characterObj.customCode) {
+        if(!customCodeIframes[threadId] && characterObj.customCode.trim()) {
           await createNewCustomCodeIframeForThread(threadId); // this adds iframe as here: customCodeIframes[threadId]
         }
 
@@ -2312,6 +2312,8 @@
         result.name = result.name.trim();
 
         if(result.name === "") result.name = "_";
+
+        if(result.customCode.trim() === "") result.customCode = ""; // if the custom code box just contained whitespace, remove it
 
         // process prompt results back into well-formed character object:
 
