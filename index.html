@@ -3542,7 +3542,7 @@ OVERALL SUMMARY:
           let memoryBatches = relevantMemories.slice(0, 5).sort((a,b) => a.index-b.index).map(m => ({memories:[m], seedMemory:m}));
           
           let maxMemoryIndex = memories.at(-1)?.index ?? 0;
-          let minMemoryIndex = memories[0].index ?? 0; // note: the term `index` is actually a misnomer here - should be `order` or something, since the `status:"noncurrent"` memories can create gaps in the `status:"current"` memories.
+          let minMemoryIndex = memories[0]?.index ?? 0; // note: the term `index` is actually a misnomer here - should be `order` or something, since the `status:"noncurrent"` memories can create gaps in the `status:"current"` memories.
 
           for(let i = 0; i < memoryBatches.length; i++) {
             let batch = memoryBatches[i];
