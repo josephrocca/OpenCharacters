@@ -901,7 +901,6 @@
           //   memory = threadMemories.find(m => m.previousMemoryId === memory.id);
           // }
         }
-
         return memoryIdToIndexMap;
       }
       
@@ -3510,6 +3509,7 @@ OVERALL SUMMARY:
           let memoryBatches = relevantMemories.slice(0, 5).sort((a,b) => a.index-b.index).map(m => ({memories:[m], seedMemory:m}));
           
           let maxMemoryIndex = memories.at(-1)?.index ?? 0;
+          let minMemoryIndex = memories[0].index ?? 0; // for some reason the first memory index is not necessarily 0 sometimes (but in import code?)
 
           for(let i = 0; i < memoryBatches.length; i++) {
             let batch = memoryBatches[i];
@@ -3540,7 +3540,8 @@ OVERALL SUMMARY:
 
               if(numPreviousAdded < numPreviousToAdd) {
                 let firstMemory = batch.memories[0];
-                if(firstMemory.index !== 0) {
+                if(firstMemory === undefined) debugger;
+                if(firstMemory.index !== minMemoryIndex) {
                   let previousMemory = memories.find(m => m.index === firstMemory.index-1); // todo: just use array indexing now that we've moved from linked list to index format
                   if(previousMemory === undefined) {
                     debugger;
