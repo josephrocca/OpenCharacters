@@ -235,7 +235,7 @@ What would you like to do?
 ```
 You could prompt/instruct/remind your character to reply in that format. And then you'd add this to your custom code:
 ```js
-oc.messageRenderingPipeline.push(({message, reader}) => {
+oc.messageRenderingPipeline.push(function({message, reader}) {
   if(reader === "user") {
     message.content = message.content.replace(/\[\[(.+?)\]\]/g, (match, text) => {
       let encodedText = encodeURIComponent(text); // this is a 'hacky' but simple way to prevent special characters like quotes from breaking the onclick attribute
