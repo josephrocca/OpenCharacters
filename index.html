@@ -676,7 +676,7 @@
 
       
       let db = new Dexie("chatbot-ui-v1");
-      db.version(60).stores({
+      db.version(63).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -719,16 +719,9 @@
           if(entry.messageIds === undefined) delete ref.value; // old summaries didn't have messageIds or prevSummaryHash
         });
 
+
         let memories = await tx.table("memories").toArray();
-        let memoryIdToIndexMap = null;
-        if(memories.find(m => m.index === undefined)) {
-          memoryIdToIndexMap = createMemoryIdToIndexMapFromOldNextPrevMemories(memories);
-        }
-        await tx.table("memories").toCollection().modify(memory => {
-          let opts = {};
-          if(memoryIdToIndexMap) opts.index = memoryIdToIndexMap[memory.id];
-          upgradeMemoryFromOldVersion(memory, opts);
-        });
+        debugger;
         let userWrittenMemories = memories.filter(m => m.type === "user-written");
         if(userWrittenMemories.length > 0) {
           let loreEntries = [];
@@ -739,7 +732,15 @@
           await tx.table("memories").toCollection().modify((entry, ref) => {
             if(entry.type === "user-written") delete ref.value;
           });
+          memories = memories.filter(m => m.type !== "user-written");
         }
+        let memoryIdToIndexMap = createMemoryIdToIndexMapForIncorrectlyIndexedOrUnindexedMemories(memories);
+        await tx.table("memories").toCollection().modify(memory => {
+          let opts = {};
+          if(memoryIdToIndexMap[memory.id] !== undefined) opts.index = memoryIdToIndexMap[memory.id];
+          upgradeMemoryFromOldVersion(memory, opts);
+        });
+        
 
       });
 
@@ -872,34 +873,63 @@
       }
 
 
-      function createMemoryIdToIndexMapFromOldNextPrevMemories(memories) {
-        // each memory has `nextMemoryId` and `previousMemoryId`, but we need to convert to `index` format.
-        // we need to create a map of memory.id -> index
-        // but first we need to group all memories by their threadId
-        let memoriesByThreadId = {};
-        for(let memory of memories) {
-          if(memory.type === "user-written") continue; // <-- these don't have an order/index, and are being moved to the lore table
-          if(!memoriesByThreadId[memory.threadId]) memoriesByThreadId[memory.threadId] = [];
-          memoriesByThreadId[memory.threadId].push(memory);
-        }
-        // now for each thread's memories we follow the `previousMemoryId`/`nextMemoryId` chain to sort them
-        // the first memory in the chain will have previousMemoryId==-1, so we get that first, and then crawl through:
-        let memoryIdToIndexMap = {};
-        for(let threadId of Object.keys(memoriesByThreadId)) {
-          let threadMemories = memoriesByThreadId[threadId];
-          let memory = threadMemories.find(m => m.previousMemoryId === -1);
-          threadMemories.sort((a,b) => a.id - b.id);
-          for(let i = 0; i < threadMemories.length; i++) {
-            memoryIdToIndexMap[threadMemories[i].id] = i;
-          }
+      // function createMemoryIdToIndexMapFromAllMemories(memories) {
+      //   // each memory has `nextMemoryId` and `previousMemoryId`, but we need to convert to `index` format.
+      //   // we need to create a map of memory.id -> index
+      //   // but first we need to group all memories by their threadId
+      //   let memoriesByThreadId = {};
+      //   for(let memory of memories) {
+      //     if(memory.type === "user-written") continue; // <-- these don't have an order/index, and are being moved to the lore table
+      //     if(!memoriesByThreadId[memory.threadId]) memoriesByThreadId[memory.threadId] = [];
+      //     memoriesByThreadId[memory.threadId].push(memory);
+      //   }
+      //   // now for each thread's memories we follow the `previousMemoryId`/`nextMemoryId` chain to sort them
+      //   // the first memory in the chain will have previousMemoryId==-1, so we get that first, and then crawl through:
+      //   let memoryIdToIndexMap = {};
+      //   for(let threadId of Object.keys(memoriesByThreadId)) {
+      //     let threadMemories = memoriesByThreadId[threadId];
+      //     threadMemories.sort((a,b) => a.id - b.id);
+      //     for(let i = 0; i < threadMemories.length; i++) {
+      //       memoryIdToIndexMap[threadMemories[i].id] = i;
+      //     }
           
-          // this was buggy for some reason:
-          // let index = 0;
-          // while(memory) {
-          //   memoryIdToIndexMap[memory.id] = index;
-          //   index++;
-          //   memory = threadMemories.find(m => m.previousMemoryId === memory.id);
-          // }
+      //     // this was buggy for some reason:
+      //     // let index = 0;
+      //     // while(memory) {
+      //     //   memoryIdToIndexMap[memory.id] = index;
+      //     //   index++;
+      //     //   memory = threadMemories.find(m => m.previousMemoryId === memory.id);
+      //     // }
+      //   }
+      //   return memoryIdToIndexMap;
+      // }
+
+      function createMemoryIdToIndexMapForIncorrectlyIndexedOrUnindexedMemories(memories) {
+        let memoriesByThreadId = {};
+        for(let m of memories) {
+          if(!memoriesByThreadId[m.threadId]) memoriesByThreadId[m.threadId] = [];
+          memoriesByThreadId[m.threadId].push(m);
+        }
+        // for each thread, check that memory indices (m.index) exist for each memory and are unique:
+        let threadIdsThatNeedToBeIndexed = [];
+        for(let threadId of Object.keys(memoriesByThreadId)) {
+          let memories = memoriesByThreadId[threadId];
+          let indices = memories.map(m => m.index);
+          if(indices.includes(undefined) || indices.length !== new Set(indices).size) {
+            threadIdsThatNeedToBeIndexed.push(threadId);
+          }
+        }
+        let memoryIdToIndexMap = {};
+        if(threadIdsThatNeedToBeIndexed.length > 0) {
+          for(let threadId of threadIdsThatNeedToBeIndexed) {
+            let memories = memoriesByThreadId[threadId];
+            memories.sort((a,b) => a.id - b.id);
+            for(let i = 0; i < memories.length; i++) {
+              let m = memories[i];
+              m.index = i;
+              memoryIdToIndexMap[m.id] = i;
+            }
+          }
         }
         return memoryIdToIndexMap;
       }
@@ -3294,6 +3324,9 @@ OVERALL SUMMARY:
       async function getBotReply({messages, threadId, aiCharacter, userCharacter, replyInstruction, onStreamingReplyChunk, onProgressMessage, signals}) {
         if(!signals) signals = {};
 
+        let originalSendButtonDisabledState = $.sendButton.disabled;
+        $.sendButton.disabled = true;
+
         let thread = await db.threads.get(threadId);
 
         let fullMessagesArr = await prepareMessagesForBot({messages, aiCharacter, userCharacter, onProgressMessage});
@@ -3509,7 +3542,7 @@ OVERALL SUMMARY:
           let memoryBatches = relevantMemories.slice(0, 5).sort((a,b) => a.index-b.index).map(m => ({memories:[m], seedMemory:m}));
           
           let maxMemoryIndex = memories.at(-1)?.index ?? 0;
-          let minMemoryIndex = memories[0].index ?? 0; // for some reason the first memory index is not necessarily 0 sometimes (but in import code?)
+          let minMemoryIndex = memories[0].index ?? 0; // note: the term `index` is actually a misnomer here - should be `order` or something, since the `status:"noncurrent"` memories can create gaps in the `status:"current"` memories.
 
           for(let i = 0; i < memoryBatches.length; i++) {
             let batch = memoryBatches[i];
@@ -3527,12 +3560,9 @@ OVERALL SUMMARY:
               if(numNextAdded < numNextToAdd) {
                 let lastMemory = batch.memories.at(-1);
                 if(lastMemory === undefined) debugger;
-                if(lastMemory.index !== maxMemoryIndex) {
-                  let nextMemory = memories.find(m => m.index === lastMemory.index+1); // todo: just use array indexing now that we've moved from linked list to index format
-                  if(nextMemory === undefined) {
-                    debugger;
-                  }
-                  batch.memories.push(nextMemory);
+                let mI = memories.findIndex(m => m === lastMemory);
+                if(memories[mI+1]) {
+                  batch.memories.push(memories[mI+1]);
                   addedNext = true;
                   numNextAdded++;
                 }
@@ -3541,12 +3571,9 @@ OVERALL SUMMARY:
               if(numPreviousAdded < numPreviousToAdd) {
                 let firstMemory = batch.memories[0];
                 if(firstMemory === undefined) debugger;
-                if(firstMemory.index !== minMemoryIndex) {
-                  let previousMemory = memories.find(m => m.index === firstMemory.index-1); // todo: just use array indexing now that we've moved from linked list to index format
-                  if(previousMemory === undefined) {
-                    debugger;
-                  }
-                  batch.memories.unshift(previousMemory);
+                let mI = memories.findIndex(m => m === firstMemory);
+                if(memories[mI-1]) {
+                  batch.memories.unshift(memories[mI-1]);
                   addedPrevious = true;
                   numPreviousAdded++;
                 }
@@ -3892,6 +3919,8 @@ OVERALL SUMMARY:
         }
 
         clearInterval(abortCheckInterval);
+
+        $.sendButton.disabled = originalSendButtonDisabledState;
 
         return {message:result, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed};
       }
@@ -6863,15 +6892,6 @@ OVERALL SUMMARY:
           }
           let loreEntriesToAddAfterImport = [];
           if(importedMemories) {
-            let memoryIdToIndexMap = null;
-            if(importedMemories.find(m => m.index === undefined)) {
-              memoryIdToIndexMap = createMemoryIdToIndexMapFromOldNextPrevMemories(importedMemories);
-            }
-            for(let memory of importedMemories) {
-              let opts = {};
-              if(memoryIdToIndexMap) opts.index = memoryIdToIndexMap[memory.id];
-              upgradeMemoryFromOldVersion(memory, opts);
-            }
             let userWrittenMemories = importedMemories.filter(m => m.type === "user-written");
             if(userWrittenMemories.length > 0) {
               for(let m of userWrittenMemories) {
@@ -6883,6 +6903,13 @@ OVERALL SUMMARY:
                 }
               }
               importedMemories = importedMemories.filter(m => m.type !== "user-written");
+            }
+
+            let memoryIdToIndexMap = createMemoryIdToIndexMapForIncorrectlyIndexedOrUnindexedMemories(importedMemories);
+            for(let memory of importedMemories) {
+              let opts = {};
+              if(memoryIdToIndexMap[memory.id] !== undefined) opts.index = memoryIdToIndexMap[memory.id];
+              upgradeMemoryFromOldVersion(memory, opts);
             }
           }
           
