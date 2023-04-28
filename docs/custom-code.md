@@ -220,6 +220,31 @@ oc.thread.on("StreamingMessage", async function (data) {
 });
 ```
 
+## Interactive Messages
+You can use button `onclick` handlers in message so that e.g. the user can click a button to take an action instead of typing:
+```html
+What would you like to do?
+1. <button onclick="oc.thread.messages.push({author:'user', content:'Fight'});">Fight</button>
+2. <button onclick="oc.thread.messages.push({author:'user', content:'Run'});">Run</button>
+```
+I recommend that you use `oc.messageRenderingPipeline` to turn a custom format into HTML, rather than actually having HTML in your messages (it will use more tokens, and might confuse the AI). So your format might look like this:
+```html
+What would you like to do?
+1. [[Fight]]
+2. [[Run]]
+```
+You could prompt/instruct/remind your character to reply in that format. And then you'd add this to your custom code:
+```js
+oc.messageRenderingPipeline.push(({message, reader}) => {
+  if(reader === "user") {
+    message.content = message.content.replace(/\[\[(.+?)\]\]/g, (match, text) => {
+      let encodedText = encodeURIComponent(text); // this is a 'hacky' but simple way to prevent special characters like quotes from breaking the onclick attribute
+      return `<button onclick="oc.thread.messages.push({author:'user', content:decodeURIComponent('${encodedText}')});">${text}</button>`;
+    });
+  }
+});
+```
+Note that you can't use the `this` keyword within the button onclick handler - it actually just sends the code in the onclick to your custom code iframe and executes it there, so there's no actual element, and thus no `this` or `event`, etc.
 
 ## Gotchas
 
