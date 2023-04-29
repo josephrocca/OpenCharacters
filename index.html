@@ -5694,7 +5694,7 @@ OVERALL SUMMARY:
               if(e.data.type === "event") {
                 let eventName = e.data.eventName.toLowerCase();
                 
-                if(eventName === "messageadded" || eventName === "messageedited") {
+                if(eventName === "messageadded" || eventName === "messageedited" || eventName === "messagedeleted") {
                   currentlyProcessingMessageActionHandlers = true; // <-- we use this variable to pause the normal data update polling.
                   let returnData = null;
                   try {
