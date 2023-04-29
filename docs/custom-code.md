@@ -162,6 +162,7 @@ oc.thread.on("MessageAdded", async function () {
   }
 });
 ```
+There are also `MessageEdited` and `MessageDeleted` events.
 
 ### Message Rendering
 Sometimes you may want to display different text to the user than what the AI sees. For that, you can use `oc.messageRenderingPipeline`. It's an array that you `.push()` a function into, and that function is used to process messages. Your function should use the `reader` parameter to determine who is "reading" the message (either `user` or `ai`), and then "render" the message `content` accordingly. Here's an example to get you started:
