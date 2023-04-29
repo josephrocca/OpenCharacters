@@ -3802,7 +3802,7 @@ OVERALL SUMMARY:
             data.stream = true;
             let tokensInPrompt = await countTokensInMessages(messagesArr, modelName);
             apiTokenUsage = {prompt:tokensInPrompt, completion:0, total:tokensInPrompt};
-
+            
             let response = await fetch(modelObj.endpointUrl, {
               headers,
               body: JSON.stringify(data),
@@ -4388,7 +4388,7 @@ OVERALL SUMMARY:
             if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
             
             messageEl.dataset.canDelete = "true";
-            await triggerMessageAddedCustomCodeEvent(threadId);
+            await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
           }
 
         } catch(e) {
@@ -4404,6 +4404,8 @@ OVERALL SUMMARY:
         botIsCurrentlyReplying = false;
         botIsCurrentlyReplyingPromiseResolve();
         botIsCurrentlyReplyingPromise = null;
+
+        $.sendButton.disabled = false;
       }
 
 
@@ -4456,7 +4458,9 @@ OVERALL SUMMARY:
           }
           // if this is the last message in the feed, then we treat it as an "added" message, rather than an edited message, so we trigger the custom code MessageAdded event:
           if(isLastMessage) {
-            await triggerMessageAddedCustomCodeEvent(threadId);
+            await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
+          } else {
+            await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageEdited"});
           }
         }
       }
@@ -4624,7 +4628,7 @@ OVERALL SUMMARY:
           }
 
           if(message.memoryQueriesUsed.length > 0) {
-            content.push(`<b>Memory Queries Used:</b>\n${sanitizeHtml(message.memoryQueriesUsed.join("\n"))}`);
+            content.push(`<b>Memory/Lore Queries Used:</b>\n${sanitizeHtml(message.memoryQueriesUsed.join("\n"))}`);
           }
 
           if(message.messageIdsUsed.length > 0) {
@@ -4837,10 +4841,14 @@ OVERALL SUMMARY:
         let shouldScrollDown = messageFeedIsNearBottom();
         await addMessageToFeed(newMessage, {inPlaceOf:messageEl});
         if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+
+        await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageEdited"});
       }
+
 
       async function messageDeleteButtonClickHandler(e) {
         if(this.closest(".message").dataset.canDelete === "false") return; // it doesn't exist (just a "typing indicator" place holder) - deletion during that time is handled within the doBotReplyIfNeeded function
+        let threadId = parseInt($.messageFeed.dataset.threadId);
         e.preventDefault();
         e.stopPropagation();
         const messageId = parseInt(this.closest(".message").dataset.id);
@@ -4851,6 +4859,7 @@ OVERALL SUMMARY:
         }
         await updateInlineReminderMessage();
         await updateThreadScene();
+        await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageDeleted"});
       }
 
       const defaultUserName = "Anon";
@@ -4898,7 +4907,7 @@ OVERALL SUMMARY:
         return characterObj;
       }
 
-      let instructionForNextBotReply = null; // this is a mildly hacky but convenient global alternative to passing replyInstruction to doBotReplyIfNeeded, because that is triggered in various places so it's hard to "thread" the instruction through the various functions that end up calling it (e.g. triggerMessageAddedCustomCodeEvent --> renderMessageThread --> doBotReplyIfNeeded)
+      let instructionForNextBotReply = null; // this is a mildly hacky but convenient global alternative to passing replyInstruction to doBotReplyIfNeeded, because that is triggered in various places so it's hard to "thread" the instruction through the various functions that end up calling it (e.g. triggerMessageActionCustomCodeEvent --> renderMessageThread --> doBotReplyIfNeeded)
 
       async function sendButtonClickHandler() {
         $.sendButton.disabled = true;
@@ -5219,8 +5228,8 @@ OVERALL SUMMARY:
             
             $.messageInput.value = "";
             $.messageInput.style.height = "";
-            await triggerMessageAddedCustomCodeEvent(threadId);
-            await doBotReplyIfNeeded(); // note that we can't just pass the replyInstruction here because doBotReplyIfNeeded can get called in the process of executing triggerMessageAddedCustomCodeEvent, so we use the global instructionForNextBotReply instead
+            await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
+            await doBotReplyIfNeeded(); // note that we can't just pass the replyInstruction here because doBotReplyIfNeeded can get called in the process of executing triggerMessageActionCustomCodeEvent, so we use the global instructionForNextBotReply instead
           }
         } catch(e) {
           console.error(e);
@@ -5362,6 +5371,8 @@ OVERALL SUMMARY:
           (function() {
             let userHandlers = {
               messageadded: [],
+              messageedited: [],
+              messagedeleted: [],
               streamingmessagechunk: [],
               streamingmessage: [],
             };
@@ -5630,16 +5641,16 @@ OVERALL SUMMARY:
               }
             }
 
-            let currentlyProcessingMessageAddedHandlers = false;
+            let currentlyProcessingMessageActionHandlers = false;
             (async function() {
               while(1) {
                 try {
                   // TODO: make this more efficient - polling is not ideal
                   await new Promise(r => setTimeout(r, 100));
 
-                  // MessageAdded event is special in that it sends data back immediately afterwards,
+                  // MessageAdded/MessageEdited event is special in that it sends data back immediately afterwards,
                   // so to prevent any weirdness, we wait for it to finish:
-                  while(currentlyProcessingMessageAddedHandlers) {
+                  while(currentlyProcessingMessageActionHandlers) {
                     await new Promise(r => setTimeout(r, 100));
                   }
 
@@ -5683,8 +5694,8 @@ OVERALL SUMMARY:
               if(e.data.type === "event") {
                 let eventName = e.data.eventName.toLowerCase();
                 
-                if(eventName === "messageadded") {
-                  currentlyProcessingMessageAddedHandlers = true; // <-- we use this variable to pause the normal data update polling.
+                if(eventName === "messageadded" || eventName === "messageedited") {
+                  currentlyProcessingMessageActionHandlers = true; // <-- we use this variable to pause the normal data update polling.
                   let returnData = null;
                   try {
                     let data = e.data.data;
@@ -5693,7 +5704,7 @@ OVERALL SUMMARY:
                     oc.thread.messages = data.thread.messages;
                     dataChangedByCustomCode = origFlag;
                     
-                    await Promise.all(userHandlers.messageadded.map(handler => handler(data)));
+                    await Promise.all(userHandlers[eventName].map(handler => handler(data)));
                     
                     if(dataChangedByCustomCode) {
                       returnData = getChangedData();
@@ -5701,12 +5712,12 @@ OVERALL SUMMARY:
                       dataSnapshotWhenLastSentToMainThread = getCurrentData();
                     }
                   } catch(e) {
-                    console.error("There was an error while processing the MessageAdded event:");
+                    console.error(\`There was an error while processing the \${eventName} event:\`);
                     console.error(e);
                   }
                   console.log("custom code iframe sending back:", returnData);
                   window.parent.postMessage({_id:e.data._id, success:true, result:returnData}, "${window.location.origin}");
-                  currentlyProcessingMessageAddedHandlers = false;
+                  currentlyProcessingMessageActionHandlers = false;
                 }
 
                 if(eventName === "streamingmessagechunk") {
@@ -6045,7 +6056,7 @@ OVERALL SUMMARY:
       }
 
       // this function runs after every message is added: https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md
-      async function triggerMessageAddedCustomCodeEvent(threadId) {
+      async function triggerMessageActionCustomCodeEvent({threadId, eventName}) {
         let thread = await db.threads.get(threadId);
         let threadCharacter = await db.characters.get(thread.characterId);
 
@@ -6055,9 +6066,9 @@ OVERALL SUMMARY:
         showEl($.statusNotifier);
 
         let { data, originalMessages } = await getDataForCustomCode(threadId);
-        console.log("@@@@@@@@@@@ Data sent to custom code for MessageAdded handler:", data);
-        let receivedData = await sendCustomCodeIframeMessage(threadId, {type:"event", eventName:"messageadded", data});
-        console.log("@@@@@@@@@@@ Data received from custom code after MessageAdded handler:", receivedData);
+        console.log(`@@@@@@@@@@@ Data sent to custom code for ${eventName} handler:`, data);
+        let receivedData = await sendCustomCodeIframeMessage(threadId, {type:"event", eventName:eventName.toLowerCase(), data});
+        console.log(`@@@@@@@@@@@ Data received from custom code after ${eventName} handler:`, receivedData);
         if(receivedData) await updateDbWithNewDataFromCustomCode({threadId, receivedData, originalMessages});
         $.statusNotifier.innerHTML = "";
         hideEl($.statusNotifier);
@@ -6308,7 +6319,7 @@ OVERALL SUMMARY:
           await addMessageToFeed(messageObj, {character, inPlaceOf:messageEl});
           if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
-          await triggerMessageAddedCustomCodeEvent(threadId);
+          await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
         }
         return true;
       }
