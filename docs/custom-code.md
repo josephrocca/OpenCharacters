@@ -255,6 +255,8 @@ oc.messageRenderingPipeline.push(function({message, reader}) {
   }
 });
 ```
+If you want to change something about the way this works (e.g. change the double-square-bracket format to something else), but don't know JavaScript, the "Custom Code Helper" starter character might be able to help you make some adjustments.
+
 Note that you can't use the `this` keyword within the button onclick handler - it actually just sends the code in the onclick to your custom code iframe and executes it there, so there's no actual element that's firing the onclick from the iframe's perspective, and thus no `this` or `event`, etc.
 
 ## Gotchas
