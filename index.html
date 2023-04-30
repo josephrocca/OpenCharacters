@@ -922,6 +922,11 @@
         if(Array.isArray(memory.embedding)) {
           memory.embeddings = {"text-embedding-ada-002":memory.embedding};
           delete memory.embedding;
+          if(memory.$types) {
+            // needed for manual upgrading of dexie json import (still don't know why we need to manually upgrade stuff though - should be able to import old json and it upgrades automatically)
+            memory.$types["embeddings.text-embedding-ada-002"] = memory.$types.embedding;
+            delete memory.$types.embedding;
+          }
         }
       }
 
@@ -930,6 +935,11 @@
         if(Array.isArray(entry.embedding)) {
           entry.embeddings = {"text-embedding-ada-002":entry.embedding};
           delete entry.embedding;
+          if(entry.$types) {
+            // needed for manual upgrading of dexie json import (still don't know why we need to manually upgrade stuff though - should be able to import old json and it upgrades automatically)
+            entry.$types["embeddings.text-embedding-ada-002"] = entry.$types.embedding;
+            delete entry.$types.embedding;
+          }
         }
       }
 
