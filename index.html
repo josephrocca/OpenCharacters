@@ -493,7 +493,7 @@
     <audio id="musicPlayer" style="display:none;"></audio>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=28";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=29";
 
       let JSON5;
       (async function() {
@@ -672,11 +672,47 @@
         }, { passive: true });
       }
 
+      // todo:
+      // OVERALL PLAN:
+      // 1. add lore book url list to character
+      // 2. add optional bookUrl to lore entries
+      // 3. when starting new thread
+      //   - load the entries from the URL
+      //   - embed them (and cache embeddings)
+      //   - save to db with a bookUrl (and bookId=null)
+      // 4. when recalling lore/memories, use character.loreBookUrls to db.lore.where("bookUrl").anyOf(loreBookUrls)
+      // 5. add bookUrl lore items to readonly hidden text area in /lore popup
 
+      // - character.loreBookUrls
+      //   - updgrade db
+      //   - character details prompt
+      //   - sharing link
+      // - do larger batch sizes for embedTexts if possible - make sure it's fast for 1000 entries
+      // - make sure importing/exporting (thread and full) work
+      //   - textEmbeddingCache
+      //   - character.loreBookUrls
 
+      // oc.thread.messageWrapperStyle
+
+      const dbName = "chatbot-ui-v1";
+      const dbVersion = 65;
+
+      let db = await new Dexie(dbName).open();
+
+      let usersOriginalDbVersion = db.verno;
+      if(usersOriginalDbVersion < dbVersion) {
+        let result = await prompt2({
+          message: {type:"none", "html":`<p style="margin:0;">A database upgrade will be done when you click continue. A full export/backup will be downloaded first in case anything goes wrong.</p>`},
+        }, {cancelButtonText:null, submitButtonText:"Continue"});
+
+        const originalDbJsonText = await db.export({prettyJson: true}).then(blob => blob.text());
+        let yyyymmdd = new Date().toISOString().split("T")[0];
+        downloadText(originalDbJsonText, `opencharacters-export-${yyyymmdd}.json`);
+      }
+
+      await db.close(); // we need to close before db.version() call below and re-open afterwards
       
-      let db = new Dexie("chatbot-ui-v1");
-      db.version(63).stores({
+      db.version(dbVersion).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
         // in particular: the character hash code shouldn't include fields like `id` and `creationTime` and `lastMessageTime`.
         
@@ -692,7 +728,8 @@
         misc: "key", // key=>value
         summaries: "hash,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries. we also need it for grabbing summaries for the edit interface.
         memories: "++id,[summaryHash+threadId],[characterId+status],[threadId+status],[threadId+index],threadId", // memories are associated with a summary hash because they are computed alongside the summary. We need to track the hash so that if earlier messages are edited (and therefore the summaries need to be recomputed), we know to only consider "valid"/"current" the memories that are associated with currently-"used". The "type" property is used to track the "currentness", and also to track whether a memory was manually added by the user (in which case it is *always* considered valid)
-        lore: "++id,bookId",
+        lore: "++id,bookId,bookUrl",
+        textEmbeddingCache: "++id,textHash",
         usageStats: "[dateHour+threadId+modelName],threadId,characterId,dateHour", // note that characterId can be derived from threadId - it's just included for quick aggregation. modelName is like "gpt-3.5-turbo", dateHour is like "2023-3-29-14"
       }).upgrade(async tx => {
 
@@ -721,7 +758,6 @@
 
 
         let memories = await tx.table("memories").toArray();
-        debugger;
         let userWrittenMemories = memories.filter(m => m.type === "user-written");
         if(userWrittenMemories.length > 0) {
           let loreEntries = [];
@@ -740,9 +776,15 @@
           if(memoryIdToIndexMap[memory.id] !== undefined) opts.index = memoryIdToIndexMap[memory.id];
           upgradeMemoryFromOldVersion(memory, opts);
         });
+
+        await tx.table("lore").toCollection().modify(entry => {
+          upgradeLoreFromOldVersion(entry);
+        });
         
 
       });
+
+      await db.open();
 
       function upgradeCharacterInitialMessagesArrayIfNeeded(character) {
         // upgrade from the ["foo", "bar"] format to [{author:"user", content:"foo"}, {author:"ai", content:"bar"}]
@@ -797,6 +839,11 @@
         if(character.uuid === undefined) character.uuid = null;
         if(character.customData === undefined) character.customData = {};
         if(character.systemCharacter === undefined) character.systemCharacter = {avatar:{}};
+        if(character.loreBookUrls === undefined) character.loreBookUrls = [];
+        if(character.associativeMemoryMethod !== undefined) {
+          character.autoGenerateMemories = character.associativeMemoryMethod;
+          delete character.associativeMemoryMethod;
+        }
         // if(character.publicId === undefined) character.publicId = "";
         // WARNING: If you add something here, you'll likely have to edit:
         //  - characterDetailsPrompt (characterDetailsPrompt should return a valid character object - addCharacter only adds creationTime and lastMessageTime, so characterDetailsPrompt should fill in everything else, even if it's not visible in the editor)
@@ -853,6 +900,7 @@
         if(thread.character === undefined) thread.character = {avatar:{}}; 
         if(thread.systemCharacter === undefined) thread.systemCharacter = {avatar:{}}; // this overrides the default user character object (for this specific thread)
         if(thread.loreBookId === undefined) thread.loreBookId = thread.id; // user-written memories for each thread are now lore entries, and for simplicity I've made the lorebook id equal to the thread id the the existing lore entries (thread and lorebook ids are not actually coupled though)
+        if(thread.messageWrapperStyle === undefined) thread.messageWrapperStyle = "";
         // WARNING: If you add something here, you may need to edit:
         // - addThread
         // - window.oc.thread.<...>  (during declaration of window.oc object, with Object.seal if property is an object)
@@ -870,6 +918,19 @@
           memory.index = opts.index;
         }
         delete memory.type; // no longer need type="generated" because it's the only type (and also a better name would be "chronological" because user's can edit them and add their own)
+
+        if(Array.isArray(memory.embedding)) {
+          memory.embeddings = {"text-embedding-ada-002":memory.embedding};
+          delete memory.embedding;
+        }
+      }
+
+      function upgradeLoreFromOldVersion(entry) {
+        if(entry.bookUrl === undefined) entry.bookUrl = null;
+        if(Array.isArray(entry.embedding)) {
+          entry.embeddings = {"text-embedding-ada-002":entry.embedding};
+          delete entry.embedding;
+        }
       }
 
 
@@ -983,13 +1044,16 @@
         let keepThreadCheck;
         let keepCharacterCheck;
         let keepLoreBookCheck;
+        let keepLoreBookUrlCheck;
         if(result.exportType === "allCharactersAndThreads") {
           keepThreadCheck = (id) => true;
           keepLoreBookCheck = (id) => true;
+          keepLoreBookUrlCheck = (url) => true;
           keepCharacterCheck = (id) => true;
         } else if (result.exportType === "allCharactersNoThreads") {
           keepThreadCheck = (id) => false;
           keepLoreBookCheck = (id) => false;
+          keepLoreBookUrlCheck = (url) => false;
           keepCharacterCheck = (id) => true;
         } else if (result.exportType === "specificCharacters") {
           if(!result.exportCharacterIds.trim()) return alert("You must specify at least one character ID to export.")
@@ -998,23 +1062,30 @@
           keepCharacterCheck = (id) => keepCharacterIds.includes(id);
 
           if(result.includeThreadsOfCharacters === "yes") {
+            const keepCharacters = await db.characters.where("id").anyOf(keepCharacterIds).toArray();
             const keepThreads = await db.threads.where("characterId").anyOf(keepCharacterIds).toArray();
             const keepThreadIds = keepThreads.map(t => t.id);
             const keepLoreBookIds = keepThreads.map(t => t.loreBookId);
+            const keepLoreBookUrls = keepCharacters.map(c => c.loreBookUrls).flat();
             keepThreadCheck = (id) => keepThreadIds.includes(id);
             keepLoreBookCheck = (id) => keepLoreBookIds.includes(id);
+            keepLoreBookUrlCheck = (url) => keepLoreBookUrls.includes(url);
           } else {
             keepThreadCheck = (id) => false;
             keepLoreBookCheck = (id) => false;
+            keepLoreBookUrlCheck = (url) => false;
           }
         } else if (result.exportType === "specificThreads") {
           if(!result.exportThreadIds.trim()) return alert("You must specify at least one thread ID to export.")
           const keepThreadIds = result.exportThreadIds.split(",").map(s => parseInt(s)).filter(id => !isNaN(id));
           const keepThreads = await db.threads.where("id").anyOf(keepThreadIds).toArray();
+          const keepCharacterIds = [...new Set(keepThreads.map(t => t.characterId))];
+          const keepCharacters = await db.characters.where("id").anyOf(keepCharacterIds).toArray();
+          const keepLoreBookUrls = keepCharacters.map(c => c.loreBookUrls).flat();
           const keepLoreBookIds = keepThreads.map(t => t.loreBookId);
           keepThreadCheck = (id) => keepThreadIds.includes(id);
           keepLoreBookCheck = (id) => keepLoreBookIds.includes(id);
-          const keepCharacterIds = (await db.threads.where("id").anyOf(keepThreadIds).toArray()).map(t => t.characterId);
+          keepLoreBookUrlCheck = (url) => keepLoreBookUrls.includes(url);
           keepCharacterCheck = (id) => keepCharacterIds.includes(id);
         }
 
@@ -1043,8 +1114,16 @@
 
         let lore = json.data.data.find(d => d.tableName === "lore");
         if(lore) {
-          lore.rows = lore.rows.filter(l => keepLoreBookCheck(l.bookId));
+          lore.rows = lore.rows.filter(l => keepLoreBookCheck(l.bookId) || keepLoreBookUrlCheck(l.bookUrl));
         }
+
+        let textEmbeddingCache = json.data.data.find(d => d.tableName === "textEmbeddingCache");
+        if(textEmbeddingCache) {
+          let memoryAndLoreTextHashes = new Set(await Promise.all([...lore.rows, ...memories.rows].map(entry => sha256Text(entry.text))));
+          textEmbeddingCache.rows = textEmbeddingCache.rows.filter(c => memoryAndLoreTextHashes.has(c.textHash));
+        }
+
+        
 
         if(result.exportUserData === "no") {
           json.data.data.find(d => d.tableName === "usageStats").rows = [];
@@ -2243,8 +2322,8 @@
       //   const result = await prompt2({
       //     modelName: { label: "Model name:", type:"select", options:[availableModels.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => ({value:m.name, content:m.shortLabel ?? m.name}))], defaultValue: thread.modelName },
       //     fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod },
-      //     associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Persistent, 'infinite' character memory:", infoTooltip:"This increases the cost by up to 2x and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod },
-      //     textEmbeddingModelName: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Memory embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory (text) into a list of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[...broadlyAvailableModels.filter(m => m.type === "text-embedding").map(m => ({value:m.name, content:m.name}))], defaultValue: defaultValues.textEmbeddingModelName },
+      //     autoGenerateMemories: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Persistent, 'infinite' character memory:", infoTooltip:"This increases the cost by up to 2x and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod },
+      //     textEmbeddingModelName: { hidden:true, label: "Memory embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory (text) into a list of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[...broadlyAvailableModels.filter(m => m.type === "text-embedding").map(m => ({value:m.name, content:m.name}))], defaultValue: defaultValues.textEmbeddingModelName },
       //   }, {submitButtonText: "save", showHiddenInputsText: "show advanced options"});
       //   if(!result) return;
 
@@ -2311,6 +2390,10 @@
         if(defaultValues.initialMessages) initialMessagesText = generateTextFormatFromMessages(defaultValues.initialMessages);
         else initialMessagesText = "";
 
+        let loreBookUrlsText;
+        if(defaultValues.loreBookUrls) loreBookUrlsText = defaultValues.loreBookUrls.join("\n");
+        else loreBookUrlsText = "";
+
         const result = await prompt2({
           header: { html: opts.editingExistingCharacter ? `<div style="border-radius:3px;font-size: 0.8rem;padding: 0.5rem;border: 1px solid var(--border-color);">You're currently <b>editing</b> an existing character named '${existingCharacter.name}'.</div>` : "", type:"none" },
           name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:characterNameValidationPattern },
@@ -2321,16 +2404,16 @@
           modelName: { hidden:true, label: "Model name:", infoTooltip:"GPT-4 is really smart, but expensive (about 15x price of gpt-3.5-turbo), and you need to have have access via the GPT-4 waitlist. If you use gpt-3.5-turbo and set the 'temperature' option (see advanced settings) to 1, then apparently (according to community members) it's pretty close to DaVinci in terms of creativity and overall quality. DaVinci is overpriced given its performance - GPT-4 is significantly better and only ~1.5x the price.", type:"select", options:[{content:"good, cheap (currently: gpt-3.5-turbo)", value:"good"}, {content:"great, but *expensive* (currently: davinci, or gpt-4 *if* you have access)", value:"great"}, ...broadlyAvailableModels.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => ({value:m.name, content:m.shortLabel}))], defaultValue: defaultValues.modelName || "good" },
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
           textEmbeddingModelName: { hidden:true, label: "Text embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory/lore entry (text) into a bunch of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[...broadlyAvailableModels.filter(m => m.type === "text-embedding").map(m => ({value:m.name, content:m.name}))], defaultValue: defaultValues.textEmbeddingModelName ?? "text-embedding-ada-002" },
-          /* NOTE: "associativeMemoryMethod" is now a bit of a misnomer - this is now just a switch to enable/disable *automatic* memory creation during summarization. */
-          associativeMemoryMethod: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Auto-generated character memories:", infoTooltip:"You can use /mem and /lore commands to manually add memories and lore. If you enable this feature, memories will be created by the character during each summarization step. This increases the cost a bit (maybe +20%) and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. You can manually copy memories and lore over into a new thread if needed.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.associativeMemoryMethod ?? "none" },
+          autoGenerateMemories: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Auto-generated character memories:", infoTooltip:"You can use /mem and /lore commands to manually add memories and lore. If you enable this feature, memories will be created by the character during each summarization step. This increases the cost a bit (maybe +20%) and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. You can manually copy memories and lore over into a new thread if needed.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.autoGenerateMemories ?? "none" },
           avatarSize: { hidden:true, label: "Avatar size, as a multiple of the default size.", type:"textLine", defaultValue: defaultValues.avatar?.size ?? "1" },
           avatarShape: { hidden:true, label: "Avatar shape:", type:"select", options:[{value:"square"}, {value:"circle"}, {value:"portrait"}], defaultValue: defaultValues.avatar?.shape ?? "square" },
           sceneBackgroundUrl: { hidden:true, label: "Chat background image/video URL (jpg, webp, webm, mp4, etc.)", type:"textLine", defaultValue: defaultValues.scene?.background?.url ?? "" },
           sceneMusicUrl: { hidden:true, label: "Chat background music/audio URL (mp3, webm, mp4, etc.)", infoTooltip:"Permission is always requested from the user before playing audio - i.e. music will not autoplay because that could annoy some users. You can use a video file for audio - the visuals will obviously not be shown.", type:"textLine", defaultValue: defaultValues.scene?.music?.url ?? "" },
           userCharacterName: { hidden:true, label: "User's name. This overrides the user's default username when chatting with this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.name || "" },
           userCharacterAvatarUrl: { hidden:true, label: "User's avatar. This overrides the user's default avatar when chatting to this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.avatar?.url || "" },
-          // initialThreadMemories: { hidden:true, show:d=>d.associativeMemoryMethod!=="none", label: "Initial thread-specific memories. The character will create memories based on the chat, but you can add some starter memories/lore here.", infoTooltip:"Manually-written memories can be used as 'dynamic' instruction/role/reminders that engage when relevant. This saves you from having to pack too much text into your instruction/reminder, which will 'eat up' your context, which means the AI will be able to see fewer recent messages, and summarization will have to be done more often.", type:"text", defaultValue: defaultValues.textEmbeddingModelName ?? "" },
+          // initialThreadMemories: { hidden:true, show:d=>d.autoGenerateMemories!=="none", label: "Initial thread-specific memories. The character will create memories based on the chat, but you can add some starter memories/lore here.", infoTooltip:"Manually-written memories can be used as 'dynamic' instruction/role/reminders that engage when relevant. This saves you from having to pack too much text into your instruction/reminder, which will 'eat up' your context, which means the AI will be able to see fewer recent messages, and summarization will have to be done more often.", type:"text", defaultValue: defaultValues.textEmbeddingModelName ?? "" },
           temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", infoTooltip:"People seem to get good results between 0.7 and 1.2 - higher values may sacrifice some 'correctness' but should result in more 'imagination'.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.85 },
+          loreBookUrlsText: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Lorebook URLs - one per line. Use <a href='https://rentry.org' target='_blank'>rentry.org</a> or similar. Should be a url to the raw text. For changes to propagate to <b>existing</b> threads, you need to use the <b>/lore</b> command and click the reload button. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/lore.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: loreBookUrlsText },
           customCode: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
           systemCharacterName: { hidden:true, label: "System's name:", type:"textLine", defaultValue: defaultValues.systemCharacter?.name || "" },
           systemCharacterAvatarUrl: { hidden:true, label: "System's avatar:", type:"textLine", defaultValue: defaultValues.systemCharacter?.avatar?.url || "" },
@@ -2355,6 +2438,23 @@
           result.initialMessages = [];
         }
         delete result.initialMessagesText;
+
+        if(result.loreBookUrlsText?.trim()) {
+          result.loreBookUrls = result.loreBookUrlsText.trim().split("\n").map(url => url.trim()).filter(url => url);
+          for(let i = 0; i < result.loreBookUrls.length; i++) {
+            let url = new URL(result.loreBookUrls[i]);
+            if(url.hostname === "rentry.org" || url.hostname === "rentry.co") {
+              url.pathname = url.pathname.replace(/\/$/, "");
+              if(!url.pathname.endsWith("/raw")) {
+                url.pathname += "/raw";
+              }
+              result.loreBookUrls[i] = url.toString();
+            }
+          }
+        } else {
+          result.loreBookUrls = [];
+        }
+        delete result.loreBookUrlsText;
 
         result.avatar = {
           url: result.avatarUrl,
@@ -2625,6 +2725,8 @@
           textEmbeddingModelName: aiCharacter.textEmbeddingModelName,
         };
 
+        await ensureLoreUrlsAreLoaded({loreBookUrls:aiCharacter.loreBookUrls, modelName:aiCharacter.textEmbeddingModelName});
+
         // when a thread is first created, we copy across the character's userCharacter as a starting point for the `thread.userCharacter` - after that, the `aiCharacter.userCharacter` is not relevant to the thread (i.e. thread's userCharacter can diverge from the character's 'template' userCharacter)
         applyObjectOverrides({object:threadObj.userCharacter, overrides:aiCharacter.userCharacter});
         // same for systemCharacter
@@ -2632,6 +2734,65 @@
 
         await db.threads.add(threadObj);
         return threadObj;
+      }
+
+      async function ensureLoreUrlsAreLoaded({loreBookUrls, modelName}) {
+        let loadingModal = createLoadingModal("Downloading lore...");
+        for(let url of loreBookUrls) {
+          let downloadUrl;
+          if(origin.endsWith("jsdelivr.net")
+            || (origin.endsWith("huggingface.co") && url.includes("/resolve/"))
+            || origin === "https://raw.githubusercontent.com"
+          ) {
+            // the server has correct CORS headers, so we don't need the proxy:
+            downloadUrl = url;
+          } else {
+            // code for this CORS proxy server is here: https://replit.com/@joe64/opencharacters-cors-proxy
+            downloadUrl = "https://opencharacters-cors-proxy.joe64.repl.co?url=" + encodeURIComponent(url);
+          }
+          let text = await fetch(downloadUrl).then(r => r.text());
+          let entryTextArr = text.replace(/\r/g, "").split(/\n{2,}/).map(entry => entry.trim()).filter(entry => entry);
+          
+          let textHashes = await Promise.all(entryTextArr.map(e => sha256Text(e)));
+          let entries = entryTextArr.map((e, i) => ({
+            text: e,
+            textHash: textHashes[i],
+            bookUrl: url,
+            bookId: null,
+            triggers: [],
+          }));
+          
+          // Add embeddings to entries:
+          let onProgressMessage = (data) => loadingModal.updateContent("Adding lore entries..." + Math.round(data.progress * 100) + "%");
+          // Note that `embedTexts` will try to get embeddings from textEmbeddingCache first
+          let embeddings = await embedTexts({textArr:entries.map(e => e.text), modelName, onProgressMessage, shouldCache:true});
+          entries.forEach((e, i) => {
+            e.embeddings = {[modelName]:embeddings[i]};
+          });
+          let textToEntry = new Map(entries.map(e => [e.text, e]));
+
+          let entryTextsThatAreAlreadyInDb = new Set();
+          await db.lore.where({bookUrl:url}).modify((entry, ref) => {
+            if(!textToEntry.has(entry.text)) {
+              delete ref.value; // delete this entry because it no longer exists as an entry in the text at this url
+              return;
+            }
+            entryTextsThatAreAlreadyInDb.add(entry.text);
+            if(!entry.embeddings[modelName]) { // <-- it's possible that the entry exists, but doesn't have an embedding for this model
+              entry.embeddings[modelName] = textToEntry.get(entry.text).embeddings[modelName];
+            }
+          });
+
+          let entriesToAdd = entries.filter(e => !entryTextsThatAreAlreadyInDb.has(e.text));
+          for(let entry of entriesToAdd) {
+            delete entry.textHash;
+          }
+          if(entriesToAdd.length > 0) {
+            await db.lore.bulkAdd(entriesToAdd);
+            console.log(`Added lore entries for ${url}:`, entriesToAdd);
+          }
+        }
+        loadingModal.delete();
       }
 
       let modelNameToTokenizerCache = {};
@@ -2683,10 +2844,30 @@
         return sum;
       }
 
-      async function embedTexts(textArr, modelName) {
+      async function embedTexts({textArr, modelName, onProgressMessage, shouldCache=false}={}) {
+        // we need to return the embeddings in the same order despite our caching-retrieval process:
+        let textsRemaining = textArr.slice(0).map((t, i) => ({text:t, order:i}));
+
+        // try to get embeddings from cache.
+        // first add text hashes:
+        let textHashes = await Promise.all(textsRemaining.map(e => sha256Text(e.text)));
+        textsRemaining.forEach((e, i) => e.textHash = textHashes[i]);
+        // then get cached embeddings:
+        let cachedEmbeddings = await db.textEmbeddingCache.where("textHash").anyOf(textHashes).toArray();
+        cachedEmbeddings = cachedEmbeddings.filter(e => e.modelName === modelName);
+        // then add cached embeddings to textsRemaining:
+        let textHashToCachedEmbedding = {};
+        cachedEmbeddings.forEach(e => textHashToCachedEmbedding[e.textHash] = e.embedding);
+        textsRemaining.forEach(e => {
+          if(textHashToCachedEmbedding[e.textHash]) {
+            e.embedding = textHashToCachedEmbedding[e.textHash];
+          }
+        });
+        
+        let embeddings = textsRemaining.filter(e => e.embedding);
+        textsRemaining = textsRemaining.filter(e => !e.embedding);
+
         // batch textArr into chunks of 100
-        let textsRemaining = textArr.slice(0);
-        let embeddings = [];
         while(textsRemaining.length > 0) {
           let textsToEmbed = textsRemaining.splice(0, 100);
           let result = await fetch("https://api.openai.com/v1/embeddings", {
@@ -2697,17 +2878,44 @@
               "api-key": `${(await db.misc.get("openAiApiKey"))?.value}`,
             },
             body: JSON.stringify({
-              input: textsToEmbed,
+              input: textsToEmbed.map(e => e.text),
               model: modelName,
             })
           }).then(response => response.json()); // TODO: this returns token counts under result.usage.total_tokens - I should add it to cost usageStats for cost estimation
           if(!result.data) {
             alert("Error:\n" + JSON.stringify(result, null, 2));
           }
-          let embeddingsForThisBatch = result.data.map(o => o.embedding);
+          let embeddingsForThisBatch = result.data.map((o, i) => {
+            return {
+              text: textsToEmbed[i].text,
+              textHash: textsToEmbed[i].textHash,
+              embedding: o.embedding,
+              order: textsToEmbed[i].order,
+              modelName,
+              notFromCache: true,
+            };
+          });
           embeddings.push(...embeddingsForThisBatch);
+          if(onProgressMessage) onProgressMessage({progress:1-textsRemaining.length/textArr.length});
         }
-        return embeddings;
+        embeddings.sort((a,b) => a.order-b.order)
+        let embeddingVectorsToReturn = embeddings.map(e => e.embedding);
+
+        // add to cache:
+        let entriesToAddToCache = [];
+        for(let entry of embeddings) {
+          if(entry.notFromCache) {
+            delete entry.order;
+            delete entry.notFromCache;
+            entriesToAddToCache.push(entry);
+          }
+        }
+        if(shouldCache) {
+          await db.textEmbeddingCache.bulkAdd(entriesToAddToCache);
+        }
+
+        if(onProgressMessage) onProgressMessage({progress:1});
+        return embeddingVectorsToReturn;
       }
 
 
@@ -2834,7 +3042,7 @@
           throw new Error("The specified values of `maxTokenCountOfSummary` and `messageTokensToConsumePerSummary` are such that the summarization process could go over this model's token limit.");
         }
 
-        if(aiCharacter.associativeMemoryMethod === "v1") {
+        if(aiCharacter.autoGenerateMemories === "v1") {
           // set isCurrent to false on all memories of this character so we can re-validate them along with the summaries - in case the thread has been edited
           await db.memories.where({threadId, status:"current"}).modify({status:"noncurrent"});
           await db.memories.where({summaryHash:"", threadId}).modify({status:"current"}); // <-- bit hacky, but this is needed for user-added memories before any summaries were done (so they don't belong to a summaryHash). could maybe make *all* user-added memories use "" (empty string) as summaryHash, but for now I just add them to the summary that they were closest to, or if there is no summary yet, then ""
@@ -2884,7 +3092,7 @@
           }
 
           let messageBatchSummarizationInstruction;
-          if(aiCharacter.associativeMemoryMethod === "v1") {
+          if(aiCharacter.autoGenerateMemories === "v1") {
             if(i > 0) { // if i>0, then we have prevSummary 
               let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
               // NOTE: Dedent doesn't work here because messageBatchText is multi-line, so the second line is not indented and thus prevents the dedenting
@@ -2992,7 +3200,7 @@ OVERALL SUMMARY:
               alert("The summary system might be caught in a loop? This could be a bug. If you click OK, it will continue, but please watch it to ensure it doesn't infinitely loop and spend lots of API credits.");
               alreadyWarnedAboutLoop = true;
             }
-            if(aiCharacter.associativeMemoryMethod === "v1") {
+            if(aiCharacter.autoGenerateMemories === "v1") {
               let [ memoriesText, summaryText ] = result.split(/OVERALL SUMMARY:|NEW OVERALL SUMMARY:/);
               let memories = memoriesText.trim().replace(/^LEARNINGS:|NEW LEARNINGS:/, "").trim().split("\n").map(m => m.trim().replace(/^\* (We learned that )?/, "").trim()).filter(m => m);
               memories = memories.map(m => m.replace(/\n+/g, "\n")); // not ideal, but: memories cannot have two consecutive newlines, since in the memory editing UI two newlines indicate a gap between entries
@@ -3011,7 +3219,7 @@ OVERALL SUMMARY:
                 }
               }
 
-              let embeddings = await embedTexts(memories, embeddingModelName);
+              let embeddings = await embedTexts({textArr:memories, modelName:embeddingModelName, shouldCache:true});
 
               // counter-intuitively, in rare cases it's possible for us to already have memories for this batch of messages (i.e. for this summary hash).
               // e.g. if the user closed the tab right as the memories were being added to the db, but the summary didn't get a chance to be added.
@@ -3025,7 +3233,7 @@ OVERALL SUMMARY:
               let i = 0;
               for(let memory of memories) {
                 let embedding = embeddings[i];
-                let newMemoryId = await db.memories.put({summaryHash:hash, threadId, text:memory, characterId, embedding, status:"current", index:previousMemoryIndex+1, triggers:[]});
+                let newMemoryId = await db.memories.put({summaryHash:hash, threadId, text:memory, characterId, embeddings:{[embeddingModelName]:embedding}, status:"current", index:previousMemoryIndex+1, triggers:[]});
                 previousMemoryIndex++;
                 addToSummaryLog(`<b>added memory:</b> ${memory}`);
                 console.log("added memory:", memory);
@@ -3042,7 +3250,7 @@ OVERALL SUMMARY:
             await db.summaries.put({hash, summary, threadId, messageIds, prevSummaryHash});
           } else {
             // There's already an existing summary that matches this instruction hash.
-            if(aiCharacter.associativeMemoryMethod === "v1") {
+            if(aiCharacter.autoGenerateMemories === "v1") {
               // mark the existing memories that match this summary has as current/valid:
               await db.memories.where({summaryHash:hash, threadId}).modify({status:"current"});
             }
@@ -3282,6 +3490,17 @@ OVERALL SUMMARY:
         return messages;
       }
 
+      async function threadHasMemoriesOrLore(threadId) {
+        let thread = await db.threads.get(threadId);
+        let character = await db.characters.get(thread.characterId);
+
+        let loreBookIdEntries = await db.lore.where({bookId:thread.loreBookId}).count();
+        let loreBookUrlEntries = await db.lore.where("bookUrl").anyOf(character.loreBookUrls).count();
+        let memories = await db.memories.where({threadId, status:"current"}).count();
+
+        return loreBookIdEntries > 0 || loreBookUrlEntries > 0 || memories > 0;
+      }
+
       const retrievedMemoriesTokenLimitFraction = 0.075;
 
       async function getTokenLimitForSummaryAndMessages(character, thread) {
@@ -3310,7 +3529,7 @@ OVERALL SUMMARY:
         tokenLimit -= await countTokens(roleInstruction, thread.modelName); // allow for system message tokens
         tokenLimit -= await countTokens( "("+(reminderMessage||"")+")" , thread.modelName); // allow for reminder message tokens
         tokenLimit -= Math.round(maxTokenLimit*0.15); // allow for bot response
-        if(character.associativeMemoryMethod !== "none") {
+        if(await threadHasMemoriesOrLore(thread.id)) {
           tokenLimit -= Math.round(maxTokenLimit*retrievedMemoriesTokenLimitFraction); // allow for retrieved memories
         }
         return tokenLimit;
@@ -3465,14 +3684,17 @@ OVERALL SUMMARY:
         let loreIdsUsed = [];
         let memoryQueriesUsed = [];
 
-        let loreEntries = await db.lore.where({bookId:thread.loreBookId}).toArray();
+        let loreBookIdEntries = await db.lore.where({bookId:thread.loreBookId}).toArray();
+        let loreBookUrlEntries = await db.lore.where("bookUrl").anyOf(aiCharacter.loreBookUrls).toArray();
+        let loreEntries = [...loreBookIdEntries, ...loreBookUrlEntries];
         let memories = await db.memories.where({threadId, status:"current"}).toArray();
         memories.sort((a,b) => a.index - b.index);
-        if((aiCharacter.associativeMemoryMethod === "v1" && memories.length > 0) || loreEntries.length > 0) {
+        if(memories.length > 0 || loreEntries.length > 0) {
           onProgressMessage({message:"gen mem queries..."});
 
           memories.forEach(m => m._type="memory");
           loreEntries.forEach(m => m._type="lore");
+          let memoriesAndLore = [...memories, ...loreEntries];
 
           // NOTE: I replace newlines in messages with spaces because I *think* the AI was getting confused about the structure of the messages
           const messagesToTextFormat = (messages) => messages.filter(m => !m._isReminder).slice(-10).map(m => `[[${m.name || "System"}]]: ${m.content.replace(/\n/g, " ")}`).join("\n\n");
@@ -3502,14 +3724,19 @@ OVERALL SUMMARY:
           memoryQueriesUsed.push(...searchQueries);
 
           let embeddingModelName = thread.textEmbeddingModelName;
-          let searchEmbeddings = await embedTexts(searchQueries, embeddingModelName);
+          let searchEmbeddings = await embedTexts({textArr:searchQueries, modelName:embeddingModelName});
 
           const scoreThreshold = 0; // this is zero now because we subtract the average inverseDistance from the score when computing the score
           console.log("memory/lore score threshold:", scoreThreshold);
 
           onProgressMessage({message:"calc mem/lore relevance..."});
 
-          let memoriesAndLore = [...memories, ...loreEntries];
+          for(let entry of memoriesAndLore) {
+            if(!entry.embeddings[embeddingModelName]) {
+              // embeddings should have been computed during addThread
+              throw new Error(`lore/memory doesn't have embedding for model ${embeddingModelName}:\ntext:${entry.text}\nbookUrl:${entry.bookUrl}\nbookId:${entry.bookId}`);
+            }
+          }
 
           for(let entry of memoriesAndLore) {
             if(entry._relevanceScore === undefined) entry._relevanceScore = 0;
@@ -3517,7 +3744,7 @@ OVERALL SUMMARY:
             for(let searchEmbedding of searchEmbeddings) {
               let multiplier = 1;
               if(i === 0) multiplier = 3; // first search query is likely to be much more relevant (later ones tend to be grasping at straws)
-              let inverseDistance = (1 / cosineDistance(searchEmbedding, entry.embedding));
+              let inverseDistance = (1 / cosineDistance(searchEmbedding, entry.embeddings[embeddingModelName]));
               let score = (inverseDistance-4) * multiplier; // subtract 4 because that seems to be roughly the average distance between two random embeddings
               entry._relevanceScore += score;
               i++;
@@ -4695,7 +4922,7 @@ OVERALL SUMMARY:
         if(thread.character.avatar.size) avatarSize = thread.character.avatar.size;
         if(messageObj.avatar?.size !== undefined) avatarSize = messageObj.avatar.size;
 
-        let wrapperStyle = messageObj.wrapperStyle ?? "";
+        let wrapperStyle = messageObj.wrapperStyle || thread.messageWrapperStyle || "";
 
         // fall back to ai character's settings where appropriate:
         if(character.id < 0) {
@@ -4992,101 +5219,98 @@ OVERALL SUMMARY:
             }
             $.messageInput.value = "";
           } else if(message.trim() === "/mem") {
-            if(threadCharacter.associativeMemoryMethod === "none") {
-              alert("You need to enable memories in the character editor before you can use this command.");
-            } else {
-              let thread = await db.threads.get(threadId);
-              let originalGeneratedMemories = await db.memories.where({threadId, status:"current"}).toArray();
-              originalGeneratedMemories.sort((a,b) => a.index - b.index);
+            let thread = await db.threads.get(threadId);
+            let originalGeneratedMemories = await db.memories.where({threadId, status:"current"}).toArray();
+            originalGeneratedMemories.sort((a,b) => a.index - b.index);
 
-              let textToEmbeddingCache = new Map();
-              for(let entry of originalGeneratedMemories) {
-                textToEmbeddingCache.set(entry.text, entry.embedding);
-              }
-
-              let textToMemoryObj = new Map();
-              for(let entry of originalGeneratedMemories) {
-                if(textToMemoryObj.has(entry.text)) {
-                  // there's a duplicate, so for now we just hackily add a space to the end to avoid problems with mapping entries back to their object:
-                  while(textToMemoryObj.has(entry.text)) {
-                    entry.text += " ";
-                  }
-                  await db.memories.update(entry.id, {text:entry.text});
-                }
-                textToMemoryObj.set(entry.text, entry);
-              }
-
-              let originalGeneratedMemoriesText = originalGeneratedMemories.map(m => `${m.text}`).join("\n\n");
-
-              let generatedDefaultValue = originalGeneratedMemoriesText;
-
-              while(1) {
-                let result = await prompt2({
-                  generatedMemoriesText: {label: "Edit character 'memories'. Entries should be separated with a blank line. Edits should not significantly change the overall chronology. Use the <b>/lore</b> command to store non-chronological facts/things.", type: "text", height:"fit-content", defaultValue:generatedDefaultValue, placeholder:"If this box is empty, your character hasn't stored any memories yet because the chat thread isn't long enough to warrant it."},
-                }, {submitButtonText:"save"});
-                if(!result) break;
-                
-                // we set these so that if there's an error (e.g. while embedding, or with database) the while loop continues and they don't lose their edits
-                generatedDefaultValue = result.generatedMemoriesText;
-
-                let newGeneratedMemoryTextEntries = result.generatedMemoriesText.split(/\n{2,}/).map(m => m.trim()).filter(m => m);
-
-                let loadingModal = createLoadingModal("Computing memory embeddings. Please wait...", $.middleColumn);
-
-                let embeddingModelName = thread.textEmbeddingModelName;
-                let newTexts = [];
-                for(let text of newGeneratedMemoryTextEntries) {
-                  if(!textToEmbeddingCache.has(text)) {
-                    newTexts.push(text);
-                  }
-                }
-
-                try {
-
-                  let newEmbeddings = await embedTexts(newTexts, embeddingModelName);
-                  for(let i = 0; i < newTexts.length; i++) {
-                    textToEmbeddingCache.set(newTexts[i], newEmbeddings[i]);
-                  }
-
-                  if(originalGeneratedMemoriesText !== result.generatedMemoriesText) {
-                    let newMemoryObjs = [];
-                    let index = 0;
-                    let prevSummaryHash = originalGeneratedMemories[0]?.summaryHash ?? ""; // empty string as a summary hash indicates that the memory doesn't "belong" to any summary
-                    for(let text of newGeneratedMemoryTextEntries) {
-                      let embedding = textToEmbeddingCache.get(text);
-                      let obj;
-                      if(textToMemoryObj.has(text)) {
-                        obj = textToMemoryObj.get(text);
-                        prevSummaryHash = obj.summaryHash;
-                        obj.index = index;
-                      } else {
-                        let embedding = textToEmbeddingCache.get(text);
-                        // we group new memories under the previous memory hash. a valid summary hash is necessary because it's what we use to 'validate' that memories are 'current' during the summarization process.
-                        obj = {summaryHash:prevSummaryHash, threadId, text, characterId:thread.characterId, embedding, status:"current", index, triggers:[]};
-                      }
-                      newMemoryObjs.push(obj);
-                      index++;
-                    }
-
-                    await db.transaction('rw', db.memories, async tx => {
-                      // note: entries lose their original id if they are edited, which means references from message.memoryIdBatchesUsed are lost - that's okay, since it's just used for 'debugging' anyway - we just indicate to the user (in the 'brain icon modal') that the memory no longer exists.
-                      await tx.table("memories").where({threadId, status:"current"}).delete();
-                      await tx.table("memories").bulkAdd(newMemoryObjs);
-                    });
-                  }
-
-                } catch(e) {
-                  alert("There was an error while saving the memories:\n"+e.stack);
-                  continue;
-                }
-                
-                loadingModal.delete();
-                break;
-              }
-              $.messageInput.value = "";
+            let textToEmbeddingCache = new Map();
+            for(let entry of originalGeneratedMemories) {
+              textToEmbeddingCache.set(entry.text, entry.embedding);
             }
+
+            let textToMemoryObj = new Map();
+            for(let entry of originalGeneratedMemories) {
+              if(textToMemoryObj.has(entry.text)) {
+                // there's a duplicate, so for now we just hackily add a space to the end to avoid problems with mapping entries back to their object:
+                while(textToMemoryObj.has(entry.text)) {
+                  entry.text += " ";
+                }
+                await db.memories.update(entry.id, {text:entry.text});
+              }
+              textToMemoryObj.set(entry.text, entry);
+            }
+
+            let originalGeneratedMemoriesText = originalGeneratedMemories.map(m => `${m.text}`).join("\n\n");
+
+            let generatedDefaultValue = originalGeneratedMemoriesText;
+
+            while(1) {
+              let result = await prompt2({
+                generatedMemoriesText: {label: "Edit character 'memories'. Entries should be separated with a blank line. Edits should not significantly change the overall chronology. Use the <b>/lore</b> command to store non-chronological facts/things.", type: "text", height:"fit-content", defaultValue:generatedDefaultValue, placeholder:"If this box is empty, your character hasn't stored any memories yet because the chat thread isn't long enough to warrant it."},
+              }, {submitButtonText:"save"});
+              if(!result) break;
+              
+              // we set these so that if there's an error (e.g. while embedding, or with database) the while loop continues and they don't lose their edits
+              generatedDefaultValue = result.generatedMemoriesText;
+
+              let newGeneratedMemoryTextEntries = result.generatedMemoriesText.replace(/\r/g, "").split(/\n{2,}/).map(m => m.trim()).filter(m => m);
+
+              let loadingModal = createLoadingModal("Computing memory embeddings. Please wait...", $.middleColumn);
+
+              let embeddingModelName = thread.textEmbeddingModelName;
+              let newTexts = [];
+              for(let text of newGeneratedMemoryTextEntries) {
+                if(!textToEmbeddingCache.has(text)) {
+                  newTexts.push(text);
+                }
+              }
+
+              try {
+
+                let newEmbeddings = await embedTexts({textArr:newTexts, modelName:embeddingModelName, shouldCache:true});
+                for(let i = 0; i < newTexts.length; i++) {
+                  textToEmbeddingCache.set(newTexts[i], newEmbeddings[i]);
+                }
+
+                if(originalGeneratedMemoriesText !== result.generatedMemoriesText) {
+                  let newMemoryObjs = [];
+                  let index = 0;
+                  let prevSummaryHash = originalGeneratedMemories[0]?.summaryHash ?? ""; // empty string as a summary hash indicates that the memory doesn't "belong" to any summary
+                  for(let text of newGeneratedMemoryTextEntries) {
+                    let embedding = textToEmbeddingCache.get(text);
+                    let obj;
+                    if(textToMemoryObj.has(text)) {
+                      obj = textToMemoryObj.get(text);
+                      prevSummaryHash = obj.summaryHash;
+                      obj.index = index;
+                    } else {
+                      let embedding = textToEmbeddingCache.get(text);
+                      // we group new memories under the previous memory hash. a valid summary hash is necessary because it's what we use to 'validate' that memories are 'current' during the summarization process.
+                      obj = {summaryHash:prevSummaryHash, threadId, text, characterId:thread.characterId, embeddings:{[embeddingModelName]:embedding}, status:"current", index, triggers:[]};
+                    }
+                    newMemoryObjs.push(obj);
+                    index++;
+                  }
+
+                  await db.transaction('rw', db.memories, async tx => {
+                    // note: entries lose their original id if they are edited, which means references from message.memoryIdBatchesUsed are lost - that's okay, since it's just used for 'debugging' anyway - we just indicate to the user (in the 'brain icon modal') that the memory no longer exists.
+                    await tx.table("memories").where({threadId, status:"current"}).delete();
+                    await tx.table("memories").bulkAdd(newMemoryObjs);
+                  });
+                }
+
+              } catch(e) {
+                alert("There was an error while saving the memories:\n"+e.stack);
+                continue;
+              }
+              
+              loadingModal.delete();
+              break;
+            }
+            $.messageInput.value = "";
           } else if(message.trim() === "/lore") {
             let thread = await db.threads.get(threadId);
+            let character = await db.characters.get(thread.characterId);
             let loreBookId = thread.loreBookId;
             if(loreBookId === undefined) debugger;
             let originalLoreEntries = await db.lore.where({bookId:loreBookId}).toArray();
@@ -5105,16 +5329,28 @@ OVERALL SUMMARY:
 
             let loreDefaultValue = originalLoreEntriesText;
 
+            let loreBookUrlEntries = await db.lore.where("bookUrl").anyOf(character.loreBookUrls).toArray();
+
             while(1) {
+              let controls = {}; // this will get populated with `data` object that is proxied such that we can update the values of the inputs in reloadButtonClickHandler.
+
+              async function reloadButtonClickHandler() {
+                await ensureLoreUrlsAreLoaded({loreBookUrls:character.loreBookUrls, modelName:thread.textEmbeddingModelName});
+                loreBookUrlEntries = await db.lore.where("bookUrl").anyOf(character.loreBookUrls).toArray();
+                controls.data.loreBookUrlEntriesText = loreBookUrlEntries.map(m => `${m.text}`).join("\n\n");
+              }
+
               let result = await prompt2({
-                loreEntriesText: {label: "Edit lore entries. Entries should be separated with a blank line.", type: "text", height:"fit-content", defaultValue:loreDefaultValue, placeholder:"Here's an example lore entry.\n\nAnd here's another.\n\nAnd here's yet another. As you can see, lore entries should be separated with a blank line.", focus:true, infoTooltip:"Lorebook entries can be used to describe the lore of your world. The AI 'searches' the lorebook for relevant entries when it's trying to work out the most appropriate thing to say/write next. Use relevant words, phrases, character names, etc. in each entry to help it trigger it at the appropriate moments. Don't make lore entries too big - probably aim for under 5 sentences for most entries."},
-              }, {submitButtonText:"save"});
+                loreEntriesText: {label: "Add/edit lore entries for this thread. Entries should be separated with a blank line.", type: "text", height:"fit-content", defaultValue:loreDefaultValue, placeholder:"Here's an example lore entry.\n\nAnd here's another.\n\nAnd here's yet another. As you can see, lore entries should be separated with a blank line.", focus:true, infoTooltip:"Lorebook entries can be used to describe the lore of your world. The AI 'searches' the lorebook for relevant entries when it's trying to work out the most appropriate thing to say/write next. Use relevant words, phrases, character names, etc. in each entry to help it trigger it at the appropriate moments. Don't make lore entries too big - probably aim for under 5 sentences for most entries."},
+                loreBookUrlEntriesText: {hidden:true, label: "Here are the entries loaded from this character's lorebook URLs. You can't edit these directly. Click the reload button below to pull in any changes that have been made to the character's lorebook URLs or the content at those URLs.", type: "text", disabled:true, height:"fit-content", defaultValue:loreBookUrlEntries.map(e => e.text).join("\n\n")},
+                reloadLoreUrlsButton: {hidden:true, type:"buttons", label:null, buttons:[{text:"Reload Lore URLs", onClick:reloadButtonClickHandler}]},
+              }, {submitButtonText:"save", controls});
               if(!result) break;
               
               // we set these so that if there's an error (e.g. while embedding, or with database) the while loop continues and they don't lose their edits
               loreDefaultValue = result.loreEntriesText;
 
-              let newLoreEntries = result.loreEntriesText.split(/\n{2,}/).map(e => e.trim()).filter(e => e);
+              let newLoreEntries = result.loreEntriesText.replace(/\r/g, "").split(/\n{2,}/).map(e => e.trim()).filter(e => e);
 
               // remove duplicates from newLoreEntries to prevent problems with our textToLoreObj mappings.
               // doesn't make sense to have duplicate memories anyway.
@@ -5132,7 +5368,7 @@ OVERALL SUMMARY:
 
               try {
 
-                let newEmbeddings = await embedTexts(newTexts, embeddingModelName);
+                let newEmbeddings = await embedTexts({textArr:newTexts, modelName:embeddingModelName});
                 for(let i = 0; i < newTexts.length; i++) {
                   textToEmbeddingCache.set(newTexts[i], newEmbeddings[i]);
                 }
@@ -5145,7 +5381,7 @@ OVERALL SUMMARY:
                       obj = textToLoreObj.get(text);
                     } else {
                       let embedding = textToEmbeddingCache.get(text);
-                      obj = {bookId:loreBookId, text, embedding, triggers:[]};
+                      obj = {bookId:loreBookId, bookUrl:null, text, embeddings:{[embeddingModelName]:embedding}, triggers:[]};
                     }
                     newLoreEntryObjs.push(obj);
                   }
@@ -5409,6 +5645,7 @@ OVERALL SUMMARY:
                   roleInstruction: undefined,
                 }),
                 customData: null,
+                messageWrapperStyle: null,
                 on: function(eventName, callback) {
                   userHandlers[eventName.toLowerCase()].push(callback);
                 },
@@ -5694,7 +5931,7 @@ OVERALL SUMMARY:
               if(e.data.type === "event") {
                 let eventName = e.data.eventName.toLowerCase();
                 
-                if(eventName === "messageadded" || eventName === "messageedited" || eventName === "messagedeleted") {
+                if(eventName === "messageadded" || eventName === "messageedited"  || eventName === "messagedeleted") {
                   currentlyProcessingMessageActionHandlers = true; // <-- we use this variable to pause the normal data update polling.
                   let returnData = null;
                   try {
@@ -5874,10 +6111,13 @@ OVERALL SUMMARY:
         let visibleThread = null;
         if(visibleThreadId !== null) visibleThread = await db.threads.get(visibleThreadId);
 
+        let character = null;
+        if(visibleThread !== null) character = await db.characters.get(visibleThread.characterId);
+
         $.customCodeIframeCtn.querySelectorAll(`iframe`).forEach(iframe => iframe.style.display = "none");
         $.customCodeColumn.style.display = "none";
 
-        if(visibleThread !== null && visibleThread.customCodeWindow.visible === true) {
+        if(visibleThread !== null && character.customCode.trim() && visibleThread.customCodeWindow.visible === true) {
           customCodeIframes[visibleThreadId].style.display = "block";
           let width = visibleThread.customCodeWindow.width ?? "300px";
           if(typeof width === "number") width = width+"px";
@@ -6037,6 +6277,7 @@ OVERALL SUMMARY:
             systemCharacter: thread.systemCharacter,
             customData: thread.customData,
             character: thread.character,
+            messageWrapperStyle: thread.messageWrapperStyle,
           },
           character: {},
         };
@@ -6102,7 +6343,7 @@ OVERALL SUMMARY:
         let thread = await db.threads.get(threadId);
         let threadCharacter = await db.characters.get(thread.characterId);
 
-        // THREAD updates:
+        // THREAD MESSAGES:
         if(receivedData.thread?.messages) {
           // note that originalMessages will only be defined if this is part of the MessageHandler process - because in that case we actually sent the messages, whereas in the data polling updates, we didn't send anything
           // currentMessages and originalMessages can differ because e.g. a message could have been deleted by the user while the custom code was processing
@@ -6186,7 +6427,7 @@ OVERALL SUMMARY:
           // debugger;
         }
         
-        
+        // OTHER THREAD STUFF:
         {
           let thread = await db.threads.get(threadId);
           let changed = false;
@@ -6204,6 +6445,10 @@ OVERALL SUMMARY:
           }
           if(receivedData.thread?.customData) {
             thread.customData = receivedData.thread.customData;
+            changed = true;
+          }
+          if(receivedData.thread?.messageWrapperStyle) {
+            thread.messageWrapperStyle = receivedData.thread.messageWrapperStyle;
             changed = true;
           }
           if(changed) {
@@ -6802,7 +7047,9 @@ OVERALL SUMMARY:
               thread.loreBookId = loreBookIdMap[thread.loreBookId];
             }
             for(let entry of importedLore) {
-              entry.bookId = loreBookIdMap[entry.bookId];
+              if(typeof entry.bookId == "number") { // <-- bookId is null for bookUrl-based entries
+                entry.bookId = loreBookIdMap[entry.bookId];
+              }
             }
           }
 
@@ -6922,6 +7169,14 @@ OVERALL SUMMARY:
               if(memoryIdToIndexMap[memory.id] !== undefined) opts.index = memoryIdToIndexMap[memory.id];
               upgradeMemoryFromOldVersion(memory, opts);
             }
+          }
+          if(importedLore) {
+            for(let entry of importedLore) {
+              upgradeLoreFromOldVersion(entry);
+            }
+          }
+          for(let entry of loreEntriesToAddAfterImport) {
+            upgradeLoreFromOldVersion(entry);
           }
           
 
