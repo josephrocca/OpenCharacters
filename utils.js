@@ -41,7 +41,7 @@ export async function prompt2(specs, opts={}) {
           <div class="sectionLabel" style="${structuredSectionsI === 0 ? "margin-top:0;" : ""}">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
-              <select data-spec-key="${sanitizeHtml(key)}" value="${sanitizeHtml(spec.defaultValue)}" style="width:100%;height:100%; padding:0.25rem;">${spec.options.map(o => `<option value="${sanitizeHtml(o.value)}" ${o.value === spec.defaultValue ? "selected" :""}>${sanitizeHtml(o.content) || sanitizeHtml(o.value)}</option>`).join("")}</select>
+              <select data-spec-key="${sanitizeHtml(key)}" value="${sanitizeHtml(spec.defaultValue)}" ${spec.disabled === true ? "disabled" : ""} style="width:100%;height:100%; padding:0.25rem;">${spec.options.map(o => `<option value="${sanitizeHtml(o.value)}" ${o.value === spec.defaultValue ? "selected" :""}>${sanitizeHtml(o.content) || sanitizeHtml(o.value)}</option>`).join("")}</select>
             </div>
           </div>
         </section>`;
@@ -52,7 +52,7 @@ export async function prompt2(specs, opts={}) {
           <div class="sectionLabel" style="${structuredSectionsI === 0 ? "margin-top:0;" : ""}">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
-              <input data-initial-focus="${spec.focus === true ? "yes" : "no"}" data-spec-key="${sanitizeHtml(key)}" value="${sanitizeHtml(spec.defaultValue)}" style="width:100%;height:100%; border: 1px solid lightgrey; border-radius: 3px; padding: 0.25rem;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}" ${spec.validationPattern ? `pattern="${sanitizeHtml(spec.validationPattern)}"` : ""}>
+              <input data-initial-focus="${spec.focus === true ? "yes" : "no"}" data-spec-key="${sanitizeHtml(key)}" ${spec.disabled === true ? "disabled" : ""} value="${sanitizeHtml(spec.defaultValue)}" style="width:100%;height:100%; border: 1px solid lightgrey; border-radius: 3px; padding: 0.25rem;" type="text" placeholder="${sanitizeHtml(spec.placeholder)}" ${spec.validationPattern ? `pattern="${sanitizeHtml(spec.validationPattern)}"` : ""}>
             </div>
           </div>
         </section>`;
@@ -63,14 +63,25 @@ export async function prompt2(specs, opts={}) {
           <div class="sectionLabel" style="${structuredSectionsI === 0 ? "margin-top:0;" : ""}">${spec.label}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
           <div style="display:flex;">
             <div style="flex-grow:1;">
-              <textarea data-initial-focus="${spec.focus === true ? "yes" : "no"}" data-spec-key="${sanitizeHtml(key)}" ${spec.height === "fit-content" ? `data-height="fit-content"` : ``} style="width:100%; ${spec.height === "fit-content" ? "" : `height:${sanitizeHtml(spec.height)}`}; min-height:${spec.minHeight ?? "4rem"}; max-height:${spec.maxHeight ?? "50vh"}; border: 1px solid lightgrey; border-radius: 3px; padding:0.25rem; ${spec.cssText || ""};" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
+              <textarea data-initial-focus="${spec.focus === true ? "yes" : "no"}" data-spec-key="${sanitizeHtml(key)}" ${spec.height === "fit-content" ? `data-height="fit-content"` : ``} ${spec.disabled === true ? "disabled" : ""} style="width:100%; ${spec.height === "fit-content" ? "" : `height:${sanitizeHtml(spec.height)}`}; min-height:${spec.minHeight ?? "4rem"}; max-height:${spec.maxHeight ?? "50vh"}; border: 1px solid lightgrey; border-radius: 3px; padding:0.25rem; ${spec.cssText || ""};" type="text" placeholder="${sanitizeHtml(spec.placeholder)}">${sanitizeHtml(spec.defaultValue)}</textarea>
+            </div>
+          </div>
+        </section>`;
+      structuredSectionsI++;
+    } else if(spec.type == "buttons") {
+      sections += `
+        <section data-spec-key="${sanitizeHtml(key)}" class="structuredInputSection" data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" style="${spec.hidden === true ? "display:none" : ""};">
+          <div class="sectionLabel" style="${structuredSectionsI === 0 ? "margin-top:0;" : ""}">${spec.label ?? ""}${spec.infoTooltip ? ` <span title="${sanitizeHtml(spec.infoTooltip)}" style="cursor:pointer;" onclick="alert(this.title)">ℹ️</span>` : ""}</div>
+          <div style="display:flex;">
+            <div style="flex-grow:1;">
+              ${spec.buttons.map(b => `<button ${b.disabled === true ? "disabled" : ""} style="width:100%; border: 1px solid lightgrey; border-radius: 3px; padding:0.25rem; ${b.cssText || ""};">${b.text}</button>`).join(" ")}
             </div>
           </div>
         </section>`;
       structuredSectionsI++;
     } else if(spec.type == "none") {
       sections += `
-        <section data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" data-requires-element-insert="${typeof spec.html === "string" ? "no" : "yes"}" style="${spec.hidden === true ? "display:none" : ""};">
+        <section data-spec-key="${sanitizeHtml(key)}" data-is-hidden-extra="${spec.hidden === true ? "yes" : "no"}" data-requires-element-insert="${typeof spec.html === "string" ? "no" : "yes"}" style="${spec.hidden === true ? "display:none" : ""};">
           ${typeof spec.html === "string" ? spec.html : ""}
         </section>`;
     }
@@ -139,10 +150,22 @@ export async function prompt2(specs, opts={}) {
     };
   }
 
+  // insert non-string HTML elements for type==html specs
   let elementObjects = Object.values(specs).filter(s => s.html && typeof s.html !== "string").map(s => s.html);
   ctn.querySelectorAll('.sectionsContainer [data-requires-element-insert=yes]').forEach((el, i) => {
     el.append(elementObjects[i]);
   });
+
+  // add onclick handlers for type==button specs
+  let buttonSpecKeys = Object.entries(specs).filter(([key, spec]) => spec.type === "buttons").map(([key, spec]) => key);
+  for(let key of buttonSpecKeys) {
+    ctn.querySelectorAll(`.sectionsContainer [data-spec-key=${key}]`).forEach(el => {
+      let buttonEls = [...el.querySelectorAll("button")];
+      for(let i = 0; i < buttonEls.length; i++) {
+        buttonEls[i].onclick = specs[key].buttons[i].onClick;
+      }
+    });
+  }
 
   setTimeout(() => {
     // add scrollFade if sectionsContainer has scroll
@@ -179,6 +202,24 @@ export async function prompt2(specs, opts={}) {
   updateInputVisibilies();
   for(const el of [...ctn.querySelectorAll("[data-spec-key]")]) {
     el.addEventListener("input", updateInputVisibilies);
+  }
+
+  if(opts.controls) {
+    // add a proxy to the controls object so that we can read and write spec values from the outside
+    opts.controls.data = new Proxy({}, {
+      set: function(obj, prop, value) {
+        let el = ctn.querySelector(`[data-spec-key=${prop}]`);
+        if(!el) return true;
+        el.value = value;
+        updateInputVisibilies();
+        return true;
+      },
+      get: function(obj, prop) {
+        let el = ctn.querySelector(`[data-spec-key=${prop}]`);
+        if(!el) return undefined;
+        return el.value;
+      }
+    });
   }
 
   function getAllValues() {
