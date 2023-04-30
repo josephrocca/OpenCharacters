@@ -2877,16 +2877,21 @@
         let embeddings = textsRemaining.filter(e => e.embedding);
         textsRemaining = textsRemaining.filter(e => !e.embedding);
 
+        let endpointUrl = "https://api.openai.com/v1/embeddings";
+        let headers = {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${(await db.misc.get("openAiApiKey"))?.value}`,
+        };
+        if(new URL(endpointUrl).hostname.includes("azure")) {
+          headers["api-key"] = (await db.misc.get("openAiApiKey"))?.value;
+        }
+
         // batch textArr into chunks of 100
         while(textsRemaining.length > 0) {
           let textsToEmbed = textsRemaining.splice(0, 100);
-          let result = await fetch("https://api.openai.com/v1/embeddings", {
+          let result = await fetch(endpointUrl, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${(await db.misc.get("openAiApiKey"))?.value}`,
-              "api-key": `${(await db.misc.get("openAiApiKey"))?.value}`,
-            },
+            headers,
             body: JSON.stringify({
               input: textsToEmbed.map(e => e.text),
               model: modelName,
@@ -4011,7 +4016,7 @@ OVERALL SUMMARY:
 
         let headers = {"Content-Type": "application/json"};
         if(apiKey) headers.authorization = `Bearer ${apiKey}`;
-        if(apiKey) headers["api-key"] = apiKey; // some non-OpenAI APIs require this (e.g. Azure)
+        if(apiKey && new URL(modelObj.endpointUrl).hostname.includes("azure")) headers["api-key"] = apiKey;
 
         let abortController = new AbortController();
         let abortSignal = abortController.signal;
@@ -4221,7 +4226,7 @@ OVERALL SUMMARY:
 
         let headers = {"content-type": "application/json"};
         if(apiKey) headers.authorization = `Bearer ${apiKey}`;
-        if(apiKey) headers["api-key"] = apiKey; // some non-OpenAI APIs require this (e.g. Azure)
+        if(apiKey && new URL(modelObj.endpointUrl).hostname.includes("azure")) headers["api-key"] = apiKey;
 
         if(modelType === "chat-completion") {
 
