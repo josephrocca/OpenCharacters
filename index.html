@@ -697,20 +697,24 @@
       const dbName = "chatbot-ui-v1";
       const dbVersion = 65;
 
-      let db = await new Dexie(dbName).open();
+      let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
+      
+      if(db) {
+        let usersOriginalDbVersion = db.verno;
+        if(usersOriginalDbVersion < dbVersion) {
+          let result = await prompt2({
+            message: {type:"none", "html":`<p style="margin:0;">A database upgrade will be done when you click continue. A full export/backup will be downloaded first in case anything goes wrong.</p>`},
+          }, {cancelButtonText:null, submitButtonText:"Continue"});
 
-      let usersOriginalDbVersion = db.verno;
-      if(usersOriginalDbVersion < dbVersion) {
-        let result = await prompt2({
-          message: {type:"none", "html":`<p style="margin:0;">A database upgrade will be done when you click continue. A full export/backup will be downloaded first in case anything goes wrong.</p>`},
-        }, {cancelButtonText:null, submitButtonText:"Continue"});
-
-        const originalDbJsonText = await db.export({prettyJson: true}).then(blob => blob.text());
-        let yyyymmdd = new Date().toISOString().split("T")[0];
-        downloadText(originalDbJsonText, `opencharacters-export-${yyyymmdd}.json`);
+          const originalDbJsonText = await db.export({prettyJson: true}).then(blob => blob.text());
+          let yyyymmdd = new Date().toISOString().split("T")[0];
+          downloadText(originalDbJsonText, `opencharacters-export-${yyyymmdd}.json`);
+        }
+        await db.close(); // we need to close before db.version() call below and re-open afterwards
+      } else {
+        // brand new user, so create the db:
+        db = new Dexie(dbName);
       }
-
-      await db.close(); // we need to close before db.version() call below and re-open afterwards
       
       db.version(dbVersion).stores({
         // REMEMBER: If you update the database schema, you may also need to update the export/import code
