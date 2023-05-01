@@ -394,6 +394,25 @@
         background:var(--button-bg-hover);
       }
 
+
+      #userMessagesSentHistoryCtn .historyItem {
+        cursor: pointer;
+        padding: 0.25rem;
+        font-size: 85%;
+      }
+      #userMessagesSentHistoryCtn .historyItem:hover {
+        background: var(--background);
+      }
+      #userMessagesSentHistoryCtn .historyItem .pinButton {
+        opacity: 0.5;
+      }
+      #userMessagesSentHistoryCtn .historyItem[data-is-pinned="true"] .pinButton {
+        opacity: 1;
+      }
+      body:not(.isMobile) #userMessagesSentHistoryCtn .historyItem .pinButton:hover {
+        opacity: 1;
+      }
+
       /* typing indicator from https://codepen.io/arthak/pen/rmqvgo */
       .tiblock { align-items: center; display: flex; height: 17px; }
       .ticontainer{ display: inline-block; }
@@ -473,6 +492,7 @@
               <!-- <div style="display:flex;margin-bottom: 0.25rem;">
                 <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
               </div> -->
+              <div id="userMessagesSentHistoryCtn" style="margin-bottom:0.25rem; position:relative;"></div>
               <div style="display:flex;">
                 <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sys &lt;message&gt; - reply as system&#10;/sum - edit summary&#10;/mem - open memory editor&#10;/lore - open lore editor&#10;/name &lt;name&gt; - set your name for this thread&#10;/avatar &lt;url&gt; - set your avatar image for this thread&#10;/import - add chat messages in bulk&#10;&#10;Note: You can add '/ai &lt;instruction&gt;' as the final line in your normal messages to instruct AI for its reply."></textarea>
                 <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
@@ -675,30 +695,9 @@
         }, { passive: true });
       }
 
-      // todo:
-      // OVERALL PLAN:
-      // 1. add lore book url list to character
-      // 2. add optional bookUrl to lore entries
-      // 3. when starting new thread
-      //   - load the entries from the URL
-      //   - embed them (and cache embeddings)
-      //   - save to db with a bookUrl (and bookId=null)
-      // 4. when recalling lore/memories, use character.loreBookUrls to db.lore.where("bookUrl").anyOf(loreBookUrls)
-      // 5. add bookUrl lore items to readonly hidden text area in /lore popup
-
-      // - character.loreBookUrls
-      //   - updgrade db
-      //   - character details prompt
-      //   - sharing link
-      // - do larger batch sizes for embedTexts if possible - make sure it's fast for 1000 entries
-      // - make sure importing/exporting (thread and full) work
-      //   - textEmbeddingCache
-      //   - character.loreBookUrls
-
-      // oc.thread.messageWrapperStyle
 
       const dbName = "chatbot-ui-v1";
-      const dbVersion = 65;
+      const dbVersion = 68;
 
       let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
       
@@ -908,8 +907,12 @@
         if(thread.systemCharacter === undefined) thread.systemCharacter = {avatar:{}}; // this overrides the default user character object (for this specific thread)
         if(thread.loreBookId === undefined) thread.loreBookId = thread.id; // user-written memories for each thread are now lore entries, and for simplicity I've made the lorebook id equal to the thread id the the existing lore entries (thread and lorebook ids are not actually coupled though)
         if(thread.messageWrapperStyle === undefined) thread.messageWrapperStyle = "";
+        if(thread.userMessagesSentHistory === undefined) thread.userMessagesSentHistory = [];
+        if(thread.unsentMessageText === undefined) thread.unsentMessageText = "";
         // WARNING: If you add something here, you may need to edit:
         // - addThread
+        // - getThreadJSONById
+        // and if exposing to custom code:
         // - window.oc.thread.<...>  (during declaration of window.oc object, with Object.seal if property is an object)
         // - getDataForCustomCode  (sending data to custom code)
         // - updateDbWithNewDataFromCustomCode (receiving data from custom code)
@@ -1343,11 +1346,15 @@
 
             const result = await prompt2({
               exportType: {label: "export type:", type: "select", options:[{value:"json", content:"whole thread, including character (recommended)"}, {value:"text", content:"message text only (in [AI]/[USER] format - use '/import' command to import)"}]},
+              // includeUserMessagesSentHistory: {hidden:true, label: "include user messages sent history:", type: "select", options:[{value:"no"}, {value:"yes"}]},
             }, {submitButtonText:"export"});
             if(!result) return;
 
+            let opts = {};
+            opts.excludeUserMessagesSentHistory = true;
+
             const threadId = parseInt(btn.closest(".thread").dataset.threadId);
-            let json = await getThreadJSONById(threadId);
+            let json = await getThreadJSONById(threadId, opts);
 
             let thread = await db.threads.get(threadId);
             let character = await db.characters.get(thread.characterId);
@@ -1431,6 +1438,12 @@
         let threads = json.data.data.find(d => d.tableName === "threads");
         threads.rows = threads.rows.filter(t => t.id === threadId);
         if(threads.rows.length > 1) alert("Something went wrong. There should only be one thread in the export, but several were exported.");
+        
+        // privacy stuff:
+        if(opts.excludeUserMessagesSentHistory) {
+          threads.rows[0].userMessagesSentHistory = [];
+        }
+        threads.rows[0].unsentMessageText = "";
         
         let messages = json.data.data.find(d => d.tableName === "messages");
         messages.rows = messages.rows.filter(m => m.threadId === threadId);
@@ -2377,6 +2390,10 @@
         document.querySelectorAll("#middleColumn > .middleColumnScreen").forEach(el => hideEl(el));
         showEl($.chatInterface);
 
+        if(isMobile) {
+          closeLeftColumn();
+        }
+
         $.threadModelSelector.value = thread.modelName;
 
         // thus must come before rendering the message feed because we may need to render the messages with `oc.messageRenderingPipeline`
@@ -2389,6 +2406,8 @@
         await db.threads.where({id:threadId}).modify({lastViewTime:Date.now()});
 
         await updateCustomCodeIframeVisibility();
+
+        $.messageInput.value = thread.unsentMessageText;
 
         clearTimeout(loadingModalCreationTimeout);
         if(loadingModal) loadingModal.delete();
@@ -2743,6 +2762,7 @@
           folderPath: folderPath || "",
           loreBookId,
           textEmbeddingModelName: aiCharacter.textEmbeddingModelName,
+          userMessagesSentHistory: [],
         };
 
         await ensureLoreUrlsAreLoaded({loreBookUrls:aiCharacter.loreBookUrls, modelName:aiCharacter.textEmbeddingModelName});
@@ -5144,6 +5164,11 @@ OVERALL SUMMARY:
         
         let messageObj = await db.messages.get(messageId);
 
+        // remove any exsiting undo buttons
+        for(let undoButton of $.messageFeed.querySelectorAll(".undoMessageDeleteButton")) {
+          undoButton.remove();
+        }
+
         let undoBtn = document.createElement("div");
         undoBtn.innerHTML = `<div class="undoMessageDeleteButton" style="text-align:center;"><button>undo deletion</button></div>`;
         undoBtn.querySelector("button").addEventListener("click", async function() {
@@ -5216,6 +5241,20 @@ OVERALL SUMMARY:
         return characterObj;
       }
 
+      {
+        let debounceTimeout = null;
+        $.messageInput.addEventListener("input", async function(e) {
+          // debounce, and after 500ms, save current $.messageInput.value to thread.unsentMessageText
+          if(debounceTimeout) clearTimeout(debounceTimeout);
+          debounceTimeout = setTimeout(async function() {
+            let threadId = parseInt($.messageFeed.dataset.threadId);
+            let thread = await db.threads.get(threadId);
+            thread.unsentMessageText = $.messageInput.value;
+            await db.threads.put(thread);
+          }, 500);
+        });
+      }
+
       let instructionForNextBotReply = null; // this is a mildly hacky but convenient global alternative to passing replyInstruction to doBotReplyIfNeeded, because that is triggered in various places so it's hard to "thread" the instruction through the various functions that end up calling it (e.g. triggerMessageActionCustomCodeEvent --> renderMessageThread --> doBotReplyIfNeeded)
 
       async function sendButtonClickHandler() {
@@ -5225,6 +5264,21 @@ OVERALL SUMMARY:
         let characterId = thread.characterId;
         let threadCharacter = await db.characters.get(characterId);
         let message = $.messageInput.value;
+
+        // if user sent message history contains message, move it to the end, otherwise add it to the end:
+        let userMessageHistoryEntry = thread.userMessagesSentHistory.find(x => x.text === message);
+        if(userMessageHistoryEntry) {
+          thread.userMessagesSentHistory.splice(thread.userMessagesSentHistory.indexOf(userMessageHistoryEntry), 1);
+        } else {
+          userMessageHistoryEntry = {text:message, isPinned:false};
+        }
+        thread.userMessagesSentHistory.push(userMessageHistoryEntry);
+        // ensure isPinned items are at the end of the array:
+        thread.userMessagesSentHistory.sort((a,b) => a.isPinned === b.isPinned ? 0 : a.isPinned ? 1 : -1);
+        // keep only the last 50 messages:
+        thread.userMessagesSentHistory = thread.userMessagesSentHistory.slice(-30); 
+        await db.threads.update(threadId, {userMessagesSentHistory:thread.userMessagesSentHistory});
+
         try {
 
           if(message.trim() === "/ai" || message.startsWith("/ai ")) {
@@ -5250,12 +5304,10 @@ OVERALL SUMMARY:
             await doBotReplyIfNeeded();
           } else if(message.trim() === "/sum") {
             // first ensure summary is up to date:
-            $.messageInput.value = "Please wait...";
-            $.messageInput.disabled = true;
-            const onProgressMessage = (e) => $.messageInput.value = "Please wait... "+e.message;
+            let loadingModal = createLoadingModal("Please wait...");
+            const onProgressMessage = (e) => loadingModal.updateContent("Please wait... "+e.message);
             let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, onProgressMessage});
-            $.messageInput.value = "";
-            $.messageInput.disabled = false;
+            loadingModal.delete();
             if(summary === undefined) {
               return alert("No summary available for this thread yet. Wait until the thread gets longer.");
             }
@@ -5555,6 +5607,8 @@ OVERALL SUMMARY:
           $.messageInput.value = message;
         }
         $.sendButton.disabled = false;
+
+        await db.threads.update(threadId, {unsentMessageText:$.messageInput.value});
 
         let messageCount = await db.messages.count();
         if(await db.threads.count() === 1 && (messageCount === 4 || messageCount === 5)) {
@@ -6847,7 +6901,7 @@ OVERALL SUMMARY:
         $.messageFeed.innerHTML = "";
       });
 
-      // Fast actions:
+      // User messages sent history:
       {
         let lastTapTime = 0;
         let lastClickTime = 0;
@@ -6856,7 +6910,6 @@ OVERALL SUMMARY:
         $.messageInput.addEventListener('click', handleDoubleClick);
 
         function handleDoubleTap(e) {
-          e.preventDefault();
           let currentTime = new Date().getTime();
           let tapInterval = currentTime - lastTapTime;
           
@@ -6877,9 +6930,63 @@ OVERALL SUMMARY:
           lastClickTime = currentTime;
         }
 
-        function onDoubleTapOrClick() {
+        async function onDoubleTapOrClick() {
           console.log('Double-tap/double-click on message input textarea detected');
-          // Your custom logic here
+          let threadId = parseInt($.messageFeed.dataset.threadId);
+          let thread = await db.threads.get(threadId);
+          if(thread.userMessagesSentHistory.length === 0) return;
+          // sort so isPinned items are at the end:
+          thread.userMessagesSentHistory.sort((a, b) => {
+            if(a.isPinned && !b.isPinned) return 1;
+            if(!a.isPinned && b.isPinned) return -1;
+            return 0;
+          });
+          // create the history messages element:
+          let ctn = document.createElement("div");
+          ctn.innerHTML = thread.userMessagesSentHistory.map(m => `<div class="historyItem" data-is-pinned="${m.isPinned}" data-message-text="${encodeURIComponent(m.text)}"><span class="pinButton">📌</span> ${m.text.length > 100 ? m.text.slice(0, 100)+"..." : m.text}</div>`).join("");
+          // position it above the message input text area, with same width:
+          ctn.style.cssText = `
+            max-height: 50vh;
+            overflow: auto;
+            background: var(--textarea-bg);
+            border: 1px solid var(--button-border-color);
+            border-radius: var(--border-radius);
+            padding: 5px;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+          `;
+
+          // if user clicks the star, toggle the fav status of the message and save the userMessagesSentHistory
+          ctn.querySelectorAll(".historyItem .pinButton").forEach(el => {
+            el.addEventListener("click", async function(e) {
+              e.stopPropagation();
+              let messageText = decodeURIComponent(el.parentElement.dataset.messageText);
+              let message = thread.userMessagesSentHistory.find(m => m.text === messageText);
+              message.isPinned = !message.isPinned;
+              await db.threads.update(threadId, {userMessagesSentHistory:thread.userMessagesSentHistory});
+              el.closest(".historyItem").dataset.isPinned = message.isPinned;
+            });
+          });
+
+          // add it to the DOM:
+          $.userMessagesSentHistoryCtn.appendChild(ctn);
+          // when the user clicks anywhere else, remove it from the DOM:
+          function clickAnywhereElseHandler(e) {
+            if(e.target === ctn || ctn.contains(e.target)) return;
+            window.removeEventListener("click", clickAnywhereElseHandler);
+            ctn.remove();
+          }
+          window.addEventListener("click", clickAnywhereElseHandler);
+          // when user clicks a message, add it to the message input text area:
+          ctn.querySelectorAll(".historyItem").forEach(el => {
+            el.addEventListener("click", function() {
+              $.messageInput.value = decodeURIComponent(el.dataset.messageText);
+              $.messageInput.focus();
+              window.removeEventListener("click", clickAnywhereElseHandler);
+              ctn.remove();
+            });
+          });
         }
       }
 
@@ -7529,7 +7636,12 @@ OVERALL SUMMARY:
             editingExistingCharacter = true;
           }
 
-          let result = await characterDetailsPrompt(character, {editingExistingCharacter, submitButtonText:"save edits"});
+          let submitButtonText = "add character";
+          if(editingExistingCharacter) {
+            submitButtonText = "save edits";
+          }
+
+          let result = await characterDetailsPrompt(character, {editingExistingCharacter, submitButtonText});
           if(result) {
             if(editingExistingCharacter) {
               await db.characters.where({uuid:character.uuid}).modify(result);
