@@ -167,7 +167,10 @@
         bottom: 0.0625rem;
         left: 0.0625rem;
       }
-      #chatThreads .thread .favStar:hover, #chatThreads .thread .changeFolderPath:hover {
+      body:not(.isMobile) #chatThreads .thread .favStar:hover {
+        opacity: 1;
+      }
+      #chatThreads .thread .changeFolderPath:hover {
         opacity: 1;
       }
       #chatThreads .thread:hover .favStar, #chatThreads .thread:hover .changeFolderPath {
@@ -471,7 +474,7 @@
                 <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
               </div> -->
               <div style="display:flex;">
-                <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sys &lt;message&gt; - reply as system&#10;/sum - edit summary&#10;/mem - edit character memories&#10;/lore - edit world lore&#10;/name &lt;name&gt; - set your name for this thread&#10;/avatar &lt;url&gt; - set your avatar image for this thread&#10;/import - add chat messages in bulk&#10;&#10;Note: You can add '/ai &lt;instruction&gt;' as the final line in your normal messages to instruct AI for its reply."></textarea>
+                <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sys &lt;message&gt; - reply as system&#10;/sum - edit summary&#10;/mem - open memory editor&#10;/lore - open lore editor&#10;/name &lt;name&gt; - set your name for this thread&#10;/avatar &lt;url&gt; - set your avatar image for this thread&#10;/import - add chat messages in bulk&#10;&#10;Note: You can add '/ai &lt;instruction&gt;' as the final line in your normal messages to instruct AI for its reply."></textarea>
                 <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
                   <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
                   <button id="replyWithButton" style="min-width:80px; margin-top:0.25rem;">reply with…</button>
@@ -2215,6 +2218,9 @@
 
       // this function deletes and "cleans up references" to messages - e.g. ids in `message.messageIdsUsed`
       async function safelyDeleteMessagesByIds(idsToDelete) {
+        // IMPORTANT: If you make changes here, ensure it it doesn't break the 'undo deletion' feature for messages.
+        // It's okay (for now, at least) if diagnostic information (like messageIdsUsed), but 'critical' info that is deleted should be undone.
+
         if(idsToDelete.length === 0) return;
         // get thread id:
         let threadId = await db.messages.get(idsToDelete[0]).then(m => m.threadId);
@@ -2427,7 +2433,7 @@
           userCharacterAvatarUrl: { hidden:true, label: "User's avatar. This overrides the user's default avatar when chatting to this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.avatar?.url || "" },
           // initialThreadMemories: { hidden:true, show:d=>d.autoGenerateMemories!=="none", label: "Initial thread-specific memories. The character will create memories based on the chat, but you can add some starter memories/lore here.", infoTooltip:"Manually-written memories can be used as 'dynamic' instruction/role/reminders that engage when relevant. This saves you from having to pack too much text into your instruction/reminder, which will 'eat up' your context, which means the AI will be able to see fewer recent messages, and summarization will have to be done more often.", type:"text", defaultValue: defaultValues.textEmbeddingModelName ?? "" },
           temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", infoTooltip:"People seem to get good results between 0.7 and 1.2 - higher values may sacrifice some 'correctness' but should result in more 'imagination'.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.85 },
-          loreBookUrlsText: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Lorebook URLs - one per line. Use <a href='https://rentry.org' target='_blank'>rentry.org</a> or similar. Should be a url to the raw text. For changes to propagate to <b>existing</b> threads, you need to use the <b>/lore</b> command and click the reload button. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/memories-and-lore.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: loreBookUrlsText },
+          loreBookUrlsText: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Lorebook URLs - one per line. Use <a href='https://rentry.org' target='_blank'>rentry.org</a> or similar. Should be a url to the 'raw' text file, where your lore entries are separated by blank lines. For changes to propagate to <b>existing</b> threads, you need to use the <b>/lore</b> command and click the reload button. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/memories-and-lore.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: loreBookUrlsText },
           customCode: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
           systemCharacterName: { hidden:true, label: "System's name:", type:"textLine", defaultValue: defaultValues.systemCharacter?.name || "" },
           systemCharacterAvatarUrl: { hidden:true, label: "System's avatar:", type:"textLine", defaultValue: defaultValues.systemCharacter?.avatar?.url || "" },
@@ -3727,7 +3733,9 @@ OVERALL SUMMARY:
           let rawResult = await getChatCompletion({
             messages: [
               {role:"user", content: `Here's the list of messages:\n\n${messagesToTextFormat(messagesArr)}\n\n(this is the end of the messages)`},
-              {role:"user", content: `${aiCharacter.name} will reply next. ${aiCharacter.name} is actually an AI/bot who has a database of memories. Please write a list of suggested keyphrases to help ${aiCharacter.name} search their memory database for facts that may be relevant to their reply. Try to surface facts that are relevant to their *very next* message - rephrase/reword keyphrases multiple times if needed. Look for specific entities/things/claims/topics/people/places/questions/etc. in the previous message (the one ending with "...${mostRecentMessage.content.slice(-100)}" and the ones before that) that may be important. Write several rephrasings of important queries. No need to query for stuff that you already know the answer to. Reply with this template:\n\nMEMORY SEARCH KEYPHRASES:\n- <keyphrase 1>\n- <keyphrase 2>\n- ...`},
+              // {role:"user", content: `${aiCharacter.name} will reply next. ${aiCharacter.name} is actually an AI/bot who has a database of memories. Please write a list of suggested keyphrases to help ${aiCharacter.name} search their memory database for facts that may be relevant to their reply. Try to surface facts that are relevant to their *very next* message - rephrase/reword keyphrases multiple times if needed. Look for specific entities/things/claims/topics/people/places/questions/etc. in the previous message (the one ending with "...${mostRecentMessage.content.slice(-100)}" and the ones before that) that may be important. Write several rephrasings of important queries. No need to query for stuff that you already know the answer to. Reply with this template:\n\nMEMORY SEARCH KEYPHRASES:\n- <keyphrase 1>\n- <keyphrase 2>\n- ...`},
+              // {role:"user", content: `The next message will come from ${aiCharacter.name}. If you were tasked with writing that message as ${aiCharacter.name}, and you had access to a database of ${aiCharacter.name}'s memories, what search queries would you use on that database? Respond with a list of keyphrases that you would use to search the memory database for things that would be useful if you were trying to write an accurate/in-character/correct message as ${aiCharacter.name}. Try to surface facts that are relevant to their *very next* message - rephrase/reword keyphrases multiple times if needed. Look for specific entities/things/claims/topics/people/places/questions/etc. in the previous message (the one ending with "...${mostRecentMessage.content.slice(-100)}" and the ones before that) that may be important. Write several rephrasings of important queries. Try to search the database for things you don't know, but which might be important for writing a reply that makes sense. Reply with this template:\n\nMEMORY SEARCH KEYPHRASES:\n- <keyphrase 1>\n- <keyphrase 2>\n- ...`},
+              {role:"user", content: `You are tasked with writing the next message on behalf of ${aiCharacter.name}. However, there is a large database of memories/lore/facts/etc. which you'll need to use to make sure your reply makes sense, and doesn't contradict established facts/lore/memories. Respond with a list of keyphrases that you would like to use to search the database for useful information. Try to surface facts that are relevant to ${aiCharacter.name}'s *very next* message - rephrase/reword keyphrases multiple times if needed. Look for specific entities/things/claims/topics/people/places/questions/etc. in the previous message (the one ending with "...${mostRecentMessage.content.slice(-100)}" and the ones before that) that may be important. Write several rephrasings of important queries. Try to search the database for things you don't know, but which might be important for writing a reply that doesn't contradict established world lore/facts/etc. Reply with this template:\n\nMEMORY SEARCH KEYPHRASES:\n- <keyphrase 1>\n- <keyphrase 2>\n- ...`},
             ],
             modelName,
             temperature: 0.7,
@@ -3770,9 +3778,8 @@ OVERALL SUMMARY:
             }
 
             // for debugging:
-            if(memoriesAndLore.length < 50) console.log(`score of ${entry._relevanceScore.toFixed(0)} for this memory: ${entry.text}`);
+            if(memoriesAndLore.length < 100) console.log(`score of ${entry._relevanceScore.toFixed(1)} for this ${entry._type} entry: ${entry.text}`);
           }
-          
           
           let relevantMemoriesAndLore = memoriesAndLore.filter(m => m._relevanceScore > scoreThreshold).sort((a, b) => b._relevanceScore - a._relevanceScore);
           console.log("relevant memories/lore:", relevantMemoriesAndLore);
@@ -4560,6 +4567,11 @@ OVERALL SUMMARY:
           messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
           messageEl.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
 
+          if(!replyInstruction && instructionForNextBotReply) {
+            replyInstruction = instructionForNextBotReply;
+          }
+          instructionForNextBotReply = null; // TODO: refactor various calls to doBotReplyIfNeeded (e.g. at end of renderMessageFeed) so we don't need it and can easily just pass replyInstruction without all the threading-through-multiple-functions issues
+
           if(!signals) signals = {stop:false, wasDeleted:false};
           messageEl.querySelector(".info .deleteButton").addEventListener("click", async e => {
             e.preventDefault(); e.stopPropagation();
@@ -4569,11 +4581,6 @@ OVERALL SUMMARY:
             messageEl.remove();
             await updateInlineReminderMessage();
           });
-
-          if(!replyInstruction && instructionForNextBotReply) {
-            replyInstruction = instructionForNextBotReply;
-          }
-          instructionForNextBotReply = null; // TODO: refactor various calls to doBotReplyIfNeeded (e.g. at end of renderMessageFeed) so we don't need it and can easily just pass replyInstruction without all the threading-through-multiple-functions issues
 
           $.statusNotifier.innerHTML = "<button style='font-size: 0.9rem;'>🛑 stop response</button>";
           $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
@@ -4671,9 +4678,37 @@ OVERALL SUMMARY:
         const characterId = parseInt($.messageFeed.dataset.characterId);
         const character = await db.characters.get(characterId);
 
+        let signals = {stop:false, wasDeleted:false};
+
+        $.statusNotifier.innerHTML = "<button style='font-size: 0.9rem;'>🛑 stop response</button>";
+        $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
+          e.preventDefault(); e.stopPropagation();
+          signals.stop = true;
+          if(!character.streamingResponse || (character.streamingResponse && streamingChunkCount === 0)) {
+            messageEl.remove();
+            signals.wasDeleted = true;
+          }
+          $.statusNotifier.innerHTML = "";
+          hideEl($.statusNotifier);
+        });
+        showEl($.statusNotifier);
+
+        let streamingChunkCount = 0;
+        function onStreamingReplyChunk(c) {
+          handleStreamingReplyChunk(c, messageEl);
+          streamingChunkCount++;
+        }
+
         const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-        const {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, onProgressMessage, onStreamingReplyChunk:(c)=>handleStreamingReplyChunk(c, messageEl)});
+        const {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, signals, onProgressMessage, onStreamingReplyChunk});
         messageEl.querySelector(".statusMessage").innerHTML = "";
+
+        hideEl($.statusNotifier);
+        $.statusNotifier.innerHTML = "";
+
+        if(signals.wasDeleted || message === undefined) {
+          return;
+        }
 
         messageObj.memoryIdBatchesUsed = memoryIdBatchesUsed;
         messageObj.summaryHashUsed = summaryHashUsed;
@@ -4760,6 +4795,10 @@ OVERALL SUMMARY:
         
         await updateInlineReminderMessage();
         await updateThreadScene();
+
+        for(let undoButton of $.messageFeed.querySelectorAll(".undoMessageDeleteButton")) {
+          undoButton.remove();
+        }
 
         return el;
       }
@@ -5093,13 +5132,37 @@ OVERALL SUMMARY:
 
 
       async function messageDeleteButtonClickHandler(e) {
-        if(this.closest(".message").dataset.canDelete === "false") return; // it doesn't exist (just a "typing indicator" place holder) - deletion during that time is handled within the doBotReplyIfNeeded function
+        let messageEl = this.closest(".message");
+        if(messageEl.dataset.canDelete === "false") return; // it doesn't exist (just a "typing indicator" place holder) - deletion during that time is handled within the doBotReplyIfNeeded function
         let threadId = parseInt($.messageFeed.dataset.threadId);
         e.preventDefault();
         e.stopPropagation();
-        const messageId = parseInt(this.closest(".message").dataset.id);
+        const messageId = parseInt(messageEl.dataset.id);
+
+        let prevMessageEl = messageEl.previousElementSibling;
+        while(prevMessageEl && !prevMessageEl.classList.contains("message")) prevMessageEl = prevMessageEl.previousElementSibling;
+        
+        let messageObj = await db.messages.get(messageId);
+
+        let undoBtn = document.createElement("div");
+        undoBtn.innerHTML = `<div class="undoMessageDeleteButton" style="text-align:center;"><button>undo deletion</button></div>`;
+        undoBtn.querySelector("button").addEventListener("click", async function() {
+          // add message back to db.
+          // NOTE: the message will no longer be referenced in messageIdsUsed of other messages (due to safelyDeleteMessagesByIds tidying up those references), but that's not a big deal. Can improve this later if needed.
+          await db.messages.add(messageObj);
+
+          let opts = {};
+          if(prevMessageEl) opts.insertAfter = prevMessageEl;
+          await addMessageToFeed(messageObj, opts);
+          
+          undoBtn.remove();
+
+          await updateInlineReminderMessage();
+          await updateThreadScene();
+        });
+
         await safelyDeleteMessagesByIds([messageId]);
-        this.closest(".message").remove();
+        messageEl.replaceWith(undoBtn);
         if(!$.messageFeed.querySelector(".message")) {
           showEl($.noMessagesNotice);
         }
@@ -6610,7 +6673,12 @@ OVERALL SUMMARY:
           threadCharVoiceName: {show:d=>d.textToSpeechVoicesEnabled==="enabled", label: "Existing chatacter voice:", type: "select", options:availableVoiceNames.map(v => ({content: v, value: v})) },
           otherCharVoiceName: {show:d=>d.textToSpeechVoicesEnabled==="enabled", label: "Reply-with character voice:", type: "select", options:availableVoiceNames.map(v => ({content: v, value: v})) },
         });
-        if(!promptResult) return;
+        if(!promptResult) {
+          alreadyAutoReplying = false;
+          $.replyWithButton.disabled = false;
+          $.sendButton.disabled = false;
+          return;
+        }
       
         let ttsEnabled = promptResult.textToSpeechVoicesEnabled === "enabled";
         let threadCharVoiceName = promptResult.threadCharVoiceName;
@@ -6778,6 +6846,42 @@ OVERALL SUMMARY:
         await renderCharacterList();
         $.messageFeed.innerHTML = "";
       });
+
+      // Fast actions:
+      {
+        let lastTapTime = 0;
+        let lastClickTime = 0;
+
+        $.messageInput.addEventListener('touchstart', handleDoubleTap);
+        $.messageInput.addEventListener('click', handleDoubleClick);
+
+        function handleDoubleTap(e) {
+          e.preventDefault();
+          let currentTime = new Date().getTime();
+          let tapInterval = currentTime - lastTapTime;
+          
+          if (tapInterval < 300 && tapInterval > 0) {
+            onDoubleTapOrClick();
+          }
+          lastTapTime = currentTime;
+        }
+
+        function handleDoubleClick(e) {
+          e.preventDefault();
+          let currentTime = new Date().getTime();
+          let clickInterval = currentTime - lastClickTime;
+          
+          if (clickInterval < 300 && clickInterval > 0) {
+            onDoubleTapOrClick();
+          }
+          lastClickTime = currentTime;
+        }
+
+        function onDoubleTapOrClick() {
+          console.log('Double-tap/double-click on message input textarea detected');
+          // Your custom logic here
+        }
+      }
 
 
       // $.statsButton.addEventListener("click", async function() {
