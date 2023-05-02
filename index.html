@@ -2763,6 +2763,7 @@
           loreBookId,
           textEmbeddingModelName: aiCharacter.textEmbeddingModelName,
           userMessagesSentHistory: [],
+          unsentMessageText: "",
         };
 
         await ensureLoreUrlsAreLoaded({loreBookUrls:aiCharacter.loreBookUrls, modelName:aiCharacter.textEmbeddingModelName});
