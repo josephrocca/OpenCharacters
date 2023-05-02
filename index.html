@@ -1481,6 +1481,7 @@
       // Given a threadId, this renders the message feed for that thread in the middle column.
       const numMessagesPerDisplayBatch = 50;
       async function renderMessageFeed(threadId) {
+        let originalMessageFeedThreadId = parseInt($.messageFeed.dataset.threadId);
         $.messageFeed.dataset.threadId = threadId;
         const thread = (await db.threads.where("id").equals(threadId).toArray())[0];
         const messages = await db.messages.where("threadId").equals(threadId).toArray();
@@ -1510,9 +1511,39 @@
         //   }
         // }
 
+        // get message feed scroll position:
+        let originalScrollPosition = $.messageFeed.scrollTop;
+        
+        let messagesWeNeedToAdd = displayedMessages.slice(0);
+
+        // shift messages off `messagesWeNeedToAdd` until we find one that doesn't *exactly* match the same-index element that is already in the feed
+        let lastMatchingMessageEl;
+        for(let messageEl of $.messageFeed.querySelectorAll(".message")) {
+          let messageObj = messagesWeNeedToAdd[0];
+          let messageObjHash = await sha256Text(JSON.stringify(messageObj));
+          if(messageEl.dataset.hash === messageObjHash) {
+            lastMatchingMessageEl = messageEl;
+            messagesWeNeedToAdd.shift();
+          } else {
+            break;
+          }
+        }
+
+        // remove all elements after the last matching element (including non-message elements - e.g. "undo deletion" buttons):
+        if(lastMatchingMessageEl) {
+          let el = lastMatchingMessageEl.nextSibling;
+          while(el) {
+            let nextEl = el.nextSibling;
+            el.remove();
+            el = nextEl;
+          }
+        } else {
+          // no messages matched, so clear the feed:
+          $.messageFeed.innerHTML = "";
+        }
+
         $.messageFeed.dataset.characterId = character.id;
-        $.messageFeed.innerHTML = "";
-        let messageEls = await Promise.all(displayedMessages.map(m => createMessageElement(m, {character:characterIdToCharacterObj[m.characterId]})));
+        let messageEls = await Promise.all(messagesWeNeedToAdd.map(m => createMessageElement(m, {character:characterIdToCharacterObj[m.characterId]})));
         for(let el of messageEls) {
           $.messageFeed.appendChild(el);
         }
@@ -1520,14 +1551,13 @@
           attachEventHandlersToMessageEl(messageEl);
         });
 
-        // let tmp = document.createElement("div");
-        // tmp.innerHTML = `<div class="endOfFeedStuff" style="text-align: center;">
-        //   <button class="stop">🛑 stop</button>
-        // </div>`;
-        // $messageFeed.appendChild(tmp.firstChild);
-        
-        // scroll to bottom of feed
-        $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+        if(originalMessageFeedThreadId === threadId) {
+          // restore message feed scroll position:
+          $.messageFeed.scrollTop = originalScrollPosition;
+        } else {
+          // scroll to bottom of feed
+          $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+        }
         
         if(displayedMessages.length === 0) {
           showEl($.noMessagesNotice);
@@ -4989,6 +5019,8 @@ OVERALL SUMMARY:
 
       async function createMessageElement(messageObj, opts={}) {
 
+        let messageObjHash = await sha256Text(JSON.stringify(messageObj));
+
         if(messageObj.character) debugger;
 
         let thread = await db.threads.get(messageObj.threadId);
@@ -5058,7 +5090,7 @@ OVERALL SUMMARY:
         if(messageObj.characterId >= 0) characterName = messageObj.name ?? thread.character.name ?? character.name;
 
         tmp.innerHTML = `
-          <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-order="${sanitizeHtml(messageObj.order)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" style="${sanitizeHtml(wrapperStyle)}; position:relative;">
+          <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-order="${sanitizeHtml(messageObj.order)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" data-hash="${messageObjHash}" style="${sanitizeHtml(wrapperStyle)}; position:relative;">
             <div style="text-align:center;"><button class="showHiddenMessageButton" style="cursor:pointer; font-size:0.65rem;">Show hidden message</button></div>
             <div class="bottomButtons">
               ${messageObj.characterId >= 0 ? `<div class="brainButton emojiButton">🧠</div>` : ""}
