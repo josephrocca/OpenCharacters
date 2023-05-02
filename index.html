@@ -494,7 +494,7 @@
               </div> -->
               <div id="userMessagesSentHistoryCtn" style="margin-bottom:0.25rem; position:relative;"></div>
               <div style="display:flex;">
-                <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sys &lt;message&gt; - reply as system&#10;/sum - edit summary&#10;/mem - open memory editor&#10;/lore - open lore editor&#10;/name &lt;name&gt; - set your name for this thread&#10;/avatar &lt;url&gt; - set your avatar image for this thread&#10;/import - add chat messages in bulk&#10;&#10;Note: You can add '/ai &lt;instruction&gt;' as the final line in your normal messages to instruct AI for its reply."></textarea>
+                <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sys &lt;message&gt; - reply as system&#10;/sum - open summary editor&#10;/mem - open memory editor&#10;/lore - open lore editor&#10;/name &lt;name&gt; - set your name for this thread&#10;/avatar &lt;url&gt; - set your avatar image for this thread&#10;/import - add chat messages in bulk&#10;&#10;Note: You can add '/ai &lt;instruction&gt;' as the final line in your normal messages to instruct AI for its reply."></textarea>
                 <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
                   <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
                   <button id="replyWithButton" style="min-width:80px; margin-top:0.25rem;">reply with…</button>
@@ -5379,6 +5379,8 @@ OVERALL SUMMARY:
 
             let generatedDefaultValue = originalGeneratedMemoriesText;
 
+            let loadingModal;
+
             while(1) {
               let result = await prompt2({
                 generatedMemoriesText: {label: "Edit character 'memories'. Entries should be separated with a blank line. Edits should not significantly change the overall chronology. Use the <b>/lore</b> command to store non-chronological facts/things.", type: "text", height:"fit-content", defaultValue:generatedDefaultValue, placeholder:"If this box is empty, your character hasn't stored any memories yet because the chat thread isn't long enough to warrant it."},
@@ -5390,7 +5392,7 @@ OVERALL SUMMARY:
 
               let newGeneratedMemoryTextEntries = result.generatedMemoriesText.replace(/\r/g, "").split(/\n{2,}/).map(m => m.trim()).filter(m => m);
 
-              let loadingModal = createLoadingModal("Computing memory embeddings. Please wait...", $.middleColumn);
+              loadingModal = createLoadingModal("Computing memory embeddings. Please wait...", $.middleColumn);
 
               let embeddingModelName = thread.textEmbeddingModelName;
               let newTexts = [];
@@ -5414,7 +5416,8 @@ OVERALL SUMMARY:
                   for(let text of newGeneratedMemoryTextEntries) {
                     let embedding = textToEmbeddingCache.get(text);
                     let obj;
-                    if(textToMemoryObj.has(text)) {
+                    let existingObj = textToMemoryObj.get(text);
+                    if(existingObj && !newMemoryObjs.includes(existingObj)) { // need to check if it's already in newMemoryObjs (and create a new one if so) otherwise we get a duplicate key error because the object has an id property
                       obj = textToMemoryObj.get(text);
                       prevSummaryHash = obj.summaryHash;
                       obj.index = index;
@@ -5436,6 +5439,7 @@ OVERALL SUMMARY:
 
               } catch(e) {
                 alert("There was an error while saving the memories:\n"+e.stack);
+                loadingModal.delete();
                 continue;
               }
               
