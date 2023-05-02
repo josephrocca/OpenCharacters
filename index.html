@@ -1417,7 +1417,7 @@
       }
 
 
-      async function getThreadJSONById(threadId) {
+      async function getThreadJSONById(threadId, opts={}) {
         const thread = await db.threads.get(threadId);
 
         const blob = await db.export({prettyJson: true});
