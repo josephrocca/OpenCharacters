@@ -13,6 +13,8 @@ The Survey Corps is a military branch dedicated to exploring the world outside t
 
 ODM gear, or Omni-Directional Mobility gear, is a piece of equipment used by the military to maneuver in three dimensions, allowing them to fly through the air during combat with Titans.
 ```
+Note that **each lore entry should be completely self-contained**. The AI sees entries in isolation, so if you have an entry like "He has a brother named Mark" then the AI won't know who "he" refers to because it won't necessarily see the entry above it. The order of lore entries does not matter at all - each one should be an independent "fact" about some aspect of the world (characters, rules, geography, relationships, etc.)
+
 Here's an example lorebook URL for those entries: https://rentry.org/h9pb4/raw
 
 You should think of lore like "**dynamic reminders**". They're like the reminder message, except that they only get loaded in when they're relevant to the current situation. This is good if you have lots of stuff that you want your character to know/remember - because you likely won't be able to fit it all in the instruction/reminder without using up a lot of precious 'context' tokens.
