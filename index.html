@@ -399,6 +399,9 @@
         cursor: pointer;
         padding: 0.25rem;
         font-size: 85%;
+        text-overflow: ellipsis;
+        white-space: pre;
+        overflow: hidden;
       }
       #userMessagesSentHistoryCtn .historyItem:hover {
         background: var(--background);
@@ -702,6 +705,7 @@
       let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
       
       if(db) {
+        console.log("Existing user, checking database version");
         let usersOriginalDbVersion = db.verno;
         if(usersOriginalDbVersion < dbVersion) {
           let result = await prompt2({
@@ -715,6 +719,7 @@
         await db.close(); // we need to close before db.version() call below and re-open afterwards
       } else {
         // brand new user, so create the db:
+        console.log("New user, creating database");
         db = new Dexie(dbName);
       }
       
@@ -792,6 +797,8 @@
 
       await db.open();
 
+      console.log("Database ready.");
+
       function upgradeCharacterInitialMessagesArrayIfNeeded(character) {
         // upgrade from the ["foo", "bar"] format to [{author:"user", content:"foo"}, {author:"ai", content:"bar"}]
         if(character.initialMessages && character.initialMessages.length === 1 && character.initialMessages[0] === "") {
@@ -825,9 +832,6 @@
           character.modelName = character.modelVersion;
           delete character.modelVersion;
         }
-        if(character.associativeMemoryMethod === undefined) {
-          character.associativeMemoryMethod = "none";
-        }
         if(character.textEmbeddingModelName === undefined) {
           character.textEmbeddingModelName = character.associativeMemoryEmbeddingModelName ?? "text-embedding-ada-002";
           delete character.associativeMemoryEmbeddingModelName;
@@ -849,6 +853,9 @@
         if(character.associativeMemoryMethod !== undefined) {
           character.autoGenerateMemories = character.associativeMemoryMethod;
           delete character.associativeMemoryMethod;
+        }
+        if(character.autoGenerateMemories === undefined) {
+          character.autoGenerateMemories = "none"; // we need this because very old characters could have had not had a associativeMemoryMethod property at all (it didn't exist in the original schema)
         }
         // if(character.publicId === undefined) character.publicId = "";
         // WARNING: If you add something here, you'll likely have to edit:
@@ -3088,12 +3095,15 @@
           throw new Error("The specified values of `maxTokenCountOfSummary` and `messageTokensToConsumePerSummary` are such that the summarization process could go over this model's token limit.");
         }
 
-        if(aiCharacter.autoGenerateMemories === "v1") {
-          // set isCurrent to false on all memories of this character so we can re-validate them along with the summaries - in case the thread has been edited
-          await db.memories.where({threadId, status:"current"}).modify({status:"noncurrent"});
-          await db.memories.where({summaryHash:"", threadId}).modify({status:"current"}); // <-- bit hacky, but this is needed for user-added memories before any summaries were done (so they don't belong to a summaryHash). could maybe make *all* user-added memories use "" (empty string) as summaryHash, but for now I just add them to the summary that they were closest to, or if there is no summary yet, then ""
-        }
-
+        let memoryIdsToSetToCurrent = [];
+        // let memories = await db.memories.where({threadId});
+        // memories.sort((a,b) => a.index - b.index);
+        // if(aiCharacter.autoGenerateMemories === "v1") {
+        //   // set isCurrent to false on all memories of this character so we can re-validate them along with the summaries - in case the thread has been edited
+        //   await db.memories.where({threadId, status:"current"}).modify({status:"noncurrent"});
+        //   await db.memories.where({summaryHash:"", threadId}).modify({status:"current"}); // <-- bit hacky, but this is needed for user-added memories before any summaries were done (so they don't belong to a summaryHash). could maybe make *all* user-added memories use "" (empty string) as summaryHash, but for now I just add them to the summary that they were closest to, or if there is no summary yet, then ""
+        // }
+        
         // get total tokens in all messages
         let initialTokenCount = await countTokensInMessages(remainingMessages, modelName);
         let currentTokenCount = initialTokenCount;
@@ -3267,24 +3277,31 @@ OVERALL SUMMARY:
 
               let embeddings = await embedTexts({textArr:memories, modelName:embeddingModelName, shouldCache:true});
 
-              // counter-intuitively, in rare cases it's possible for us to already have memories for this batch of messages (i.e. for this summary hash).
-              // e.g. if the user closed the tab right as the memories were being added to the db, but the summary didn't get a chance to be added.
-              // so we delete any existing memories that we have for these messages by checking for matches on the summaryHash.
-              await db.memories.where({summaryHash:hash, threadId}).delete();
-
               let existingThreadMemories = await db.memories.where({threadId, status:"current"}).toArray();
               existingThreadMemories.sort((a,b) => a.index - b.index);
               let previousMemory = existingThreadMemories.at(-1);
               let previousMemoryIndex = previousMemory ? previousMemory.index : -1;
               let i = 0;
+              let memoryObjsToAdd = [];
               for(let memory of memories) {
                 let embedding = embeddings[i];
-                let newMemoryId = await db.memories.put({summaryHash:hash, threadId, text:memory, characterId, embeddings:{[embeddingModelName]:embedding}, status:"current", index:previousMemoryIndex+1, triggers:[]});
+                memoryObjsToAdd.push({summaryHash:hash, threadId, text:memory, characterId, embeddings:{[embeddingModelName]:embedding}, status:"current", index:previousMemoryIndex+1, triggers:[]});
                 previousMemoryIndex++;
                 addToSummaryLog(`<b>added memory:</b> ${memory}`);
                 console.log("added memory:", memory);
                 i++;
               }
+
+              await db.transaction('rw', db.memories, async tx => {
+                // counter-intuitively, in rare cases it's possible for us to already have memories for this batch of messages (i.e. for this summary hash).
+                // e.g. if the user closed the tab right as the memories were being added to the db, but the summary didn't get a chance to be added.
+                // so we delete any existing memories that we have for these messages by checking for matches on the summaryHash.
+                await tx.table("memories").where({summaryHash:hash, threadId}).delete();
+
+                let ids = await tx.table("memories").bulkAdd(memoryObjsToAdd, undefined, {allKeys: true});
+                memoryIdsToSetToCurrent.push(...ids);
+              });
+
               summary = summaryText.trim();
             } else {
               summary = result.trim();
@@ -3296,10 +3313,9 @@ OVERALL SUMMARY:
             await db.summaries.put({hash, summary, threadId, messageIds, prevSummaryHash});
           } else {
             // There's already an existing summary that matches this instruction hash.
-            if(aiCharacter.autoGenerateMemories === "v1") {
-              // mark the existing memories that match this summary has as current/valid:
-              await db.memories.where({summaryHash:hash, threadId}).modify({status:"current"});
-            }
+            // mark the existing memories that match this summary has as current/valid:
+            let memories = await db.memories.where({summaryHash:hash, threadId}).toArray();
+            memoryIdsToSetToCurrent.push(...memories.map(m => m.id));
           }
 
           // Compress summary if needed.
@@ -3340,6 +3356,14 @@ OVERALL SUMMARY:
             remainingMessages.unshift(messagesToMaybeAdd.pop());
           }
         }
+
+        await db.transaction('rw', db.memories, async tx => {
+          await tx.table("memories").where({threadId, status:"current"}).modify({status:"noncurrent"});
+          await tx.table("memories").where("id").anyOf(memoryIdsToSetToCurrent).modify({status:"current"});
+          await tx.table("memories").where({summaryHash:"", threadId}).modify({status:"current"}); // <-- bit hacky, but this is needed for user-added memories before any summaries were done (so they don't belong to a summaryHash). could maybe make *all* user-added memories use "" (empty string) as summaryHash, but for now I just add them to the summary that they were closest to, or if there is no summary yet, then ""
+        });
+        
+
 
         // NOTE: prevSummary can be undefined - i.e. no summaries were needed to get messages under the tokenLimitForSummaryAndMessages limit
         return {summary:prevSummary, instructionHash:prevInstructionHash, remainingMessages}; // remainingMessages = unsummarized messages (the ones that follow the summary)
@@ -6948,10 +6972,10 @@ OVERALL SUMMARY:
           });
           // create the history messages element:
           let ctn = document.createElement("div");
-          ctn.innerHTML = thread.userMessagesSentHistory.map(m => `<div class="historyItem" data-is-pinned="${m.isPinned}" data-message-text="${encodeURIComponent(m.text)}"><span class="pinButton">📌</span> ${m.text.length > 100 ? m.text.slice(0, 100)+"..." : m.text}</div>`).join("");
+          ctn.innerHTML = thread.userMessagesSentHistory.map(m => `<div class="historyItem" data-is-pinned="${m.isPinned}" data-message-text="${encodeURIComponent(m.text)}"><span class="pinButton">📌</span> ${m.text.slice(0, 500).replaceAll("\n", " ")}</div>`).join("");
           // position it above the message input text area, with same width:
           ctn.style.cssText = `
-            max-height: 50vh;
+            max-height: 40vh;
             overflow: auto;
             background: var(--textarea-bg);
             border: 1px solid var(--button-border-color);
@@ -6992,6 +7016,9 @@ OVERALL SUMMARY:
               ctn.remove();
             });
           });
+
+          // scroll to bottom of ctn:
+          ctn.scrollTop = ctn.scrollHeight;
         }
       }
 
@@ -7684,6 +7711,8 @@ OVERALL SUMMARY:
       } catch(e) {
         console.error(e);
       }
+
+      console.log("Finished initialization.");
 
    
     </script>
