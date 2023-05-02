@@ -4625,6 +4625,7 @@ OVERALL SUMMARY:
             botIsCurrentlyReplying = false;
             messageEl.remove();
             await updateInlineReminderMessage();
+            $.sendButton.disabled = false;
           });
 
           $.statusNotifier.innerHTML = "<button style='font-size: 0.9rem;'>🛑 stop response</button>";
@@ -4635,11 +4636,12 @@ OVERALL SUMMARY:
             if(!character.streamingResponse || (character.streamingResponse && streamingChunkCount === 0)) {
               messageEl.remove();
               signals.wasDeleted = true;
-              botIsCurrentlyReplying = false
+              botIsCurrentlyReplying = false;
             }
             await updateInlineReminderMessage();
             $.statusNotifier.innerHTML = "";
             hideEl($.statusNotifier);
+            $.sendButton.disabled = false;
           });
           showEl($.statusNotifier);
 
@@ -6975,7 +6977,7 @@ OVERALL SUMMARY:
           ctn.innerHTML = thread.userMessagesSentHistory.map(m => `<div class="historyItem" data-is-pinned="${m.isPinned}" data-message-text="${encodeURIComponent(m.text)}"><span class="pinButton">📌</span> ${m.text.slice(0, 500).replaceAll("\n", " ")}</div>`).join("");
           // position it above the message input text area, with same width:
           ctn.style.cssText = `
-            max-height: 40vh;
+            max-height: min(40vh, 200px);
             overflow: auto;
             background: var(--textarea-bg);
             border: 1px solid var(--button-border-color);
