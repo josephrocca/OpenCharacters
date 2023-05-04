@@ -481,7 +481,7 @@
               <button id="messageFeedOpenLeftColumnButton" class="openLeftColumnButton" style="display:none; background: var(--button-bg);border-radius: var(--border-radius);border: 1px solid var(--button-border-color);padding: 0.25rem; min-width: 2rem; height: 100%; margin-right:0.5rem;">☰</button>
               <div style="background: var(--button-bg); display:flex; height: 100%; border-radius: var(--border-radius);border: 1px solid var(--button-border-color);padding: 0.25rem;">
                 <div style="display: flex;align-items: center;font-size:var(--button-font-size);margin-right: 0.25rem;">model:</div>
-                <select id="threadModelSelector"></select>
+                <select id="threadModelSelector" style="max-width:100px;"></select>
               </div>
               <!-- <div id="threadSettingsButton" style="margin-left:0.5rem; cursor:pointer;   background: var(--button-bg); display:flex; height: 100%; border-radius: var(--border-radius);border: 1px solid var(--button-border-color);padding: 0.25rem;">
                 <div style="display: flex;align-items: center;justify-content:center;font-size:var(--button-font-size);min-width:1.5rem;">⚙️</div>
@@ -516,10 +516,12 @@
       </div>
     </div>
 
+    <button id="toggleRightColumnButton" style="position:fixed; top:0.5rem; right:0.5rem; min-height:2rem; min-width:2rem; display:none; align-items:center; justify-content:center; z-index:500;">⚛️</button>
+
     <audio id="musicPlayer" style="display:none;"></audio>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=29";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=30";
 
       let JSON5;
       (async function() {
@@ -698,6 +700,34 @@
         }, { passive: true });
       }
 
+      if(isMobile) {
+        $.customCodeIframeHorizontalResizeBar.style.display = "none";
+        $.customCodeColumn.style.width = "100%";
+
+        $.rightColumn.style.position = "fixed";
+        $.rightColumn.style.top = "0";
+        $.rightColumn.style.right = "0";
+        $.rightColumn.style.bottom = "0";
+        $.rightColumn.style.left = "0";
+        $.rightColumn.style.zIndex = "100";
+        $.rightColumn.style.width = "";
+
+        $.rightColumn.style.pointerEvents = "none";
+        $.rightColumn.style.opacity = "0";
+
+        $.toggleRightColumnButton.addEventListener("click", function() {
+          if($.rightColumn.dataset.visible === "yes") {
+            $.rightColumn.style.pointerEvents = "none";
+            $.rightColumn.style.opacity = "0";
+            $.rightColumn.dataset.visible = "no";
+          } else {
+            $.rightColumn.style.pointerEvents = "";
+            $.rightColumn.style.opacity = "1";
+            $.rightColumn.dataset.visible = "yes";
+          }
+        });
+      }
+
 
       const dbName = "chatbot-ui-v1";
       const dbVersion = 68;
@@ -705,7 +735,7 @@
       let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
       
       if(db) {
-        console.log("Existing user, checking database version");
+        console.log("Existing user, checking database version...");
         let usersOriginalDbVersion = db.verno;
         if(usersOriginalDbVersion < dbVersion) {
           let result = await prompt2({
@@ -1480,9 +1510,13 @@
 
       // Given a threadId, this renders the message feed for that thread in the middle column.
       const numMessagesPerDisplayBatch = 50;
-      async function renderMessageFeed(threadId) {
-        let originalMessageFeedThreadId = parseInt($.messageFeed.dataset.threadId);
-        $.messageFeed.dataset.threadId = threadId;
+      async function renderMessageFeed(threadId, opts={}) {
+        
+        let originalMessageFeedThreadId;
+        if(opts.originalMessageFeedThreadId) {
+          originalMessageFeedThreadId = opts.originalMessageFeedThreadId;
+        }
+
         const thread = (await db.threads.where("id").equals(threadId).toArray())[0];
         const messages = await db.messages.where("threadId").equals(threadId).toArray();
         messages.sort((a,b) => a.order - b.order);
@@ -2403,8 +2437,14 @@
 
       async function showThread(threadId) {
 
+        let originalMessageFeedThreadId = parseInt($.messageFeed.dataset.threadId);
+        $.messageFeed.dataset.threadId = threadId;
+
         let thread = await db.threads.get(threadId);
         let characterObj = await db.characters.get(thread.characterId);
+
+        if(characterObj.avatar.url) updateFavicon(characterObj.avatar.url);
+        document.title = `${characterObj.name} - ${thread.name} - OpenCharacters`;
 
         $.chatThreads.dataset.currentFolderPath = thread.folderPath;
         await renderThreadList();
@@ -2438,7 +2478,7 @@
           await createNewCustomCodeIframeForThread(threadId); // this adds iframe as here: customCodeIframes[threadId]
         }
 
-        await renderMessageFeed(threadId);
+        await renderMessageFeed(threadId, {originalMessageFeedThreadId});
 
         await db.threads.where({id:threadId}).modify({lastViewTime:Date.now()});
 
@@ -2472,25 +2512,25 @@
 
         const result = await prompt2({
           header: { html: opts.editingExistingCharacter ? `<div style="border-radius:3px;font-size: 0.8rem;padding: 0.5rem;border: 1px solid var(--border-color);">You're currently <b>editing</b> an existing character named '${existingCharacter.name}'.</div>` : "", type:"none" },
-          name: { label: "Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:characterNameValidationPattern },
-          roleInstruction: { label: "Instruction/role/personality (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message defines the personality or 'role' that the AI will take during the chat. Every request to the API will include this as the first message. If you later decide to edit this, all existing and new threads will be immediately updated. This message does not get summarized by the summarization algorithm - it will always be present as the first message.", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.roleInstruction || "" },
-          reminderMessage: { label: "Reminder message - an invisible system message that is placed before every AI response (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message is inserted as a reminder at the end of the chat right before each AI response. This will always be the last/most-recent message that the AI sees when writing its response. If you later decide to edit this, all existing and new threads will be immediately updated. This message is not seen/summarized by the summarization algorithm - it will always be present as the final message.", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
-          initialMessagesText: { label: `Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md" target='blank'>here</a>.`, infoTooltip:"During the initialization of every new thread with this character, these messages will be created and placed at the start of the thread. Note that the summarization algorithm will eventually summarize these messages - so they won't stay around forever (unlike the instruction and reminder messages, which *do* stay around forever). Also note that if you edit the initial messages, only *new* threads will have the updated initial messages. In other words, once a chat thread has been created, the initial messages that are added to a thread during init 'belong' to that thread, not to the character.", type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
-          avatarUrl: { label: "Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatar?.url || "" },
-          modelName: { hidden:true, label: "Model name:", infoTooltip:"GPT-4 is really smart, but expensive (about 15x price of gpt-3.5-turbo), and you need to have have access via the GPT-4 waitlist. If you use gpt-3.5-turbo and set the 'temperature' option (see advanced settings) to 1, then apparently (according to community members) it's pretty close to DaVinci in terms of creativity and overall quality. DaVinci is overpriced given its performance - GPT-4 is significantly better and only ~1.5x the price.", type:"select", options:[{content:"good, cheap (currently: gpt-3.5-turbo)", value:"good"}, {content:"great, but *expensive* (currently: davinci, or gpt-4 *if* you have access)", value:"great"}, ...broadlyAvailableModels.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => ({value:m.name, content:m.shortLabel}))], defaultValue: defaultValues.modelName || "good" },
+          name: { label: "🪪 Character name:", type:"textLine", placeholder: "Sammy", defaultValue: defaultValues.name || "", validationPattern:characterNameValidationPattern },
+          roleInstruction: { label: "🎭 Instruction/role/personality (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message defines the personality or 'role' that the AI will take during the chat. Every request to the API will include this as the first message. If you later decide to edit this, all existing and new threads will be immediately updated. This message does not get summarized by the summarization algorithm - it will always be present as the first message.", type:"text", height:"fit-content", placeholder: "You are Sammy, an opinionated, friendly assistant. You have opinions.", defaultValue: defaultValues.roleInstruction || "" },
+          reminderMessage: { label: "💭 Reminder message - an invisible system message that is placed before every AI response (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/instruction-and-reminder.md' target='_blank'>advanced</a>)", infoTooltip:"This message is inserted as a reminder at the end of the chat right before each AI response. This will always be the last/most-recent message that the AI sees when writing its response. If you later decide to edit this, all existing and new threads will be immediately updated. This message is not seen/summarized by the summarization algorithm - it will always be present as the final message.", height:"fit-content", minHeight:"3rem", type:"text", placeholder: "Stay in character! Sammy will now respond without breaking character.", defaultValue: defaultValues.reminderMessage || "" },
+          initialMessagesText: { label: `💬 Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md" target='blank'>here</a>.`, infoTooltip:"During the initialization of every new thread with this character, these messages will be created and placed at the start of the thread. Note that the summarization algorithm will eventually summarize these messages - so they won't stay around forever (unlike the instruction and reminder messages, which *do* stay around forever). Also note that if you edit the initial messages, only *new* threads will have the updated initial messages. In other words, once a chat thread has been created, the initial messages that are added to a thread during init 'belong' to that thread, not to the character.", type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
+          avatarUrl: { label: "👤 Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatar?.url || "" },
+          modelName: { hidden:true, label: "🤖 Model name:", infoTooltip:"GPT-4 is really smart, but expensive (about 15x price of gpt-3.5-turbo), and you need to have have access via the GPT-4 waitlist. If you use gpt-3.5-turbo and set the 'temperature' option (see advanced settings) to 1, then apparently (according to community members) it's pretty close to DaVinci in terms of creativity and overall quality. DaVinci is overpriced given its performance - GPT-4 is significantly better and only ~1.5x the price.", type:"select", options:[{content:"good, cheap (currently: gpt-3.5-turbo)", value:"good"}, {content:"great, but *expensive* (currently: davinci, or gpt-4 *if* you have access)", value:"great"}, ...broadlyAvailableModels.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => ({value:m.name, content:m.shortLabel}))], defaultValue: defaultValues.modelName || "good" },
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
           textEmbeddingModelName: { hidden:true, label: "Text embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory/lore entry (text) into a bunch of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[...broadlyAvailableModels.filter(m => m.type === "text-embedding").map(m => ({value:m.name, content:m.name}))], defaultValue: defaultValues.textEmbeddingModelName ?? "text-embedding-ada-002" },
-          autoGenerateMemories: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "Auto-generated character memories:", infoTooltip:"You can use /mem and /lore commands to manually add memories and lore. If you enable this feature, memories will be created by the character during each summarization step. This increases the cost a bit (maybe +20%) and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. You can manually copy memories and lore over into a new thread if needed.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.autoGenerateMemories ?? "v1" },
+          autoGenerateMemories: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "💽 Auto-generated character memories:", infoTooltip:"You can use /mem and /lore commands to manually add memories and lore. If you enable this feature, memories will be created by the character during each summarization step. This increases the cost a bit (maybe +20%) and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. You can manually copy memories and lore over into a new thread if needed.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.autoGenerateMemories ?? "v1" },
           avatarSize: { hidden:true, label: "Avatar size, as a multiple of the default size.", type:"textLine", defaultValue: defaultValues.avatar?.size ?? "1" },
           avatarShape: { hidden:true, label: "Avatar shape:", type:"select", options:[{value:"square"}, {value:"circle"}, {value:"portrait"}], defaultValue: defaultValues.avatar?.shape ?? "square" },
-          sceneBackgroundUrl: { hidden:true, label: "Chat background image/video URL (jpg, webp, webm, mp4, etc.)", type:"textLine", defaultValue: defaultValues.scene?.background?.url ?? "" },
-          sceneMusicUrl: { hidden:true, label: "Chat background music/audio URL (mp3, webm, mp4, etc.)", infoTooltip:"Permission is always requested from the user before playing audio - i.e. music will not autoplay because that could annoy some users. You can use a video file for audio - the visuals will obviously not be shown.", type:"textLine", defaultValue: defaultValues.scene?.music?.url ?? "" },
+          sceneBackgroundUrl: { hidden:true, label: "🖼️ Chat background image/video URL (jpg, webp, webm, mp4, etc.)", type:"textLine", defaultValue: defaultValues.scene?.background?.url ?? "" },
+          sceneMusicUrl: { hidden:true, label: "🎵 Chat background music/audio URL (mp3, webm, mp4, etc.)", infoTooltip:"Permission is always requested from the user before playing audio - i.e. music will not autoplay because that could annoy some users. You can use a video file for audio - the visuals will obviously not be shown.", type:"textLine", defaultValue: defaultValues.scene?.music?.url ?? "" },
           userCharacterName: { hidden:true, label: "User's name. This overrides the user's default username when chatting with this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.name || "" },
           userCharacterAvatarUrl: { hidden:true, label: "User's avatar. This overrides the user's default avatar when chatting to this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.avatar?.url || "" },
           // initialThreadMemories: { hidden:true, show:d=>d.autoGenerateMemories!=="none", label: "Initial thread-specific memories. The character will create memories based on the chat, but you can add some starter memories/lore here.", infoTooltip:"Manually-written memories can be used as 'dynamic' instruction/role/reminders that engage when relevant. This saves you from having to pack too much text into your instruction/reminder, which will 'eat up' your context, which means the AI will be able to see fewer recent messages, and summarization will have to be done more often.", type:"text", defaultValue: defaultValues.textEmbeddingModelName ?? "" },
-          temperature: { hidden:true, label: "Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", infoTooltip:"People seem to get good results between 0.7 and 1.2 - higher values may sacrifice some 'correctness' but should result in more 'imagination'.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.85 },
-          loreBookUrlsText: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Lorebook URLs - one per line. Use <a href='https://rentry.org' target='_blank'>rentry.org</a> or similar. Should be a url to the 'raw' text file, where your lore entries are separated by blank lines. For changes to propagate to <b>existing</b> threads, you need to use the <b>/lore</b> command and click the reload button. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/memories-and-lore.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: loreBookUrlsText },
-          customCode: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
+          temperature: { hidden:true, label: "🌡️ Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", infoTooltip:"People seem to get good results between 0.7 and 1.2 - higher values may sacrifice some 'correctness' but should result in more 'imagination'.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.85 },
+          loreBookUrlsText: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "📜 Lorebook URLs - one per line. Use <a href='https://rentry.org' target='_blank'>rentry.org</a> or similar. Should be a url to the 'raw' text file, where your lore entries are separated by blank lines. For changes to propagate to <b>existing</b> threads, you need to use the <b>/lore</b> command and click the reload button. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/memories-and-lore.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: loreBookUrlsText },
+          customCode: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "🧑‍💻 Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
           systemCharacterName: { hidden:true, label: "System's name:", type:"textLine", defaultValue: defaultValues.systemCharacter?.name || "" },
           systemCharacterAvatarUrl: { hidden:true, label: "System's avatar:", type:"textLine", defaultValue: defaultValues.systemCharacter?.avatar?.url || "" },
         }, {submitButtonText: opts.submitButtonText || "save character", showHiddenInputsText: "show advanced options"});
@@ -3635,13 +3675,26 @@ OVERALL SUMMARY:
         return tokenLimit;
       }
 
+      function updateFavicon(url) {
+        let link = document.querySelector("link[rel~='icon']");
+        if(!link) {
+          link = document.createElement('link');
+          link.rel = 'icon';
+          document.head.appendChild(link);
+        }
+        link.href = url;
+      }
+      updateFavicon("https://user-images.githubusercontent.com/1167575/236043589-96770b23-4378-4114-9807-7dfad8e72f71.png");
+
       const openAiErrorTypeToReadableError = {
         "insufficient_quota": "Looks like you've used up all your OpenAI credits. You can buy more here:\nhttps://platform.openai.com/account\n\nNote that OpenCharacters does not receive any money from this. OpenAI is the company that provides the 'brain' for your AI. OpenCharacters itself is completely free.",
       };
 
+      let currentBotReplySignals;
       // Note: the reason this doesn't just take threadId as a param is because we use it for recomputeBotReply() which doesn't necessarily use all messages in a thread, and we also use it for "reply with..." which switches characters
-      async function getBotReply({messages, threadId, aiCharacter, userCharacter, replyInstruction, onStreamingReplyChunk, onProgressMessage, signals}) {
+      async function getBotReply({messages, threadId, aiCharacter, userCharacter, replyInstruction, onStreamingReplyChunk, onProgressMessage, signals, modelNameOverride}) {
         if(!signals) signals = {};
+        currentBotReplySignals = signals;
 
         let originalSendButtonDisabledState = $.sendButton.disabled;
         $.sendButton.disabled = true;
@@ -3857,17 +3910,14 @@ OVERALL SUMMARY:
           }
           
           let relevantMemoriesAndLore = memoriesAndLore.filter(m => m._relevanceScore > scoreThreshold).sort((a, b) => b._relevanceScore - a._relevanceScore);
-          console.log("relevant memories/lore:", relevantMemoriesAndLore);
-          relevantMemoriesAndLore = relevantMemoriesAndLore.slice(0, 5);
+          console.log("relevant memories/lore:", relevantMemoriesAndLore.slice(0, 1000));
 
           let relevantMemories = relevantMemoriesAndLore.filter(m => m._type === "memory");
           let relevantLore = relevantMemoriesAndLore.filter(m => m._type === "lore");
-
-          loreIdsUsed = relevantLore.map(l => l.id);
           
           // we create "batches" of memories - i.e. chronologically ordered groups of memories that are relevant and adjacent
           // use top memories as "seeds" for each batch:
-          let memoryBatches = relevantMemories.slice(0, 5).sort((a,b) => a.index-b.index).map(m => ({memories:[m], seedMemory:m}));
+          let memoryBatches = relevantMemories.sort((a,b) => a.index-b.index).map(m => ({memories:[m], seedMemory:m}));
           
           let maxMemoryIndex = memories.at(-1)?.index ?? 0;
           let minMemoryIndex = memories[0]?.index ?? 0; // note: the term `index` is actually a misnomer here - should be `order` or something, since the `status:"noncurrent"` memories can create gaps in the `status:"current"` memories.
@@ -3969,6 +4019,7 @@ OVERALL SUMMARY:
             memoryBatches.sort((a,b) => a.seedMemory.id - b.seedMemory.id);
             if(memoryBatches.length > 0 || relevantLore.length > 0) {
               memoryIdBatchesUsed = memoryBatches.map(b => b.memories.map(m => m.id));
+              loreIdsUsed = relevantLore.map(l => l.id);
 
               if(memoryIdBatchesUsed.flat().filter(id => id === undefined).length > 0) {
                 debugger; // this shouldn't happen
@@ -4738,8 +4789,15 @@ OVERALL SUMMARY:
         $.sendButton.disabled = false;
       }
 
+      
+      async function recomputeBotReply(messageEl, opts={}) {
+        
+        if(currentBotReplySignals) {
+          currentBotReplySignals.stop = true;
+          currentBotReplySignals.wasDeleted = true;
+          await delay(100);
+        }
 
-      async function recomputeBotReply(messageEl) {
         messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
 
         const messageObj = await db.messages.get(parseInt(messageEl.dataset.id));
@@ -4757,7 +4815,7 @@ OVERALL SUMMARY:
 
         let signals = {stop:false, wasDeleted:false};
 
-        $.statusNotifier.innerHTML = "<button style='font-size: 0.9rem;'>🛑 stop response</button>";
+        $.statusNotifier.innerHTML = "<button data-stop-reponse-button='1' style='font-size: 0.9rem;'>🛑 stop response</button>";
         $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
           e.preventDefault(); e.stopPropagation();
           signals.stop = true;
@@ -4777,7 +4835,11 @@ OVERALL SUMMARY:
         }
 
         const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-        const {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, signals, onProgressMessage, onStreamingReplyChunk});
+
+        let botReplyOpts = {messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, signals, onProgressMessage, onStreamingReplyChunk}
+        if(opts.modelNameOverride) botReplyOpts.modelNameOverride = opts.modelNameOverride;
+        
+        const {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply(botReplyOpts);
         messageEl.querySelector(".statusMessage").innerHTML = "";
 
         hideEl($.statusNotifier);
@@ -4814,11 +4876,14 @@ OVERALL SUMMARY:
           if($.chatThreads.firstElementChild.dataset.threadId !== threadId.toString()) {
             await renderThreadList();
           }
-          // if this is the last message in the feed, then we treat it as an "added" message, rather than an edited message, so we trigger the custom code MessageAdded event:
-          if(isLastMessage) {
-            await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
-          } else {
-            await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageEdited"});
+
+          if(!signals.stop) { // <-- don't call custom code if they stopped the message
+            // if this is the last message in the feed, then we treat it as an "added" message, rather than an edited message, so we trigger the custom code MessageAdded event:
+            if(isLastMessage) {
+              await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
+            } else {
+              await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageEdited"});
+            }
           }
         }
       }
@@ -4868,7 +4933,7 @@ OVERALL SUMMARY:
         }
 
         hideEl($.noMessagesNotice);
-        attachEventHandlersToMessageEl(el);
+        attachEventHandlersToMessageEl(el, {showVariantsSelector:opts.showVariantsSelector});
         
         await updateInlineReminderMessage();
         await updateThreadScene();
@@ -4880,7 +4945,7 @@ OVERALL SUMMARY:
         return el;
       }
 
-      function attachEventHandlersToMessageEl(messageEl) {
+      function attachEventHandlersToMessageEl(messageEl, opts={}) {
         const recomputeButton = messageEl.querySelector(".recomputeButton");
 
         messageEl.querySelector(".editButton").addEventListener("click", messageEditButtonClickHandler);
@@ -4897,10 +4962,11 @@ OVERALL SUMMARY:
           message.message = message.variants[currentIndex-1];
           message.variants[currentIndex-1] = null;
           await db.messages.put(message);
-          let newMessageEl = await addMessageToFeed(message, {inPlaceOf:messageEl});
+          let newMessageEl = await addMessageToFeed(message, {inPlaceOf:messageEl, showVariantsSelector:true});
           newMessageEl.querySelector(".currentVariantNumber").innerHTML = `${(currentIndex-1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
         });
         messageEl.querySelector(".nextMessageVariantButton").addEventListener("click", async function() {
+          let mousePos = {x:event.clientX, y:event.clientY};
           let message = await db.messages.get(parseInt(messageEl.dataset.id));
           let currentIndex = message.variants.findIndex(v => v===null); // current message is represented with `null` in variant array
           message.variants[currentIndex] = message.message;
@@ -4908,19 +4974,20 @@ OVERALL SUMMARY:
           message.message = message.variants[currentIndex+1];
           message.variants[currentIndex+1] = null;
           await db.messages.put(message);
-          let newMessageEl = await addMessageToFeed(message, {inPlaceOf:messageEl});
+          let newMessageEl = await addMessageToFeed(message, {inPlaceOf:messageEl, showVariantsSelector:true});
           newMessageEl.querySelector(".currentVariantNumber").innerHTML = `${(currentIndex+1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
         });
 
         if(!isMobile) { // on mobile the variants container is always visible after user has created at least 1 variant
           let variantsCtnHideTimeout = null;
-          recomputeButton.addEventListener("mouseenter", function() {
+          let mousePos; // <-- used for showVariantsSelector
+          recomputeButton.addEventListener("mouseenter", function(e) {
+            mousePos = {x:e.clientX, y:e.clientY};
             clearTimeout(variantsCtnHideTimeout);
             let variantsCtn = messageEl.querySelector(".messageVariantsCtn");
             showEl(variantsCtn);
-            // position variantsCtn directly above el (the recompute button), taking into account padding of variantsCtn
-            variantsCtn.style.top = (recomputeButton.getBoundingClientRect().top - variantsCtn.getBoundingClientRect().height - 5) + "px";
-            variantsCtn.style.left = (recomputeButton.getBoundingClientRect().left - variantsCtn.getBoundingClientRect().width/2 + recomputeButton.getBoundingClientRect().width/2) + "px";
+            // hotizontally position variantsCtn so it sits directly above recomputeButton (centered)
+            variantsCtn.style.left =  `${recomputeButton.offsetLeft + (recomputeButton.offsetWidth/2) - (variantsCtn.offsetWidth/2)}px`;
           });
           recomputeButton.addEventListener("mouseleave", async function() {
             let variantsCtn = messageEl.querySelector(".messageVariantsCtn");
@@ -4934,6 +5001,17 @@ OVERALL SUMMARY:
             let variantsCtn = messageEl.querySelector(".messageVariantsCtn");
             variantsCtnHideTimeout = setTimeout(() => hideEl(variantsCtn), 500);
           });
+          if(opts.showVariantsSelector) {
+            recomputeButton.dispatchEvent(new Event("mouseenter"));
+            delay(100).then(() => {
+              // if mouse is not on top of variantsCtn, dispatch mouseleave:
+              let variantsCtn = messageEl.querySelector(".messageVariantsCtn");
+              let variantsCtnRect = variantsCtn.getBoundingClientRect();
+              if(!(mousePos.x >= variantsCtnRect.left && mousePos.x <= variantsCtnRect.right && mousePos.y >= variantsCtnRect.top && mousePos.y <= variantsCtnRect.bottom)) {
+                recomputeButton.dispatchEvent(new Event("mouseleave"));
+              }
+            });
+          }
         }
 
         messageEl.querySelector(".deleteButton").addEventListener("click", messageDeleteButtonClickHandler);
@@ -5044,7 +5122,7 @@ OVERALL SUMMARY:
           }
         } else {
           // on desktop we show in hover:
-          variantCtnCss = "display:none; position:fixed; padding: 0.125rem;";
+          variantCtnCss = "display:none; position:absolute; bottom:1.4rem; padding: 0.125rem;";
         }
 
         let avatarUrl = character.avatar.url;
@@ -5103,11 +5181,13 @@ OVERALL SUMMARY:
                   <!-- <div class="time" style="font-size:0.8rem; opacity:0.5; margin-left:0.5rem; display: flex; align-items: center;">${getDateTimeString(messageObj.creationTime)}</div> -->
                   <div class="editButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
                   <div class="deleteButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
-                  <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: ${character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔁</div>
-                  <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); min-width:max-content; ${sanitizeHtml(variantCtnCss)}">
-                    <span class="prevMessageVariantButton emojiButton">◄</span>
-                    <span class="currentVariantNumber">${sanitizeHtml(currentVariantNumber)}<span style="opacity:0.5">/${sanitizeHtml(messageObj.variants.length)}</span></span>
-                    <span class="nextMessageVariantButton emojiButton">►</span>
+                  <div style="position:relative;display:flex; align-items:center;">
+                    <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: ${character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔁</div>
+                    <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); min-width:max-content; ${sanitizeHtml(variantCtnCss)}">
+                      <span class="prevMessageVariantButton emojiButton">◄</span>
+                      <span class="currentVariantNumber">${sanitizeHtml(currentVariantNumber)}<span style="opacity:0.5">/${sanitizeHtml(messageObj.variants.length)}</span></span>
+                      <span class="nextMessageVariantButton emojiButton">►</span>
+                    </div>
                   </div>
                   ${messageObj.hiddenFrom?.includes("ai") ? `<div class="hiddenFromAiIcon" onclick="alert('This icon indicates that this message is hidden from the AI.')" title="The AI cannot see this message." style="font-size:0.8rem; margin-left:1rem; display:flex; align-items: center; cursor:pointer;">🙈</div>` : ""}
                   <div class="statusMessage" style="margin-left:1rem;display: flex;align-items: center;cursor:pointer;font-size: 0.7rem;opacity: 0.5;"></div>
@@ -5413,13 +5493,10 @@ OVERALL SUMMARY:
             $.messageInput.value = "";
           } else if(message.trim() === "/mem") {
             let thread = await db.threads.get(threadId);
+            let embeddingModelName = thread.textEmbeddingModelName;
+
             let originalGeneratedMemories = await db.memories.where({threadId, status:"current"}).toArray();
             originalGeneratedMemories.sort((a,b) => a.index - b.index);
-
-            let textToEmbeddingCache = new Map();
-            for(let entry of originalGeneratedMemories) {
-              textToEmbeddingCache.set(entry.text, entry.embedding);
-            }
 
             let textToMemoryObj = new Map();
             for(let entry of originalGeneratedMemories) {
@@ -5432,6 +5509,16 @@ OVERALL SUMMARY:
               }
               textToMemoryObj.set(entry.text, entry);
             }
+
+            let textToEmbeddingCache = new Map();
+            for(let entry of originalGeneratedMemories) {
+              if(entry.embeddings[embeddingModelName] === undefined) { // <-- entry may not have an embedding if the embedding model was changed (or if there's a bug)
+                console.warn("Memory entry has no embedding for the current embedding model:", entry);
+              } else {
+                textToEmbeddingCache.set(entry.text, entry.embeddings[embeddingModelName]);
+              }
+            }
+
 
             let originalGeneratedMemoriesText = originalGeneratedMemories.map(m => `${m.text}`).join("\n\n");
 
@@ -5448,11 +5535,11 @@ OVERALL SUMMARY:
               // we set these so that if there's an error (e.g. while embedding, or with database) the while loop continues and they don't lose their edits
               generatedDefaultValue = result.generatedMemoriesText;
 
-              let newGeneratedMemoryTextEntries = result.generatedMemoriesText.replace(/\r/g, "").split(/\n{2,}/).map(m => m.trim()).filter(m => m);
+              // note: bit hacky, but we only trim newlines from start and end - NOT spaces, since we are using spaces to distinguish between different memories with the same text
+              let newGeneratedMemoryTextEntries = result.generatedMemoriesText.replace(/\r/g, "").split(/\n{2,}/).map(m => m.replace(/^\n+|\n+$/g, "")).filter(m => m);
 
               loadingModal = createLoadingModal("Computing memory embeddings. Please wait...", $.middleColumn);
 
-              let embeddingModelName = thread.textEmbeddingModelName;
               let newTexts = [];
               for(let text of newGeneratedMemoryTextEntries) {
                 if(!textToEmbeddingCache.has(text)) {
@@ -5467,7 +5554,7 @@ OVERALL SUMMARY:
                   textToEmbeddingCache.set(newTexts[i], newEmbeddings[i]);
                 }
 
-                if(originalGeneratedMemoriesText !== result.generatedMemoriesText) {
+                if(originalGeneratedMemoriesText !== result.generatedMemoriesText || newEmbeddings.length > 0) { // we need the `newEmbeddings.length > 0` bit because of stuff related to duplicate memories (possibly only due to since-fixed database upgrade bug)
                   let newMemoryObjs = [];
                   let index = 0;
                   let prevSummaryHash = originalGeneratedMemories[0]?.summaryHash ?? ""; // empty string as a summary hash indicates that the memory doesn't "belong" to any summary
@@ -5479,6 +5566,7 @@ OVERALL SUMMARY:
                       obj = textToMemoryObj.get(text);
                       prevSummaryHash = obj.summaryHash;
                       obj.index = index;
+                      if(obj.embeddings[embeddingModelName] === undefined) obj.embeddings[embeddingModelName] = textToEmbeddingCache.get(text); // needed due to since-fixed bug
                     } else {
                       let embedding = textToEmbeddingCache.get(text);
                       // we group new memories under the previous memory hash. a valid summary hash is necessary because it's what we use to 'validate' that memories are 'current' during the summarization process.
@@ -5765,6 +5853,7 @@ OVERALL SUMMARY:
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width">
+          <base target="_blank">
         </head>
         <body>
         <script type="module">
@@ -5773,12 +5862,18 @@ OVERALL SUMMARY:
           // Proxy fetch to remove CORS restrictions
           const proxyHandler = {
             apply: async function (target, thisArg, argumentsList) {
-              let url = argumentsList[0];
+              let url;
+              if(typeof argumentsList[0] === "object") url = argumentsList[0].url;
+              else url = argumentsList[0];
+
+              if(url.startsWith("blob:") || url.startsWith("data:")) return target.call(thisArg, ...argumentsList);
+
               let origin = new URL(url).origin;
 
               // for performance, exclude some CDNs that don't need CORS proxying
               if(
                 origin.endsWith("jsdelivr.net")
+                || origin.endsWith("catbox.moe")
                 || (origin.endsWith("huggingface.co") && url.includes("/resolve/"))
                 || origin === "https://raw.githubusercontent.com"
               ) {
@@ -5791,9 +5886,14 @@ OVERALL SUMMARY:
               // Just use 'fetch' as normal and this proxy will be used automatically.
               // Note: I was originally trying a normal fetch and then only falling back to this CORS proxy if it failed, but the problem with that is that this would hit the endpoint twice, which may have side effects, and the user might not want that.
               // I may eventually have to add manual "exemptions" to skip proxying certain URLs that don't need it - like huggingface models, for example, since we could start to become bandwidth limited.
-              const proxiedUrl = "https://opencharacters-cors-proxy.joe64.repl.co?url=" + encodeURIComponent(argumentsList[0]);
+              const proxiedUrl = "https://opencharacters-cors-proxy.joe64.repl.co?url=" + encodeURIComponent(url);
               try {
-                return target.call(thisArg, proxiedUrl, ...argumentsList.slice(1));
+                if(typeof argumentsList[0] === "object") {
+                  argumentsList[0].url = proxiedUrl;
+                  return target.call(thisArg, ...argumentsList);
+                } else {
+                  return target.call(thisArg, proxiedUrl, ...argumentsList.slice(1));
+                }
               } catch(e) {
                 console.error(e);
                 return target.call(thisArg, ...argumentsList); // try unproxied if proxied fails
@@ -6248,7 +6348,7 @@ OVERALL SUMMARY:
         <script type="module">
           await new Promise(r => setTimeout(r, 100));
 
-          let customCodeScriptElementText = document.querySelector(".customCodeScriptElement").textContent;
+          let customCodeScriptElementText = document.querySelector(".customCodeScriptElement")?.textContent || ""; // optional chaining is needed since they may have deleted it via document.body.innerHTML=...
 
           if(!window.__customCodeInitializationSTARTED_846298638) { // if it hasn't *started* after 1 second, it's almost certainly a parsing bug
             let staticImportRegex = ${/(^|\s)import(\s+(\*\s+as\s+\w+|{[^}]*})?\s+from)?\s*['"][^'"]+\.js['"]\s*;?/.toString()};
@@ -6322,6 +6422,10 @@ OVERALL SUMMARY:
           if(typeof width === "number") width = width+"px";
           $.customCodeIframeCtn.style.width = width;
           $.customCodeColumn.style.display = "flex";
+          if(isMobile) {
+            $.toggleRightColumnButton.style.display = "flex";
+            $.customCodeIframeCtn.style.width = "100%";
+          }
         }
       }
 
