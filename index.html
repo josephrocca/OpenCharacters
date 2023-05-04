@@ -457,7 +457,7 @@
         </div>
       </div>
 
-      <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; min-width:200px;">
+      <div id="middleColumn" style="flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; min-width:200px; z-index:1;">
         <div id="middleColumnShadowOverlay" style="display:none; position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5); z-index:20;"></div>
         <div id="characterSelection" class="middleColumnScreen" style="flex-grow:1; display:none; overflow: auto;">
           <button id="characterSelectionOpenLeftColumnButton" class="openLeftColumnButton" style="background: var(--button-bg);border-radius: var(--border-radius);border: 1px solid var(--button-border-color);padding: 0.25rem;width: 2rem;min-height: 2rem;margin-right: 0.5rem;position: absolute;top: 0.5rem;left: 0.5rem;">☰</button>
@@ -720,10 +720,12 @@
             $.rightColumn.style.pointerEvents = "none";
             $.rightColumn.style.opacity = "0";
             $.rightColumn.dataset.visible = "no";
+            $.toggleRightColumnButton.textContent = "⚛️";
           } else {
             $.rightColumn.style.pointerEvents = "";
             $.rightColumn.style.opacity = "1";
             $.rightColumn.dataset.visible = "yes";
+            $.toggleRightColumnButton.textContent = "💬";
           }
         });
       }
@@ -1510,12 +1512,9 @@
 
       // Given a threadId, this renders the message feed for that thread in the middle column.
       const numMessagesPerDisplayBatch = 50;
+      let previouslyRenderedMessageFeedThreadId = null;
       async function renderMessageFeed(threadId, opts={}) {
-        
-        let originalMessageFeedThreadId;
-        if(opts.originalMessageFeedThreadId) {
-          originalMessageFeedThreadId = opts.originalMessageFeedThreadId;
-        }
+        $.messageFeed.dataset.threadId = threadId;
 
         const thread = (await db.threads.where("id").equals(threadId).toArray())[0];
         const messages = await db.messages.where("threadId").equals(threadId).toArray();
@@ -1565,11 +1564,13 @@
 
         // remove all elements after the last matching element (including non-message elements - e.g. "undo deletion" buttons):
         if(lastMatchingMessageEl) {
-          let el = lastMatchingMessageEl.nextSibling;
-          while(el) {
-            let nextEl = el.nextSibling;
-            el.remove();
-            el = nextEl;
+          if(lastMatchingMessageEl !== [...$.messageFeed.querySelectorAll(".message")].at(-1)) { // if it's the last one, we don't need to do anything (and we want to avoid removing an 'undo delete' button that might come after it, for example)
+            let el = lastMatchingMessageEl.nextSibling;
+            while(el) {
+              let nextEl = el.nextSibling;
+              el.remove();
+              el = nextEl;
+            }
           }
         } else {
           // no messages matched, so clear the feed:
@@ -1585,7 +1586,7 @@
           attachEventHandlersToMessageEl(messageEl);
         });
 
-        if(originalMessageFeedThreadId === threadId) {
+        if(previouslyRenderedMessageFeedThreadId === threadId) {
           // restore message feed scroll position:
           $.messageFeed.scrollTop = originalScrollPosition;
         } else {
@@ -1628,7 +1629,11 @@
         await updateInlineReminderMessage({aiCharacter:character, thread, showInlineReminder});
         await updateThreadScene();
 
-        doBotReplyIfNeeded(); // we shouldn't `await` this because thread is already rendered.
+        previouslyRenderedMessageFeedThreadId = threadId;
+
+        if(opts.triggerBotReply !== false) {
+          doBotReplyIfNeeded(); // we shouldn't `await` this because thread is already rendered.
+        }
       }
       
       let threadIdToMusicPermission = {}
@@ -2435,10 +2440,10 @@
 
       // });
 
+      let threadLoadingModal;
+      let activeThreadId = null; // <-- used globally
       async function showThread(threadId) {
-
-        let originalMessageFeedThreadId = parseInt($.messageFeed.dataset.threadId);
-        $.messageFeed.dataset.threadId = threadId;
+        activeThreadId = threadId;
 
         let thread = await db.threads.get(threadId);
         let characterObj = await db.characters.get(thread.characterId);
@@ -2453,11 +2458,13 @@
 
         $.musicPlayer.pause();
 
-        let loadingModal;
+        if(threadLoadingModal) {
+          threadLoadingModal.delete();
+        }
         
         // to prevent flash for fast-loading threads:
         let loadingModalCreationTimeout = setTimeout(() => {
-          loadingModal = createLoadingModal("Loading...", $.middleColumn);
+          threadLoadingModal = createLoadingModal("Loading...", $.middleColumn);
         }, 200);
         
         document.querySelectorAll("#chatThreads .thread").forEach(el => el.classList.remove("selected"));
@@ -2478,7 +2485,7 @@
           await createNewCustomCodeIframeForThread(threadId); // this adds iframe as here: customCodeIframes[threadId]
         }
 
-        await renderMessageFeed(threadId, {originalMessageFeedThreadId});
+        await renderMessageFeed(threadId);
 
         await db.threads.where({id:threadId}).modify({lastViewTime:Date.now()});
 
@@ -2487,7 +2494,8 @@
         $.messageInput.value = thread.unsentMessageText;
 
         clearTimeout(loadingModalCreationTimeout);
-        if(loadingModal) loadingModal.delete();
+        if(threadLoadingModal) threadLoadingModal.delete();
+
       }
 
       // NOTE: spaces aren't actually allowed by OpenAI - I replace them with underscores in prepareMessagesForBot
@@ -5332,7 +5340,7 @@ OVERALL SUMMARY:
         }
         await updateInlineReminderMessage();
         await updateThreadScene();
-        await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageDeleted"});
+        await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageDeleted", triggerBotReply:false});
       }
 
       const defaultUserName = "Anon";
@@ -5837,7 +5845,9 @@ OVERALL SUMMARY:
         });
 
         iframe.setAttribute("sandbox", "allow-scripts");
-        iframe.style.cssText = "border:0; width:100%; height:100%; display:none;";
+        // we MUST NOT set display:none here, because otherwise window.innerWidth/innerHeight are zero on init, which can confuse plugin devs.
+        // instead we set opacity:0 and pointer-events:none, and then switch to display:none after load.
+        iframe.style.cssText = "border:0; width:100%; height:100%; pointer-events:none; opacity:0; display:absolute;";
         iframe.dataset.threadId = threadId;
         
         // let floatingWindow = createFloatingWindow({header:character.name, closeButtonAction:"hide"});
@@ -6366,6 +6376,15 @@ OVERALL SUMMARY:
 
         await iframeLoadPromise;
 
+        iframe.style.pointerEvents = "";
+        iframe.style.opacity = "";
+        iframe.style.display = "none";
+
+        if(isMobile) {
+          // this is necessary because some iframes will require user interaction to initialize the thread - if dev shows the iframe, then they probably want the mobile user to see it first (new users probably wouldn't know to click the button that shows the iframe)
+          $.toggleRightColumnButton.click();
+        }
+
         await triggerInitCustomCodeEvent(threadId);
 
       }
@@ -6406,7 +6425,9 @@ OVERALL SUMMARY:
 
       async function updateCustomCodeIframeVisibility() {
         let visibleThreadId = null;
-        if($.messageFeed.offsetWidth > 0 && $.messageFeed.dataset.threadId !== undefined) visibleThreadId = parseInt($.messageFeed.dataset.threadId);
+        if($.messageFeed.offsetWidth > 0 && activeThreadId !== null) {
+          visibleThreadId = activeThreadId;
+        }
         let visibleThread = null;
         if(visibleThreadId !== null) visibleThread = await db.threads.get(visibleThreadId);
 
@@ -6600,7 +6621,7 @@ OVERALL SUMMARY:
       }
 
       // this function runs after every message is added: https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md
-      async function triggerMessageActionCustomCodeEvent({threadId, eventName}) {
+      async function triggerMessageActionCustomCodeEvent({threadId, eventName, triggerBotReply=true}={}) {
         let thread = await db.threads.get(threadId);
         let threadCharacter = await db.characters.get(thread.characterId);
 
@@ -6619,7 +6640,7 @@ OVERALL SUMMARY:
 
         let currentThreadId = parseInt($.messageFeed.dataset.threadId);
         if(threadId === currentThreadId) { // <-- since user may have switched threads
-          await renderMessageFeed(threadId);
+          await renderMessageFeed(threadId, {triggerBotReply});
         }
       }
 
