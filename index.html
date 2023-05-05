@@ -1291,8 +1291,8 @@
         $.chatThreads.innerHTML = foldersHtml + threadsHtml;
 
         // if message feed is visible, set selected thread to the currently-visible chat thread
-        if($.messageFeed.offsetWidth > 0 && $.messageFeed.dataset.threadId) {
-          let threadCardForActiveThread = $.chatThreads.querySelector(`.thread[data-thread-id="${$.messageFeed.dataset.threadId}"]`);
+        if($.messageFeed.offsetWidth > 0 && activeThreadId !== null) {
+          let threadCardForActiveThread = $.chatThreads.querySelector(`.thread[data-thread-id="${activeThreadId}"]`);
           if(threadCardForActiveThread) threadCardForActiveThread.classList.add("selected");
         }
 
@@ -5890,7 +5890,7 @@ OVERALL SUMMARY:
               const proxiedUrl = "https://opencharacters-cors-proxy.joe64.repl.co?url=" + encodeURIComponent(url);
               try {
                 if(typeof argumentsList[0] === "object") {
-                  argumentsList[0].url = proxiedUrl;
+                  argumentsList[0] = new Request(proxiedUrl, argumentsList[0]);
                   return target.call(thisArg, ...argumentsList);
                 } else {
                   return target.call(thisArg, proxiedUrl, ...argumentsList.slice(1));
