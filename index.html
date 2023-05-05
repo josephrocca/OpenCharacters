@@ -503,7 +503,7 @@
         </div>
       </div>
 
-      <div id="rightColumn" style="width:min-content;">
+      <div id="rightColumn" style="width:min-content;" data-visible="no">
         <div id="customCodeColumn" style="width:min-content; display:none; height:100%;">
           <div id="customCodeIframeHorizontalResizeBar"></div>
           <div id="customCodeIframeCtn" style="height:100%; flex-grow:1;"></div>
@@ -2436,6 +2436,8 @@
         activeThreadId = threadId;
         let thread = await db.threads.get(threadId);
         activeCharacterId = thread.characterId;
+
+        $.threadModelSelector.value = thread.modelName;
 
         let characterObj = await db.characters.get(thread.characterId);
 
@@ -4608,7 +4610,7 @@ OVERALL SUMMARY:
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
         messages.sort((a,b) => a.order - b.order);
         messages = messages.slice(0, 10);
-        let preparedMessages = await prepareMessagesForBot({messages, userCharacter, aiCharacter})
+
         if(thread.name === defaultThreadName && messages.length > 8) {
 
           let modelName;
@@ -4616,6 +4618,16 @@ OVERALL SUMMARY:
             modelName = "gpt-3.5-turbo"; // if they're using any OpenAI model, then we use turbo for summarization
           } else {
             modelName = thread.modelName;
+          }
+
+          let preparedMessages = await prepareMessagesForBot({messages, userCharacter, aiCharacter});
+
+          for(let m of preparedMessages) {
+            m.content = m.content.length > 1000 ? m.content.slice(0, 1000)+"..... (message has been truncated)" : m.content;
+          }
+
+          while(await countTokensInMessages(preparedMessages, modelName) > 2000 && preparedMessages.length > 1) {
+            preparedMessages.pop();
           }
 
           let chatCompletionMessages = [
@@ -6371,8 +6383,8 @@ OVERALL SUMMARY:
         iframe.style.opacity = "";
         iframe.style.display = "none";
 
-        if(isMobile) {
-          // this is necessary because some iframes will require user interaction to initialize the thread - if dev shows the iframe, then they probably want the mobile user to see it first (new users probably wouldn't know to click the button that shows the iframe)
+        if(isMobile && thread.customCodeWindow.visible && $.rightColumn.dataset.visible === "no") {
+          // this is necessary (and must come before the triggerInitCustomCodeEvent call, below) because some iframes will require user interaction to initialize the thread - if dev shows the iframe, then they probably want the mobile user to see it first (new users probably wouldn't know to click the button that shows the iframe)
           $.toggleRightColumnButton.click();
         }
 
@@ -6437,6 +6449,16 @@ OVERALL SUMMARY:
           if(isMobile) {
             $.toggleRightColumnButton.style.display = "flex";
             $.customCodeIframeCtn.style.width = "100%";
+            if($.rightColumn.dataset.visible === "no") {
+              $.toggleRightColumnButton.click();
+            }
+          }
+        } else {
+          if(isMobile) {
+            $.toggleRightColumnButton.style.display = "none";
+            if($.rightColumn.dataset.visible === "yes") {
+              $.toggleRightColumnButton.click();
+            }
           }
         }
       }
