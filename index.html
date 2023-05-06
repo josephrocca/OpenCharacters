@@ -3950,7 +3950,8 @@ OVERALL SUMMARY:
           
           // we create "batches" of memories - i.e. chronologically ordered groups of memories that are relevant and adjacent
           // use top memories as "seeds" for each batch:
-          let memoryBatches = relevantMemories.sort((a,b) => a.index-b.index).map(m => ({memories:[m], seedMemory:m}));
+          // CAUTION: We need to `slice(0, 20)` not to stay under token limit (we drop them later if there are too many), but because we extend batches based on adjacent memories that occur in `memoryBatches`, and that can result in a looonng loop if we include very memory as a batch.
+          let memoryBatches = relevantMemories.slice(0, 20).sort((a,b) => a.index-b.index).map(m => ({memories:[m], seedMemory:m}));
           
           let maxMemoryIndex = memories.at(-1)?.index ?? 0;
           let minMemoryIndex = memories[0]?.index ?? 0; // note: the term `index` is actually a misnomer here - should be `order` or something, since the `status:"noncurrent"` memories can create gaps in the `status:"current"` memories.
@@ -4037,6 +4038,9 @@ OVERALL SUMMARY:
               }
               return chunks.join("\n\n");
             };
+
+            onProgressMessage({message:"dropping mem/lore"});
+
             // drop worst entries/batches until we're under token limit allocated to memories:
             while(await countTokens(createMemoriesAndLoreMessageContent(), modelName) > retrievedMemoriesTokenLimitFraction * availableModels[modelName].maxSequenceLength) {
               if(relevantLore.length === 0) {
