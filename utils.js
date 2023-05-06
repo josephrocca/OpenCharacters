@@ -419,8 +419,11 @@ export function dedent(str) {
 }
 
 
-export function downloadText(text, filename) {
-  const blob = new Blob([text], {type: "application/json"});
+export function downloadTextOrBlob(textOrBlob, filename) {
+  let blob;
+  if(typeof textOrBlob === "string") blob = new Blob([textOrBlob], {type: "application/json"});
+  else blob = textOrBlob;
+  
   const dataUri = URL.createObjectURL(blob);
   let linkElement = document.createElement("a");
   linkElement.setAttribute("href", dataUri);
