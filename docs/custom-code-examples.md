@@ -56,7 +56,7 @@ In the code below:
 
 * `oc.thread.on("MessageAdded", ...)` is used to trigger the code
 * `oc.getChatCompletion` is used to classify the messages that are added into one of the facial expressions that you've given
-* `<!--hidden-from-ai-start-->...<!--hidden-from-ai-end-->` is used to hide the appended images from the AI, so it doesn't get confused and start trying to make up its own image URLs based on the pattern that it observes in previous messages
+* `<!--hidden-from-ai-start-->...<!--hidden-from-ai-end-->` is used to hide the appended images from the AI, so it doesn't get confused and start trying to make up its own image URLs based on the pattern that it observes in previous messages. **Edit**: There now exists the [`oc.messageRenderingPipeline`](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md) feature, which is probably a better approach for this sort of thing.
 
 You can replace the `<expression>: <url>` list with your own.
 
