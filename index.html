@@ -394,20 +394,30 @@
         cursor: pointer;
         padding: 0.25rem;
         font-size: 85%;
-        text-overflow: ellipsis;
-        white-space: pre;
         overflow: hidden;
+        white-space: pre;
+        display: flex;
+      }
+      #userMessagesSentHistoryCtn .historyItem .text {
+        text-overflow: ellipsis;
+        overflow: hidden;
+        margin-left: 0.25rem;
+      }
+      #userMessagesSentHistoryCtn .historyItem .deleteButton {
+        margin-left: auto;
       }
       #userMessagesSentHistoryCtn .historyItem:hover {
         background: var(--background);
       }
-      #userMessagesSentHistoryCtn .historyItem .pinButton {
+      #userMessagesSentHistoryCtn .historyItem .pinButton,
+      #userMessagesSentHistoryCtn .historyItem .deleteButton {
         opacity: 0.5;
       }
       #userMessagesSentHistoryCtn .historyItem[data-is-pinned="true"] .pinButton {
         opacity: 1;
       }
-      body:not(.isMobile) #userMessagesSentHistoryCtn .historyItem .pinButton:hover {
+      body:not(.isMobile) #userMessagesSentHistoryCtn .historyItem .pinButton:hover,
+      body:not(.isMobile) #userMessagesSentHistoryCtn .historyItem .deleteButton:hover {
         opacity: 1;
       }
 
@@ -516,7 +526,7 @@
     <audio id="musicPlayer" style="display:none;"></audio>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadText, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=30";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadTextOrBlob, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=31";
 
       let JSON5;
       (async function() {
@@ -593,7 +603,7 @@
 
       let summariesWindow = createFloatingWindow({header:"Logs"});
       summariesWindow.hide();
-      function addToSummaryLog(html) {
+      function addToDebugLog(html) {
         let ctn = document.createElement("div");
         ctn.innerHTML = html;
         ctn.style.cssText = "font-size:0.8rem; padding:0.5rem; solid var(--border-color); font-family:monospace;";
@@ -728,10 +738,10 @@
 
 
       const dbName = "chatbot-ui-v1";
-      const dbVersion = 68;
+      const dbVersion = 73;
 
       let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
-      
+      let dbLoadingModal;
       if(db) {
         console.log("Existing user, checking database version...");
         let usersOriginalDbVersion = db.verno;
@@ -739,10 +749,12 @@
           let result = await prompt2({
             message: {type:"none", "html":`<p style="margin:0;">A database upgrade will be done when you click continue. A full export/backup will be downloaded first in case anything goes wrong.</p>`},
           }, {cancelButtonText:null, submitButtonText:"Continue"});
+          
+          dbLoadingModal = createLoadingModal("Please wait...");
 
-          const originalDbJsonText = await db.export({prettyJson: true}).then(blob => blob.text());
+          const originalDbJsonBlob = await db.export({prettyJson: true});
           let yyyymmdd = new Date().toISOString().split("T")[0];
-          downloadText(originalDbJsonText, `opencharacters-export-${yyyymmdd}.json`);
+          downloadTextOrBlob(originalDbJsonBlob, `opencharacters-export-${yyyymmdd}.json`);
         }
         await db.close(); // we need to close before db.version() call below and re-open afterwards
       } else {
@@ -824,6 +836,8 @@
       });
 
       await db.open();
+
+      if(dbLoadingModal) dbLoadingModal.delete();
 
       console.log("Database ready.");
 
@@ -909,6 +923,7 @@
         if(message.memoryQueriesUsed === undefined) message.memoryQueriesUsed = [];
         if(message.messageIdsUsed === undefined) message.messageIdsUsed = [];
         if(message.order === undefined) message.order = message.id; // <-- this is a little hacky, but it works because id is auto-incremented, and `order` values don't need to be contiguous
+        if(message.instruction === undefined) message.instruction = null;
         // WARNING: If you add something here, you may need to edit
         // - createMessageObj
         // - messagesToCustomCodeFormat and messagesFromCustomCodeFormat (if the data should be readable/writable from custom code)
@@ -1188,7 +1203,7 @@
         }
 
         let yyyymmdd = new Date().toISOString().split("T")[0];
-        downloadText(JSON.stringify(json), `opencharacters-export-${yyyymmdd}.json`);
+        downloadTextOrBlob(JSON.stringify(json), `opencharacters-export-${yyyymmdd}.json`);
       });
 
       // This renders the list of threads in the left column.
@@ -1399,10 +1414,10 @@
               let text = json.data.data.find(t => t.tableName === "messages").rows.sort((a,b) => a.order-b.order).map(m => {
                 return (m.characterId === -1 ? "[USER]: " : m.characterId === -2 ? "[SYSTEM]: " : "[AI]: ") + m.message;
               }).join("\n\n");
-              downloadText(text, filename);
+              downloadTextOrBlob(text, filename);
             } else {
               let filename = encodeURIComponent(`${thread.name} - ${character.name}`.replaceAll(" ", "_")) + ".json";
-              downloadText(JSON.stringify(json), filename);
+              downloadTextOrBlob(JSON.stringify(json), filename);
             }
           });
         });
@@ -2530,7 +2545,7 @@
           userCharacterAvatarUrl: { hidden:true, label: "User's avatar. This overrides the user's default avatar when chatting to this character.", type:"textLine", defaultValue: defaultValues.userCharacter?.avatar?.url || "" },
           // initialThreadMemories: { hidden:true, show:d=>d.autoGenerateMemories!=="none", label: "Initial thread-specific memories. The character will create memories based on the chat, but you can add some starter memories/lore here.", infoTooltip:"Manually-written memories can be used as 'dynamic' instruction/role/reminders that engage when relevant. This saves you from having to pack too much text into your instruction/reminder, which will 'eat up' your context, which means the AI will be able to see fewer recent messages, and summarization will have to be done more often.", type:"text", defaultValue: defaultValues.textEmbeddingModelName ?? "" },
           temperature: { hidden:true, label: "🌡️ Creativity ('temperature'). Choose a value between 0 and 2. Higher values will make the output more random, while lower values will make it more focused and deterministic.", infoTooltip:"People seem to get good results between 0.7 and 1.2 - higher values may sacrifice some 'correctness' but should result in more 'imagination'.", type:"textLine", defaultValue: defaultValues.temperature ?? 0.85 },
-          loreBookUrlsText: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "📜 Lorebook URLs - one per line. Use <a href='https://rentry.org' target='_blank'>rentry.org</a> or similar. Should be a url to the 'raw' text file, where your lore entries are separated by blank lines. For changes to propagate to <b>existing</b> threads, you need to use the <b>/lore</b> command and click the reload button. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/memories-and-lore.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: loreBookUrlsText },
+          loreBookUrlsText: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "📖 Lorebook URLs - one per line. Use <a href='https://rentry.org' target='_blank'>rentry.org</a> or similar. Should be a url to the 'raw' text file, where your lore entries are separated by blank lines. For changes to propagate to <b>existing</b> threads, you need to use the <b>/lore</b> command and click the reload button. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/memories-and-lore.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: loreBookUrlsText },
           customCode: { hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "🧑‍💻 Custom JavaScript code. This allows you to e.g. give your bot access to the internet. Visit <a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md' target='_blank'>this page</a> to learn more.", type:"text", height:"fit-content", defaultValue: defaultValues.customCode ?? "" },
           systemCharacterName: { hidden:true, label: "System's name:", type:"textLine", defaultValue: defaultValues.systemCharacter?.name || "" },
           systemCharacterAvatarUrl: { hidden:true, label: "System's avatar:", type:"textLine", defaultValue: defaultValues.systemCharacter?.avatar?.url || "" },
@@ -2720,7 +2735,7 @@
       }
 
 
-      function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime, expectsReply, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed, scene, avatar, name, customData, wrapperStyle, order}) {
+      function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime, expectsReply, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed, scene, avatar, name, customData, wrapperStyle, order, instruction}) {
         if(threadId === undefined || message === undefined || characterId === undefined) throw new Error(`createMessageObj: threadId, message, and characterId are required: ${threadId}, ${message}, ${characterId}`);
         return {
           threadId,
@@ -2741,6 +2756,7 @@
           customData: customData ?? {},
           wrapperStyle: wrapperStyle ?? "",
           order: order ?? undefined,
+          instruction: instruction ?? null,
           // RE `order` being undefined - this can happen if it's just being created (but not when e.g. being called from messagesFromCustomCodeFormat)
         };
       }
@@ -3358,7 +3374,7 @@ OVERALL SUMMARY:
                 let embedding = embeddings[i];
                 memoryObjsToAdd.push({summaryHash:hash, threadId, text:memory, characterId, embeddings:{[embeddingModelName]:embedding}, status:"current", index:previousMemoryIndex+1, triggers:[]});
                 previousMemoryIndex++;
-                addToSummaryLog(`<b>added memory:</b> ${memory}`);
+                addToDebugLog(`<b>added memory:</b> ${memory}`);
                 console.log("added memory:", memory);
                 i++;
               }
@@ -3378,7 +3394,7 @@ OVERALL SUMMARY:
               summary = result.trim();
             }
             console.log("computed summary:", summary);
-            addToSummaryLog(`<b>computed summary:</b> ${summary}`);
+            addToDebugLog(`<b>computed summary:</b> ${summary}`);
             let messageIds = messageBatchArr.map(m => m.id);
             let prevSummaryHash = prevSummaryObj ? prevSummaryObj.hash : null;
             await db.summaries.put({hash, summary, threadId, messageIds, prevSummaryHash});
@@ -3393,10 +3409,10 @@ OVERALL SUMMARY:
           // Note this is *outside* of the above `if` block because user will be able to adjust maxTokenCountOfSummary, and we want to re-compute/compress summaries if they change that value.
           // (this also helps with backwards-compat since maxTokenCountOfSummary previously didn't exist, we so we may need to compress some old summaries)
           if(await countTokens(summary, modelName) > maxTokenCountOfSummary) {
-            addToSummaryLog(`<b>summary to compress:</b> ${summary}`);
+            addToDebugLog(`<b>summary to compress:</b> ${summary}`);
             summary = await compressText({text:summary, tokenLimit:maxTokenCountOfSummary, modelName, onProgressMessage, threadId});
             await db.summaries.where({hash}).modify({summary});
-            addToSummaryLog(`<b>compressed summary:</b> ${summary}`);
+            addToDebugLog(`<b>compressed summary:</b> ${summary}`);
           }
           
           summaryObj = await db.summaries.get(hash);
@@ -3541,7 +3557,7 @@ OVERALL SUMMARY:
           if(m.characterId == -2) { author = "system"; name = m.name ?? thread.systemCharacter.name ?? defaultSystemName; }
           let hiddenFrom = m.hiddenFrom || [];
           // note: we need to pass `id` to custom code because it's used in stuff like renderMessagesForReader - we could map the ids to "public" ones, but it's probably not necessary
-          return {id:m.id, author, content:m.message, hiddenFrom, expectsReply:m.expectsReply, name, scene:m.scene, avatar:m.avatar, customData:m.customData, wrapperStyle:m.wrapperStyle};
+          return {id:m.id, author, content:m.message, hiddenFrom, expectsReply:m.expectsReply, name, scene:m.scene, avatar:m.avatar, customData:m.customData, wrapperStyle:m.wrapperStyle, wrapperStyle:m.wrapperStyle, instruction:m.instruction};
         });
         return messages;
       }
@@ -3622,6 +3638,7 @@ OVERALL SUMMARY:
           m.message = m.content+"";
           delete m.content;
           m.wrapperStyle = (m.wrapperStyle ?? "")+"";
+          m.instruction = (!m.instruction || !(m.instruction+"").trim()) ? null : m.instruction+"";
 
           let obj = createMessageObj(m);
           obj.id = m.id; // see messagesToCustomCodeFormat for why we need ids
@@ -3844,7 +3861,7 @@ OVERALL SUMMARY:
         let memories = await db.memories.where({threadId, status:"current"}).toArray();
         memories.sort((a,b) => a.index - b.index);
         if(memories.length > 0 || loreEntries.length > 0) {
-          onProgressMessage({message:"gen mem queries..."});
+          onProgressMessage({message:"get mem/lore queries"});
 
           memories.forEach(m => m._type="memory");
           loreEntries.forEach(m => m._type="lore");
@@ -3871,26 +3888,39 @@ OVERALL SUMMARY:
             threadId, // just used to track token usage
           });
 
+          if(signals.stop === true) return {};
+
+          onProgressMessage({message:"got queries"});
+
           searchQueries.push(...rawResult.trim().split("\n").filter(l => l.startsWith("- ") || l.startsWith(" - ")).map(l => l.trim().replace(/^ ?- /, "").trim()).slice(0, 10));
 
           searchQueries = searchQueries.map(q => q.replace(/^"(.+)"$/, "$1"));
 
           console.log(`MEMORY/LORE SEARCH QUERIES:\n${searchQueries.join("\n")}`);
+          addToDebugLog(`<b>Memory queries:</b>\n${searchQueries.join("\n")}`);
 
           memoryQueriesUsed.push(...searchQueries);
+
+          onProgressMessage({message:"embed queries"});
 
           let embeddingModelName = thread.textEmbeddingModelName;
           let searchEmbeddings = await embedTexts({textArr:searchQueries, modelName:embeddingModelName});
 
+          if(signals.stop === true) return {};
+
           const scoreThreshold = 0; // this is zero now because we subtract the average inverseDistance from the score when computing the score
           console.log("memory/lore score threshold:", scoreThreshold);
 
-          onProgressMessage({message:"calc mem/lore relevance..."});
+          onProgressMessage({message:"calc mem/lore scores"});
 
           for(let entry of memoriesAndLore) {
             if(!entry.embeddings[embeddingModelName]) {
               // embeddings should have been computed during addThread
-              throw new Error(`lore/memory doesn't have embedding for model ${embeddingModelName}:\ntext:${entry.text}\nbookUrl:${entry.bookUrl}\nbookId:${entry.bookId}`);
+              if(entry._type === "memory") {
+                throw new Error(`memory doesn't have embedding for model ${embeddingModelName}:\ntext:${entry.text}`);
+              } else {
+                throw new Error(`lore doesn't have embedding for model ${embeddingModelName}:\ntext:${entry.text}\nbookUrl:${entry.bookUrl}\nbookId:${entry.bookId}`);
+              }
             }
           }
 
@@ -3912,6 +3942,8 @@ OVERALL SUMMARY:
           
           let relevantMemoriesAndLore = memoriesAndLore.filter(m => m._relevanceScore > scoreThreshold).sort((a, b) => b._relevanceScore - a._relevanceScore);
           console.log("relevant memories/lore:", relevantMemoriesAndLore.slice(0, 1000));
+
+          onProgressMessage({message:"get top mem/lore"});
 
           let relevantMemories = relevantMemoriesAndLore.filter(m => m._type === "memory");
           let relevantLore = relevantMemoriesAndLore.filter(m => m._type === "lore");
@@ -4696,18 +4728,17 @@ OVERALL SUMMARY:
         let botIsCurrentlyReplyingPromiseResolve;
         botIsCurrentlyReplyingPromise = new Promise(r => botIsCurrentlyReplyingPromiseResolve = r);
         try {
-
-          const character = await db.characters.get(characterId);
-          let messageObj = createMessageObj({threadId, message:"...", characterId});
-          
-          let messageEl = await addMessageToFeed(messageObj, {character, skipReaderRendering:true});
-          messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
-          messageEl.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
-
           if(!replyInstruction && instructionForNextBotReply) {
             replyInstruction = instructionForNextBotReply;
           }
           instructionForNextBotReply = null; // TODO: refactor various calls to doBotReplyIfNeeded (e.g. at end of renderMessageFeed) so we don't need it and can easily just pass replyInstruction without all the threading-through-multiple-functions issues
+
+          const character = await db.characters.get(characterId);
+          let messageObj = createMessageObj({threadId, message:"...", characterId, instruction:replyInstruction || null});
+          
+          let messageEl = await addMessageToFeed(messageObj, {character, skipReaderRendering:true});
+          messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
+          messageEl.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
 
           if(!signals) signals = {stop:false, wasDeleted:false};
           messageEl.querySelector(".info .deleteButton").addEventListener("click", async e => {
@@ -4847,8 +4878,9 @@ OVERALL SUMMARY:
 
         const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
 
-        let botReplyOpts = {messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, signals, onProgressMessage, onStreamingReplyChunk}
+        let botReplyOpts = {messages:contextMessages, aiCharacter:character, userCharacter:await getUserCharacterObj(threadId), threadId, signals, onProgressMessage, onStreamingReplyChunk};
         if(opts.modelNameOverride) botReplyOpts.modelNameOverride = opts.modelNameOverride;
+        if(messageObj.instruction) botReplyOpts.replyInstruction = messageObj.instruction;
         
         const {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply(botReplyOpts);
         messageEl.querySelector(".statusMessage").innerHTML = "";
@@ -5281,14 +5313,18 @@ OVERALL SUMMARY:
         }
         insertNewMessageEl.querySelector(".insertAbove").addEventListener("click", insertMessageHandler.bind(null, "above"));
         insertNewMessageEl.querySelector(".insertBelow").addEventListener("click", insertMessageHandler.bind(null, "below"));
-
-        const result = await prompt2({
+        
+        let promptOpts = {
           message: {label: "message:", type: "text", height:"fit-content", defaultValue: originalMessage.message, focus:true},
+          instruction: {hidden:!!!originalMessage.instruction, label: "instruction:", type: "text", minHeight:"2rem", defaultValue: originalMessage.instruction || ""},
           hiddenFrom: {hidden:true, label: "hidden from:", type: "select", options:[{value:"user"}, {value:"ai"}, {content:"both", value:"user,ai"}, {content:"neither", value:""}], defaultValue: originalMessage.hiddenFrom.join(",")},
           insertMessage: {hidden:true, html: insertNewMessageEl, type: "none"},
-        }, {submitButtonText:"save"});
+        };
+        const result = await prompt2(promptOpts, {submitButtonText:"save"});
         if(!result) return;
+
         result.hiddenFrom = result.hiddenFrom.split(",").filter(x => x);
+        if(!result.instruction || !result.instruction.trim()) result.instruction = null;
         await db.messages.update(messageId, result);
 
         let newMessage = await db.messages.get(messageId);
@@ -5442,15 +5478,16 @@ OVERALL SUMMARY:
             }
 
           } else if(message.trim().startsWith("/user")) {
-            let instruction = "";
-            if(message.trim().length > "/user ".length) instruction = message.trim().replace(/^\/user /, "");
             let characterToReplyWith = await getUserCharacterObj(threadId);
             let threadCharacter = await db.characters.get(activeCharacterId);
+
+            let replyInstruction = null;
+            if(message.trim().length > "/user ".length) replyInstruction = message.trim().replace(/^\/user /, "");
             characterToReplyWith.modelName = thread.modelName; // use whatever model the thread character is using
-            if(instruction) {
-              characterToReplyWith.reminderMessage = `(The next message will be written from the perspective of '${characterToReplyWith.name}' and will conform to this user-provided instruction: "${instruction}")`;
-            }
-            await doBotReplyInPlaceOfUser({characterToReplyWith});
+            // if(replyInstruction) {
+            //   characterToReplyWith.reminderMessage = `(The next message will be written from the perspective of '${characterToReplyWith.name}' and will conform to this user-provided instruction: "${instruction}")`;
+            // }
+            await doBotReplyInPlaceOfUser({characterToReplyWith, replyInstruction});
             await doBotReplyIfNeeded();
           } else if(message.trim() === "/sum") {
             // first ensure summary is up to date:
@@ -5465,7 +5502,7 @@ OVERALL SUMMARY:
             let result = await prompt2({summary: {label: "Summary:", type: "text", height:"fit-content", defaultValue: summary, focus:true}});
             if(result) {
               await db.summaries.update(instructionHash, {summary:result.summary});
-              addToSummaryLog(`<b>edited summary:</b> ${result.summary}`);
+              addToDebugLog(`<b>edited summary:</b> ${result.summary}`);
             }
           } else if(message.trim() === "/import") {
             let defaultValue = "";
@@ -5637,7 +5674,7 @@ OVERALL SUMMARY:
               }
 
               let result = await prompt2({
-                loreEntriesText: {label: "Add/edit lore entries for this thread. Entries should be separated with a blank line.", type: "text", height:"fit-content", defaultValue:loreDefaultValue, placeholder:"Here's an example lore entry.\n\nAnd here's another.\n\nAnd here's yet another. As you can see, lore entries should be separated with a blank line.", focus:true, infoTooltip:"Lorebook entries can be used to describe the lore of your world. The AI 'searches' the lorebook for relevant entries when it's trying to work out the most appropriate thing to say/write next. Use relevant words, phrases, character names, etc. in each entry to help it trigger it at the appropriate moments. Don't make lore entries too big - probably aim for under 5 sentences for most entries."},
+                loreEntriesText: {label: "Add/edit lore entries for this thread. Entries should be separated with a blank line.", type: "text", height:"fit-content", defaultValue:loreDefaultValue, placeholder:"Here's an example lore entry.\n\nAnd here's another.\n\nAnd here's yet another. As you can see, lore entries should be separated with a blank line.", focus:true, infoTooltip:"Lorebook entries can be used to describe the lore of your world. The AI 'searches' the lorebook for relevant entries when it's trying to work out the most appropriate thing to say/write next. Use relevant words, phrases, character names, etc. in each entry to help it trigger it at the appropriate moments. Don't make lore entries too big - probably aim for under 5 sentences for most entries. You can add thousands of entries - it will NOT increase the price or slow down replies any more than if you only had e.g. 10 entries. You should think of lore entries like \"dynamic reminder messages\" which get read by the AI only when they're deemed relevant to the current situation in your story/chat."},
                 loreBookUrlEntriesText: {hidden:true, label: "Here are the entries loaded from this character's lorebook URLs. You can't edit these directly. Click the reload button below to pull in any changes that have been made to the character's lorebook URLs or the content at those URLs.", type: "text", disabled:true, height:"fit-content", defaultValue:loreBookUrlEntries.map(e => e.text).join("\n\n")},
                 reloadLoreUrlsButton: {hidden:true, type:"buttons", label:null, buttons:[{text:"Reload Lore URLs", onClick:reloadButtonClickHandler}]},
               }, {submitButtonText:"save", controls});
@@ -5850,7 +5887,7 @@ OVERALL SUMMARY:
         iframe.setAttribute("sandbox", "allow-scripts");
         // we MUST NOT set display:none here, because otherwise window.innerWidth/innerHeight are zero on init, which can confuse plugin devs.
         // instead we set opacity:0 and pointer-events:none, and then switch to display:none after load.
-        iframe.style.cssText = "border:0; width:100%; height:100%; pointer-events:none; opacity:0; display:absolute;";
+        iframe.style.cssText = "border:0; width:100%; height:100%; pointer-events:none; opacity:0; display:absolute; background:var(--background);";
         iframe.dataset.threadId = threadId;
         
         // let floatingWindow = createFloatingWindow({header:character.name, closeButtonAction:"hide"});
@@ -6754,7 +6791,7 @@ OVERALL SUMMARY:
             }
 
             await db.messages.bulkAdd(outputMessageObjs).catch(e => {
-              downloadText(JSON.stringify(originalThreadJSON), "data.json");
+              downloadTextOrBlob(JSON.stringify(originalThreadJSON), "data.json");
               console.error(e);
               alert("There was an error during custom code handling. The original thread has been downloaded so you can import it in case of data loss.\n\n"+e.stack);
             });
@@ -6813,11 +6850,11 @@ OVERALL SUMMARY:
 
       $.sendButton.addEventListener("click", sendButtonClickHandler);
 
-      async function doBotReplyInPlaceOfUser({characterToReplyWith, signals=null, result={}}={}) {
+      async function doBotReplyInPlaceOfUser({characterToReplyWith, replyInstruction=null, signals=null, result={}}={}) {
         let threadCharacter = await db.characters.get(activeCharacterId);
         let threadId = activeThreadId;
 
-        let messageObj = createMessageObj({threadId, message:"...", characterId:-1});
+        let messageObj = createMessageObj({threadId, message:"...", characterId:-1, instruction:replyInstruction});
         messageObj.name = characterToReplyWith.name;
         messageObj.avatar = structuredClone(characterToReplyWith.avatar);
 
@@ -6866,7 +6903,7 @@ OVERALL SUMMARY:
         
         // the "aiCharacter" is the one that replies 
         const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-        let {message, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, threadId, onProgressMessage, onStreamingReplyChunk, signals}).catch(e => {
+        let {message, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, aiCharacter:characterToReplyWith, userCharacter:threadCharacter, replyInstruction, threadId, onProgressMessage, onStreamingReplyChunk, signals}).catch(e => {
           if(e.name !== "AbortError") {
             alert("There was an error during doBotReplyInPlaceOfUser:\n\n"+e.stack);
           }
@@ -7150,7 +7187,7 @@ OVERALL SUMMARY:
           });
           // create the history messages element:
           let ctn = document.createElement("div");
-          ctn.innerHTML = thread.userMessagesSentHistory.map(m => `<div class="historyItem" data-is-pinned="${m.isPinned}" data-message-text="${encodeURIComponent(m.text)}"><span class="pinButton">📌</span> ${m.text.slice(0, 500).replaceAll("\n", " ")}</div>`).join("");
+          ctn.innerHTML = thread.userMessagesSentHistory.map(m => `<div class="historyItem" data-is-pinned="${m.isPinned}" data-message-text="${encodeURIComponent(m.text)}"><span class="pinButton">📌</span><span class="text">${m.text.slice(0, 500).replaceAll("\n", " ")}</span><span class="deleteButton">🗑️</span></div>`).join("");
           // position it above the message input text area, with same width:
           ctn.style.cssText = `
             max-height: min(40vh, 200px);
@@ -7164,7 +7201,7 @@ OVERALL SUMMARY:
             width: 100%;
           `;
 
-          // if user clicks the star, toggle the fav status of the message and save the userMessagesSentHistory
+          // if user clicks the pin button, toggle the fav status of the message and save the userMessagesSentHistory
           ctn.querySelectorAll(".historyItem .pinButton").forEach(el => {
             el.addEventListener("click", async function(e) {
               e.stopPropagation();
@@ -7173,6 +7210,17 @@ OVERALL SUMMARY:
               message.isPinned = !message.isPinned;
               await db.threads.update(threadId, {userMessagesSentHistory:thread.userMessagesSentHistory});
               el.closest(".historyItem").dataset.isPinned = message.isPinned;
+            });
+          });
+
+          ctn.querySelectorAll(".historyItem .deleteButton").forEach(el => {
+            el.addEventListener("click", async function(e) {
+              e.stopPropagation();
+              let messageText = decodeURIComponent(el.parentElement.dataset.messageText);
+              let message = thread.userMessagesSentHistory.find(m => m.text === messageText);
+              thread.userMessagesSentHistory.splice(thread.userMessagesSentHistory.indexOf(message), 1);
+              await db.threads.update(threadId, {userMessagesSentHistory:thread.userMessagesSentHistory});
+              el.closest(".historyItem").remove();
             });
           });
 
@@ -7658,7 +7706,7 @@ OVERALL SUMMARY:
         } catch(e) {
           console.error(e);
           let yyyymmdd = new Date().toISOString().split("T")[0];
-          downloadText(originalDbJsonText, `opencharacters-export-${yyyymmdd}.json`);
+          downloadTextOrBlob(originalDbJsonText, `opencharacters-export-${yyyymmdd}.json`);
           await delay(1000);
           alert(`There was an error importing your data. Your data has been downloaded as a backup. Please share this error message on Github:\n\n${e.message}\n\n${e.stack}`);
           return "fail";
