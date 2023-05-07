@@ -30,10 +30,3 @@
 ## Changelog
 
 Please see the `#announcements` channel on the [Discord server](https://discord.gg/5tkWXJFqPV) for latest updates.
-
-## Video Demo
-
-Here's a video demo of two bots chatting with one another using the "reply with..." button:
-
-https://user-images.githubusercontent.com/1167575/223195801-2eb9b417-a868-422f-aa76-942571e31a7e.mp4
-
