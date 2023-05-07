@@ -526,7 +526,7 @@
     <audio id="musicPlayer" style="display:none;"></audio>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadTextOrBlob, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=31";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadTextOrBlob, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=32";
 
       let JSON5;
       (async function() {
@@ -3035,6 +3035,7 @@
           }).then(response => response.json()); // TODO: this returns token counts under result.usage.total_tokens - I should add it to cost usageStats for cost estimation
           if(!result.data) {
             alert("Error:\n" + JSON.stringify(result, null, 2));
+            throw new Error("Error getting text embeddings from OpenAI API");
           }
           let embeddingsForThisBatch = result.data.map((o, i) => {
             return {
@@ -7588,6 +7589,7 @@ OVERALL SUMMARY:
         const originalDbJsonText = await db.export({prettyJson: true}).then(blob => blob.text());
 
         let singleThreadImportId = null;
+        let loadingModal;
 
         try {
           try {
@@ -7609,6 +7611,8 @@ OVERALL SUMMARY:
           let json = JSON.parse(await new Blob([file]).text());
 
           if(!json.data || !json.data.data) return "fail";
+
+          loadingModal = createLoadingModal(`Importing data...<br><span style="font-size:80%; opacity:0.6;">This could take a while if the file is large.</span>`);
 
           // TODO: I should probably convert IDs to UUIDs so I don't need to do this sort of thing, but this is fine for now. Note: If you do this, you need to update the export modal because it currently uses comma-separated IDs
           
@@ -7892,7 +7896,9 @@ OVERALL SUMMARY:
               alreadyGotTextHashModelNamePairs.add(`${e.textHash}-<<-|->>-${e.modelName}`);
               return keep;
             });
-            await db.textEmbeddingCache.bulkAdd(textEmbeddingsToAddToCache);
+            await db.textEmbeddingCache.bulkAdd(textEmbeddingsToAddToCache).catch(e => {
+              alert("Your data was imported, but there was one non-critical error/warning: " + e.message);
+            });
           }
 
           // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
@@ -7903,8 +7909,10 @@ OVERALL SUMMARY:
           downloadTextOrBlob(originalDbJsonText, `opencharacters-export-${yyyymmdd}.json`);
           await delay(1000);
           alert(`There was an error importing your data. Your data has been downloaded as a backup. Please share this error message on Github:\n\n${e.message}\n\n${e.stack}`);
+          if(loadingModal) loadingModal.delete();
           return "fail";
         }
+        if(loadingModal) loadingModal.delete();
         
         await renderCharacterList(); // <-- in case they're currently on the character screen
         await renderThreadList();
