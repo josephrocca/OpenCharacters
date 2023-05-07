@@ -7838,6 +7838,19 @@ OVERALL SUMMARY:
           for(let entry of loreEntriesToAddAfterImport) {
             upgradeLoreFromOldVersion(entry);
           }
+
+          {
+            let entries = json.data.data.find(d => d.tableName === "textEmbeddingCache").rows;
+            // remove duplicate embeddings (duplicates were possible in older versions of the app, but are now disallowed)
+            let seen = new Set();
+            entries = entries.filter(entry => {
+              let key = entry.textHash + "-<<-|->>-" + entry.modelName;
+              if(seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+            json.data.data.find(d => d.tableName === "textEmbeddingCache").rows = entries;
+          }
           
 
           json.data.data.find(d => d.tableName === "characters").rows = importedCharacters;
@@ -7896,9 +7909,7 @@ OVERALL SUMMARY:
               alreadyGotTextHashModelNamePairs.add(`${e.textHash}-<<-|->>-${e.modelName}`);
               return keep;
             });
-            await db.textEmbeddingCache.bulkAdd(textEmbeddingsToAddToCache).catch(e => {
-              alert("Your data was imported, but there was one non-critical error/warning: " + e.message);
-            });
+            await db.textEmbeddingCache.bulkAdd(textEmbeddingsToAddToCache);
           }
 
           // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
