@@ -12,7 +12,8 @@
 * All your data is stored in your browser's local storage (again, there is no server).
 * Share characters with a link - all character data is embedded within the link.
 * Auto-summarization algorithm (for old messages) which extends effective character memory/context size massively.
-* Characters automatically compress messages into 'memories' and retrieve relevant memories based on context (currently in beta, enable in advanced options). You can manually add memories and use them like "lorebook" entries. Can handle as many memories as you need - tens of thousands or more.
+* Characters automatically compress messages into 'memories' and retrieve relevant memories based on context. Can handle as many memories as you need - tens of thousands or more.
+* Add lorebook(s) to your character, and add thread-specific lore with the `/lore` command.
 * Fully extensible with [custom code](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md). See examples [here](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code-examples.md).
   * Give your character access to the internet
   * Create your own slash commands
