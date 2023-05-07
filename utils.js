@@ -423,7 +423,7 @@ export function downloadTextOrBlob(textOrBlob, filename) {
   let blob;
   if(typeof textOrBlob === "string") blob = new Blob([textOrBlob], {type: "application/json"});
   else blob = textOrBlob;
-  
+
   const dataUri = URL.createObjectURL(blob);
   let linkElement = document.createElement("a");
   linkElement.setAttribute("href", dataUri);
@@ -461,6 +461,7 @@ export function createLoadingModal(initialContent, parentElement) {
       display: flex;
       justify-content: center;
       align-items: center;
+      padding: 1rem;
       z-index: 99999999;
     }
     .loadingModalContent-856246272937 {
