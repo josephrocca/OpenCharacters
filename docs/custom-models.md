@@ -60,8 +60,12 @@ There are some services which duplicate OpenAI's APIs *exactly* because they're 
 let proxyHandler = {
   apply: async function (target, thisArg, argumentsList) {
     let url = argumentsList[0];
-    if(url.startsWith("https://api.openai.com")) url = url.replace("api.openai.com", "api.example.com");
-    return target.call(thisArg, url, ...argumentsList.slice(1));
+    let opts = argumentsList[1];
+    if(url.startsWith("https://api.openai.com")) {
+      url = url.replace("api.openai.com", "api.example.com");
+      opts.headers.authorization = `Bearer YOUR_API_KEY_HERE`;
+    }
+    return target.call(thisArg, url, opts, ...argumentsList.slice(2));
   },
 };
 let originalFetch = window.fetch;
