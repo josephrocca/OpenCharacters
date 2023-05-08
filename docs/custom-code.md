@@ -189,7 +189,7 @@ You may want to use GPT/LLM APIs in your message processing code. For example, y
 Use it like this:
 ```js
 let result = await oc.getChatCompletion({
-  messages: [{author:"system", content:"..."},{author:"user", content:"..."}, {author:"ai", content:"..."}, ...],
+  messages: [{author:"system", content:"..."}, {author:"user", content:"..."}, {author:"ai", content:"..."}, ...],
   temperature: 1,
   stopSequences: ["\n"],
   ...
