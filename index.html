@@ -6138,6 +6138,7 @@ OVERALL SUMMARY:
             
             window.oc = {
               thread: Object.seal({
+                name: undefined,
                 messages: [],
                 userCharacter: Object.seal({
                   name: undefined,
@@ -6818,6 +6819,7 @@ OVERALL SUMMARY:
         let formattedMessages = await messagesToCustomCodeFormat({messages});
         let data = {
           thread: {
+            name: thread.name,
             messages: formattedMessages,
             userCharacter: thread.userCharacter,
             systemCharacter: thread.systemCharacter,
@@ -6972,6 +6974,7 @@ OVERALL SUMMARY:
         }
         
         // OTHER THREAD STUFF:
+        let threadListChanged = false;
         {
           let thread = await db.threads.get(threadId);
           let changed = false;
@@ -6995,9 +6998,18 @@ OVERALL SUMMARY:
             thread.messageWrapperStyle = receivedData.thread.messageWrapperStyle;
             changed = true;
           }
+          if(receivedData.thread?.name) {
+            thread.name = receivedData.thread.name;
+            threadListChanged = true;
+            changed = true;
+          }
           if(changed) {
             await db.threads.put(thread);
           }
+        }
+
+        if(threadListChanged) {
+          await renderThreadList();
         }
 
 
