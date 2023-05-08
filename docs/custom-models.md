@@ -43,7 +43,12 @@ The model selector at the top of the thread should show your new model.
 
 ### Alternatives to Basaran
 
-If you know of any API wrappers for Anthropic, Cohere, etc. models that make them OpenAI API-compatible, then please let me know here on Github or on the Discord and I can make sure the custom model system works with them. It should work with any API endpoint that's compatible with OpenAI's completion APIs.
+Some projects to keep an eye on:
+
+ * https://github.com/go-skynet/LocalAI
+ * https://github.com/closedai-project/closedai
+
+Also, if you know of any API wrappers for Anthropic, Cohere, etc. models that make them OpenAI API-compatible, then please let me know here on Github or on the Discord and I can make sure the custom model system works with them. It should work with any API endpoint that's compatible with OpenAI's completion APIs.
 
 Note that, if you do end up finding an API wrapper, you'll still want to use the correct Hugging Face repo name to load the tokenizer - e.g. [`Cohere/Command-nightly`](https://huggingface.co/Cohere/Command-nightly) contains the `tokenizer.json` needed for the Cohere APIs.
 
