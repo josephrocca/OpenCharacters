@@ -55,7 +55,7 @@ Note that, if you do end up finding an API wrapper, you'll still want to use the
 
 ### Swapping out OpenAI API for an exact duplicate/proxy
 
-There are some services which duplicate OpenAI's APIs *exactly* because they're actually just proxying it or have licensed access to OpenAI's models (e.g. Azure). The custom model config doesn't fully support this use case yet, so if you run into any troubles with the custom model configs, you can instead run the following code after page load using a browser extension like GreaseMonkey:
+There are some services which duplicate OpenAI's APIs *exactly* because they're actually just proxying it or have licensed access to OpenAI's models (e.g. Azure). The custom model config doesn't fully support this use case yet, so if you run into any troubles with the custom model configs, you can instead run the following code after page load using the "after page load" custom code box in your user settings:
 ```js
 let proxyHandler = {
   apply: async function (target, thisArg, argumentsList) {
