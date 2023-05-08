@@ -4928,13 +4928,14 @@ OVERALL SUMMARY:
           messageObj.expectsReply = expectsReply;
           
           // if `message` is not a string, it means the bot failed to reply, so delete the message
-          if(typeof message !== "string") {
+          if(typeof message !== "string" && message) { // I've added `&& message` because I think with streaming enabled, it could be an empty string even though there was an error? no harm either way.
             messageEl.remove();
           } else {
             messageObj.message = message;
             result.message = message;
 
             messageObj.id = await addMessageToDb(messageObj);
+            messageEl.dataset.id = messageObj.id;
 
             let shouldScrollDown = messageFeedIsNearBottom();
             await addMessageToFeed(messageObj, {character, inPlaceOf:messageEl})
@@ -7458,15 +7459,17 @@ OVERALL SUMMARY:
         let openAiApiKeyOriginal = (await db.misc.get("openAiApiKey"))?.value || "";
         let customModelConfigsOriginal = (await db.misc.get("customModelConfigs"))?.value || [];
         let showInlineReminderOriginal = (await db.misc.get("showInlineReminder"))?.value || "yes";
+        let customPostPageLoadMainThreadCodeOriginal = (await db.misc.get("customPostPageLoadMainThreadCode"))?.value || "";
         const result = await prompt2({
           userName: {label: "Your name:", type: "textLine", defaultValue: userNameOriginal},
           userAvatarUrl: {label: "Your avatar URL:", type: "textLine", placeholder: "(optional)", defaultValue: userAvatarUrlOriginal},
           openAiApiKey: {label: "OpenAI API secret key (<a href='https://platform.openai.com/account/api-keys' target='_blank'>from here</a>):", type: "textLine", placeholder:"sk-...", defaultValue: openAiApiKeyOriginal},
           showInlineReminder: {hidden:true, label: "Show 'inline' reminder edit button:", type: "select", options:[{value:"yes"}, {value:"no"}], defaultValue: showInlineReminderOriginal},
           customModelConfigs: {hidden:true, cssText:"white-space:pre; font-family:monospace;", label: "Custom model configs (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-models.md' target='_blank'>follow this guide</a>):", type: "text", placeholder:`{name:"...", endpointUrl:"..."}\n{name:"...", endpointUrl:"...", apiKey:"..."}\n...`, defaultValue: customModelConfigsOriginal.map(o => JSON5.stringify(o)).join("\n")},
+          customPostPageLoadMainThreadCode: {hidden:true, cssText:"white-space:pre; font-family:monospace;", label: "This code will be run on this page after page load. You can use it to mod the OpenCharacters UI, or to e.g. <a href='https://gist.github.com/josephrocca/a82216e2f2fdf54ad8dd79dbd4cfd625' target='_blank'>proxy all `fetch` requests</a>, or whatever. Note that there are no backwards-compatibility guarantees on the main thread UI, so your code may break eventually. <b>This code can access all your data</b> - make sure it's from a trustworthy source if you didn't write it yourself (maybe ask GPT-4 what it does if you don't know how to code and are weary). Refresh the page after saving for your code to take effect.", placeholder:"// add code here", type: "text", defaultValue: customPostPageLoadMainThreadCodeOriginal},
         }, {showHiddenInputsText: "show advanced settings"});
         if(!result) return;
-        let { userName, userAvatarUrl, openAiApiKey, customModelConfigs } = result;
+        let { userName, userAvatarUrl, openAiApiKey, customModelConfigs, customPostPageLoadMainThreadCode } = result;
 
         customModelConfigs = customModelConfigs.split("\n").map(s => s.trim()).filter(s => s).map(s => JSON5.parse(s));
         for(let config of customModelConfigs) {
@@ -7516,6 +7519,7 @@ OVERALL SUMMARY:
         await db.misc.put({key: "openAiApiKey", value: openAiApiKey});
         await db.misc.put({key: "customModelConfigs", value: customModelConfigs});
         await db.misc.put({key: "showInlineReminder", value: showInlineReminder});
+        await db.misc.put({key: "customPostPageLoadMainThreadCode", value: customPostPageLoadMainThreadCode});
         
         await updateModelList();
 
@@ -8069,6 +8073,11 @@ OVERALL SUMMARY:
       }
 
       await renderThreadList();
+
+      let customPostPageLoadMainThreadCode = (await db.misc.get("customPostPageLoadMainThreadCode"))?.value || "";
+      if(customPostPageLoadMainThreadCode.trim()) {
+        eval(customPostPageLoadMainThreadCode);
+      }
       
       // if there are no threads, show the character selection screen
       if(!$("#chatThreads .thread")) {
