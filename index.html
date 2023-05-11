@@ -2224,6 +2224,7 @@
             delete character.id;
             delete character.creationTime;
             delete character.lastMessageTime;
+            character.folderName = "";
             for(let key in character.customData) {
               if(key === "PUBLIC") continue; // data within oc.character.customData.PUBLIC is shared within share links - all other data is not
               delete character.customData[key];
@@ -3819,6 +3820,10 @@ OVERALL SUMMARY:
         onProgressMessage({message:"starting..."});
         
         let modelName = thread.modelName;
+
+        if(modelNameOverride) {
+          modelName = modelNameOverride;
+        }
         
         let tokenLimitForSummaryAndMessages = await getTokenLimitForSummaryAndMessages(replyingCharacter, thread);
         
@@ -3942,11 +3947,16 @@ OVERALL SUMMARY:
           m.content = m.content.replace(/<!--hidden-from-ai-start-->.+?<!--hidden-from-ai-end-->/gs, "");
         }
 
-        let postReminderMessageContent = `The next message will be written by ${replyingCharacterName}.`;
+        let postReminderMessageContent;
+        if(replyingCharacterName !== threadCharacterName || new Set(messagesArr.map(m => m.name)).size > 2) {
+          postReminderMessageContent = `The next message will be written by ${replyingCharacterName}.`;
+        }
         if(replyInstruction) {
           postReminderMessageContent += ` The next message should be written according to this instruction: ${replyInstruction}.`;
         }
-        messagesArr.push({role:"system", content:"("+postReminderMessageContent+")"});
+        if(postReminderMessageContent) {
+          messagesArr.push({role:"system", content:"("+postReminderMessageContent+")"});
+        }
 
 
         let memoryIdBatchesUsed = [];
@@ -4361,8 +4371,8 @@ OVERALL SUMMARY:
 
         } else {
 
-          let promptIntro = `Below are some message logs between ${replyingCharacterName} and other characters. Some messages are "System" messages which do not originate from any character.\n\n` + messagesArr[0].content + "\n\nThe chat begins now:\n\n\n\n";
-          let prompt = promptIntro + messagesArr.slice(1).map(m => (m.role=="user"?`[[${m.name ?? userName}]]: `:m.role=="system"?`[[SYSTEM]]: `:`[[${m.name}]]: `)+m.content).join("\n\n") + `\n\n[[${replyingCharacterName}]]:`;
+          let promptIntro = `Below are some message logs between ${replyingCharacterName} and other characters. Some messages are "System" messages which do not originate from any character.\n\nThe chat begins now:\n\n\n\n`;
+          let prompt = promptIntro + messagesArr.map(m => (m.role=="user"?`[[${m.name ?? userName}]]: `:m.role=="system"?`[[SYSTEM]]: `:`[[${m.name}]]: `)+m.content).join("\n\n") + `\n\n[[${replyingCharacterName}]]:`;
           
           // davinci *requires* max_tokens else it defaults to 16 (unlike turbo which defaults to infinity)
           let max_tokens = Math.round((availableModels[modelName].maxSequenceLength - await countTokens(prompt, modelName)) * 0.85); // *0.85 because countTokens is an estimate
@@ -4857,11 +4867,6 @@ OVERALL SUMMARY:
         let botIsCurrentlyReplyingPromiseResolve;
         botIsCurrentlyReplyingPromise = new Promise(r => botIsCurrentlyReplyingPromiseResolve = r);
         try {
-          if(!replyInstruction && instructionForNextBotReply) {
-            replyInstruction = instructionForNextBotReply;
-          }
-          instructionForNextBotReply = null; // TODO: refactor various calls to doBotReplyIfNeeded (e.g. at end of renderMessageFeed) so we don't need it and can easily just pass replyInstruction without all the threading-through-multiple-functions issues
-
           let messageObj = createMessageObj({threadId, message:"...", characterId, instruction:replyInstruction || null});
           
           let messageEl = await addMessageToFeed(messageObj, {character, skipReaderRendering:true});
@@ -5058,12 +5063,14 @@ OVERALL SUMMARY:
             }
 
             if(!signals.stop) { // <-- don't call custom code if they stopped the message
-              // if this is the last message in the feed, then we treat it as an "added" message, rather than an edited message, so we trigger the custom code MessageAdded event:
-              if(isLastMessage) {
-                await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
-              } else {
-                await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageEdited"});
-              }
+              await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageEdited"});
+
+              // // if this is the last message in the feed, then we treat it as an "added" message, rather than an edited message, so we trigger the custom code MessageAdded event:
+              // if(isLastMessage) {
+              //   await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
+              // } else {
+              //   await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageEdited"});
+              // }
             }
           }
         } catch(e) {
@@ -5131,12 +5138,21 @@ OVERALL SUMMARY:
         return el;
       }
 
+      let mousePos = {x:0, y:0};
+      window.addEventListener("mousemove", function(e) {
+        mousePos = {x:e.clientX, y:e.clientY};
+      });
+
       function attachEventHandlersToMessageEl(messageEl, opts={}) {
         const recomputeButton = messageEl.querySelector(".recomputeButton");
 
         messageEl.querySelector(".editButton").addEventListener("click", messageEditButtonClickHandler);
         recomputeButton.addEventListener("click", async function() {
           await recomputeBotReply(messageEl);
+        });
+
+        messageEl.querySelector(".recomputeWithAltModelButton").addEventListener("click", async function() {
+          await recomputeBotReply(messageEl, {modelNameOverride:"text-davinci-003"});
         });
 
 
@@ -5152,7 +5168,6 @@ OVERALL SUMMARY:
           newMessageEl.querySelector(".currentVariantNumber").innerHTML = `${(currentIndex-1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
         });
         messageEl.querySelector(".nextMessageVariantButton").addEventListener("click", async function() {
-          let mousePos = {x:event.clientX, y:event.clientY};
           let message = await db.messages.get(parseInt(messageEl.dataset.id));
           let currentIndex = message.variants.findIndex(v => v===null); // current message is represented with `null` in variant array
           message.variants[currentIndex] = message.message;
@@ -5166,15 +5181,14 @@ OVERALL SUMMARY:
 
         if(!isMobile) { // on mobile the variants container is always visible after user has created at least 1 variant
           let variantsCtnHideTimeout = null;
-          let mousePos; // <-- used for showVariantsSelector
           recomputeButton.addEventListener("mouseenter", function(e) {
-            mousePos = {x:e.clientX, y:e.clientY};
             clearTimeout(variantsCtnHideTimeout);
             let variantsCtn = messageEl.querySelector(".messageVariantsCtn");
             showEl(variantsCtn);
             // hotizontally position variantsCtn so it sits directly above recomputeButton (centered)
             variantsCtn.style.left =  `${recomputeButton.offsetLeft + (recomputeButton.offsetWidth/2) - (variantsCtn.offsetWidth/2)}px`;
           });
+
           recomputeButton.addEventListener("mouseleave", async function() {
             let variantsCtn = messageEl.querySelector(".messageVariantsCtn");
             variantsCtnHideTimeout = setTimeout(() => hideEl(variantsCtn), 500);
@@ -5194,6 +5208,7 @@ OVERALL SUMMARY:
               let variantsCtn = messageEl.querySelector(".messageVariantsCtn");
               let variantsCtnRect = variantsCtn.getBoundingClientRect();
               if(!(mousePos.x >= variantsCtnRect.left && mousePos.x <= variantsCtnRect.right && mousePos.y >= variantsCtnRect.top && mousePos.y <= variantsCtnRect.bottom)) {
+                // debugger;
                 recomputeButton.dispatchEvent(new Event("mouseleave"));
               }
             });
@@ -5354,6 +5369,8 @@ OVERALL SUMMARY:
 
         let characterName = messageObjToCharacterName(messageObj, {thread, character});
 
+        let showRecomputeWithAltButtonModel = (thread.modelName === "gpt-3.5-turbo" || thread.modelName === "gpt-4") && textContainsAsALanguageModelText(messageObj.message + messageObj.variants.join(" "));
+
         tmp.innerHTML = `
           <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-order="${sanitizeHtml(messageObj.order)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" data-hash="${messageObjHash}" style="${sanitizeHtml(wrapperStyle)}; position:relative;">
             <div style="text-align:center;"><button class="showHiddenMessageButton" style="cursor:pointer; font-size:0.65rem;">Show hidden message</button></div>
@@ -5369,7 +5386,8 @@ OVERALL SUMMARY:
                   <div class="editButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
                   <div class="deleteButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
                   <div style="position:relative;display:flex; align-items:center;">
-                    <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: ${character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔁</div>
+                    <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display:${character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔁</div>
+                    <div class="recomputeWithAltModelButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display:${showRecomputeWithAltButtonModel ? "flex" : "none"}; align-items: center; cursor:pointer;" title="Click to recompute with the davinci model">🙄</div>
                     <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); min-width:max-content; ${sanitizeHtml(variantCtnCss)}">
                       <span class="prevMessageVariantButton emojiButton">◄</span>
                       <span class="currentVariantNumber">${sanitizeHtml(currentVariantNumber)}<span style="opacity:0.5">/${sanitizeHtml(messageObj.variants.length)}</span></span>
@@ -5411,6 +5429,15 @@ OVERALL SUMMARY:
           });
         });
         return el;
+      }
+
+      function textContainsAsALanguageModelText(text) {
+        let t = text.toLowerCase();
+        return t.includes("as a language model")
+          || t.includes("trained by openai")
+          || t.includes("as a large language model")
+          || t.includes("language model trained")
+          || /\bas an ai\b/.test(t)
       }
 
       async function messageEditButtonClickHandler(e) {
@@ -5584,8 +5611,6 @@ OVERALL SUMMARY:
           }, 500);
         });
       }
-
-      let instructionForNextBotReply = null; // this is a mildly hacky but convenient global alternative to passing replyInstruction to doBotReplyIfNeeded, because that is triggered in various places so it's hard to "thread" the instruction through the various functions that end up calling it (e.g. triggerMessageActionCustomCodeEvent --> renderMessageThread --> doBotReplyIfNeeded)
 
       async function sendButtonClickHandler() {
         $.sendButton.disabled = true;
@@ -5946,13 +5971,14 @@ OVERALL SUMMARY:
               senderCharacterId = -2;
             }
 
+            let lastLineCommand = null;
             if(senderCharacterId === -1) {
               // user can end message with /ai <instruction> to give instruction to the AI for their reply:
               let messageLines = message.trim().split("\n");
               let lastLine = messageLines.pop();
-              if(lastLine?.startsWith("/ai ")) {
+              if(lastLine?.startsWith("/ai ") || lastLine?.startsWith("/user ")) {
                 message = messageLines.join("\n");
-                instructionForNextBotReply = lastLine.replace(/^\/ai /, "");
+                lastLineCommand = lastLine;
               }
             }
 
@@ -5969,8 +5995,14 @@ OVERALL SUMMARY:
             
             $.messageInput.value = "";
             $.messageInput.style.height = "";
-            await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
-            await doBotReplyIfNeeded(); // note that we can't just pass the replyInstruction here because doBotReplyIfNeeded can get called in the process of executing triggerMessageActionCustomCodeEvent, so we use the global instructionForNextBotReply instead
+            await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded", triggerBotReply:false});
+
+            if(lastLineCommand) {
+              $.messageInput.value = lastLineCommand;
+              await sendButtonClickHandler();
+            } else {
+              await doBotReplyIfNeeded(); // note that we can't just pass the replyInstruction here because doBotReplyIfNeeded can get called in the process of executing triggerMessageActionCustomCodeEvent, so we use the global instructionForNextBotReply instead
+            }
           }
         } catch(e) {
           console.error(e);
@@ -6002,6 +6034,13 @@ OVERALL SUMMARY:
 
 
       } 
+
+      async function queueUpAutoReplies(replies) {
+        for(let reply of replies) {
+          $.messageInput.value = reply;
+          await sendButtonClickHandler();
+        }
+      }
 
       function getDateTimeString(utcMs) {
         let now = new Date();
@@ -7548,6 +7587,7 @@ OVERALL SUMMARY:
         delete char.creationTime;
         delete char.lastMessageTime;
         delete char.uuid;
+        delete char.folderPath;
         for(let key in char) {
           if(key.startsWith("$")) { // special `dexie-export-import` properties start with `$` (only exists in exported json data)
             delete char[key];
@@ -8090,20 +8130,6 @@ OVERALL SUMMARY:
       if(customPostPageLoadMainThreadCode.trim()) {
         eval(customPostPageLoadMainThreadCode);
       }
-      
-      // if there are no threads, show the character selection screen
-      if(!$("#chatThreads .thread")) {
-        $.newThreadButton.click();
-      } else {
-        // otherwise click the most recently-interacted-with thread
-        let allThreads = await db.threads.orderBy("lastViewTime").reverse().toArray();
-        let thread = allThreads[0];
-        $.chatThreads.dataset.currentFolderPath = thread.folderPath;
-        await renderThreadList();
-        let el = $.chatThreads.querySelector(`.thread[data-thread-id="${thread.id}"]`);
-        if(!el) el = $.chatThreads.querySelector(`.thread`); // in case the 'last viewed' thread is in a different folder to the 'last messaged' thread (renderThreadList shows last messaged thread)
-        el.click();
-      }
 
       // parse url hash as json
       let ignoreHashChange = false;
@@ -8144,17 +8170,35 @@ OVERALL SUMMARY:
               await createNewThreadWithCharacterId(newCharacter.id);
             }
           }
+          ignoreHashChange = true;
+          window.location.hash = "";
+          ignoreHashChange = false;
+          return true;
+        } else {
+          return false;
         }
-        ignoreHashChange = true;
-        window.location.hash = "";
-        ignoreHashChange = false;
       }
       window.addEventListener('hashchange', (event) => {
         if(!ignoreHashChange) {
           checkForHashCommand();
         }
       });
-      checkForHashCommand();
+
+      if(!checkForHashCommand()) {
+        // if there are no threads, show the character selection screen
+        if(!$("#chatThreads .thread")) {
+          $.newThreadButton.click();
+        } else {
+          // otherwise click the most recently-interacted-with thread
+          let allThreads = await db.threads.orderBy("lastViewTime").reverse().toArray();
+          let thread = allThreads[0];
+          $.chatThreads.dataset.currentFolderPath = thread.folderPath;
+          await renderThreadList();
+          let el = $.chatThreads.querySelector(`.thread[data-thread-id="${thread.id}"]`);
+          if(!el) el = $.chatThreads.querySelector(`.thread`); // in case the 'last viewed' thread is in a different folder to the 'last messaged' thread (renderThreadList shows last messaged thread)
+          el.click();
+        }
+      }
 
       try {
         let messageCount = await db.messages.count();
