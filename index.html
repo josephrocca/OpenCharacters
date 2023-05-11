@@ -138,8 +138,11 @@
         position: relative;
         user-select:none;
       }
-      #chatThreads .thread:not(:first-child), #chatThreads .threadFolder {
+      #chatThreads .thread, #chatThreads .threadFolder {
         margin-top: 0.5rem;
+      }
+      #chatThreads .thread:first-child, #chatThreads .threadFolder:first-child {
+        margin-top: 0;
       }
 
       #chatThreads .threadFolder {
