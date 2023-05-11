@@ -1083,16 +1083,16 @@
       ];
       
       async function updateModelList() {
-        console.log("updateModelList");
+        // console.log("updateModelList");
         let modelsArr = broadlyAvailableModels.slice(0);
         let customModelConfigs = (await db.misc.get("customModelConfigs"))?.value || [];
-        console.log("updateModelList", customModelConfigs);
+        // console.log("updateModelList", customModelConfigs);
         modelsArr.push(...customModelConfigs);
         availableModels = {};
         for(let m of modelsArr) {
           availableModels[m.name] = m;
         }
-        console.log("updateModelList", availableModels);
+        // console.log("updateModelList", availableModels);
         let currentValue = $.threadModelSelector;
         $.threadModelSelector.innerHTML = modelsArr.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => `<option value="${m.name}" ${m.name === currentValue ? "selected" : ""}>${m.name}</option>`).join("");
       }
@@ -8187,7 +8187,7 @@ OVERALL SUMMARY:
         }
       });
 
-      if(!checkForHashCommand()) {
+      if(await checkForHashCommand() === false) {
         // if there are no threads, show the character selection screen
         if(!$("#chatThreads .thread")) {
           $.newThreadButton.click();
