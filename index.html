@@ -5675,6 +5675,9 @@ OVERALL SUMMARY:
                 characterToReplyWith = await db.characters.get(characterId);
                 replyInstruction = replyInstruction.replace(/^@([^#]+)#([0-9]+)/, "").trim() || null;
               }
+              if(!characterToReplyWith) {
+                characterToReplyWith = await getUserCharacterObj(threadId);
+              }
               await doBotReplyInPlaceOfUser({characterToReplyWith, replyInstruction, expectsReply:false});
             }
           } else if(message.trim() === "/sum") {
@@ -7081,10 +7084,8 @@ OVERALL SUMMARY:
         let messageObj = createMessageObj({threadId, message:"...", characterId:-1, instruction:replyInstruction});
         messageObj.name = characterToReplyWith.name;
         messageObj.avatar = structuredClone(characterToReplyWith.avatar);
-
-        let character = await getUserCharacterObj(threadId); // <-- this is the 'user character', not the characterToReplyWith because the character is "typing the reply", but it's as if the user wrote it. Might change this later when I allow multiple characters per thread.
         
-        let messageEl = await addMessageToFeed(messageObj, {character, skipReaderRendering:true});
+        let messageEl = await addMessageToFeed(messageObj, {character:characterToReplyWith, skipReaderRendering:true});
         messageEl.querySelector(".messageText").innerHTML = createPaddedTypingIndicatorHtml();
         
         if(!signals) signals = {stop:false, wasDeleted:false};
@@ -7097,14 +7098,6 @@ OVERALL SUMMARY:
 
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
         messages.sort((a,b) => a.order - b.order);
-        
-        // characterToReplyWith is replying *on behalf of the user*, so we replace *user* message ids (characterId==-1) with the id of characterToReplyWith.
-        // this is needed because of the aiCharacter/userCharacter approach in getBotReply
-        for(let message of messages) {
-          if(message.characterId === -1) {
-            message.characterId = characterToReplyWith.id;
-          }
-        }
 
         $.statusNotifier.innerHTML = "<button style='font-size: 0.9rem;'>🛑 stop response</button>";
         $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
@@ -7125,7 +7118,6 @@ OVERALL SUMMARY:
           streamingChunkCount++;
         }
         
-        // the "aiCharacter" is the one that replies 
         const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
         let {message, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, replyingCharacter:characterToReplyWith, replyInstruction, threadId, onProgressMessage, onStreamingReplyChunk, signals}).catch(e => {
           if(e.name !== "AbortError") {
@@ -7161,7 +7153,7 @@ OVERALL SUMMARY:
           messageObj.id = await addMessageToDb(messageObj);
 
           let shouldScrollDown = messageFeedIsNearBottom();
-          await addMessageToFeed(messageObj, {character, inPlaceOf:messageEl});
+          await addMessageToFeed(messageObj, {character:characterToReplyWith, inPlaceOf:messageEl});
           if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
           await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
@@ -8176,9 +8168,9 @@ OVERALL SUMMARY:
           ignoreHashChange = true;
           window.location.hash = "";
           ignoreHashChange = false;
-          return true;
+          return "addCharacter";
         } else {
-          return false;
+          return null;
         }
       }
       window.addEventListener('hashchange', (event) => {
@@ -8187,7 +8179,7 @@ OVERALL SUMMARY:
         }
       });
 
-      if(await checkForHashCommand() === false) {
+      if(await checkForHashCommand() === null) {
         // if there are no threads, show the character selection screen
         if(!$("#chatThreads .thread")) {
           $.newThreadButton.click();
