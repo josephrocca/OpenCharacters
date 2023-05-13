@@ -626,8 +626,12 @@
         }
       }
 
-      const isMobile = window.innerWidth < 700; // TODO: improve this heuristic. this isn't just about screen width - it's also about touch screens (no pointer hover events).
-      if(isMobile) {
+      function isMobile() {
+        // Check if the user agent string contains 'Mobile' or 'Tablet'
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(navigator.userAgent);
+      }
+
+      if(isMobile()) {
         document.body.classList.add("isMobile"); // to use in CSS selectors
       }
 
@@ -636,7 +640,7 @@
         showEl($.leftColumn);
         document.querySelectorAll(".openLeftColumnButton").forEach(el => hideEl(el));
         showEl($.closeLeftColumnButton);
-        if(isMobile) {
+        if(isMobile()) {
           showEl($.middleColumnShadowOverlay);
         }
       }
@@ -644,7 +648,7 @@
         hideEl($.leftColumn);
         document.querySelectorAll(".openLeftColumnButton").forEach(el => showEl(el));
         hideEl($.closeLeftColumnButton);
-        if(isMobile) {
+        if(isMobile()) {
           hideEl($.middleColumnShadowOverlay);
         }
       }
@@ -655,7 +659,7 @@
           openLeftColumn();
         });
       });
-      if(isMobile) {
+      if(isMobile()) {
         closeLeftColumn();
         // if they click anywhere in the middle column, close the menu
         $.middleColumnShadowOverlay.addEventListener("click", (e) => {
@@ -709,7 +713,7 @@
         }, { passive: true });
       }
 
-      if(isMobile) {
+      if(isMobile()) {
         $.customCodeIframeHorizontalResizeBar.style.display = "none";
         $.customCodeColumn.style.width = "100%";
 
@@ -2496,7 +2500,7 @@
         document.querySelectorAll("#middleColumn > .middleColumnScreen").forEach(el => hideEl(el));
         showEl($.chatInterface);
 
-        if(isMobile) {
+        if(isMobile()) {
           closeLeftColumn();
         }
 
@@ -5054,7 +5058,7 @@ OVERALL SUMMARY:
             let currentVariantNumber = messageObj.variants.findIndex(v => v===null) + 1;
             newMessageEl.querySelector(".currentVariantNumber").innerHTML = `${currentVariantNumber}<span style="opacity:0.5">/${messageObj.variants.length}</span>`;
             
-            if(isMobile) showEl(newMessageEl.querySelector(".messageVariantsCtn"));
+            if(isMobile()) showEl(newMessageEl.querySelector(".messageVariantsCtn"));
 
             // update db with bot's reply
             await db.messages.put(messageObj);
@@ -5321,7 +5325,7 @@ OVERALL SUMMARY:
         let currentVariantNumber = messageObj.variants.findIndex(v => v === null) + 1;
 
         let variantCtnCss;
-        if(isMobile) {
+        if(isMobile()) {
           // on mobile we show when there are multiple variants
           if(messageObj.variants.length >= 2) {
             variantCtnCss = "margin-left:1rem;";
@@ -6701,7 +6705,7 @@ OVERALL SUMMARY:
           if(typeof width === "number") width = width+"px";
           $.customCodeIframeCtn.style.width = width;
           $.customCodeColumn.style.display = "flex";
-          if(isMobile) {
+          if(isMobile()) {
             $.toggleRightColumnButton.style.display = "flex";
             $.customCodeIframeCtn.style.width = "100%";
             if($.rightColumn.dataset.visible === "no") {
@@ -6709,7 +6713,7 @@ OVERALL SUMMARY:
             }
           }
         } else {
-          if(isMobile) {
+          if(isMobile()) {
             $.toggleRightColumnButton.style.display = "none";
             if($.rightColumn.dataset.visible === "yes") {
               $.toggleRightColumnButton.click();
@@ -7294,7 +7298,7 @@ OVERALL SUMMARY:
         document.querySelectorAll("#chatThreads .thread").forEach(el => el.classList.remove("selected"));
         await renderCharacterList();
         
-        if(isMobile) {
+        if(isMobile()) {
           closeLeftColumn();
         } else {
           hideEl($.characterSelectionOpenLeftColumnButton);
@@ -7327,9 +7331,9 @@ OVERALL SUMMARY:
         let height = Math.min(window.innerHeight*0.75, $.messageInput.scrollHeight);
         $.messageInput.style.height = height + "px";
       }
-
+      
       $.messageInput.addEventListener("keydown", async e => {
-        if(isMobile) return; // on mobile, if enter/returns triggers send, then people can't add linebreaks
+        if(isMobile()) return; // on mobile, if enter/returns triggers send, then people can't add linebreaks
 
         if(e.key === "Enter") {
           if(e.shiftKey) {
