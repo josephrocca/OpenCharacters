@@ -5480,11 +5480,14 @@ OVERALL SUMMARY:
           else opts.insertAfter = messageEl;
 
           await addMessageToFeed(messageObj, opts);
+
+          await triggerMessageActionCustomCodeEvent({threadId, eventData:{messageId:messageObj.id}, eventName:"MessageInserted"});
         }
         insertNewMessageEl.querySelector(".insertAbove").addEventListener("click", insertMessageHandler.bind(null, "above"));
         insertNewMessageEl.querySelector(".insertBelow").addEventListener("click", insertMessageHandler.bind(null, "below"));
         
         let promptOpts = {
+          // CAUTION: All non-none types must have a defaultValue, since we use it for change detection, below
           message: {label: "message:", type: "text", height:"fit-content", defaultValue: originalMessage.message, focus:true},
           instruction: {hidden:!!!originalMessage.instruction, label: "instruction:", type: "text", minHeight:"2rem", defaultValue: originalMessage.instruction || ""},
           hiddenFrom: {hidden:true, label: "hidden from:", type: "select", options:[{value:"user"}, {value:"ai"}, {content:"both", value:"user,ai"}, {content:"neither", value:""}], defaultValue: originalMessage.hiddenFrom.join(",")},
@@ -5492,6 +5495,17 @@ OVERALL SUMMARY:
         };
         const result = await prompt2(promptOpts, {submitButtonText:"save"});
         if(!result) return;
+
+        let noChangesMade = true;
+        for(let key of Object.keys(result)) {
+          if(promptOpts[key].type === "none") continue;
+
+          if(result[key] !== promptOpts[key].defaultValue) {
+            noChangesMade = false;
+            break;
+          }
+        }
+        if(noChangesMade) return;
 
         result.hiddenFrom = result.hiddenFrom.split(",").filter(x => x);
         if(!result.instruction || !result.instruction.trim()) result.instruction = null;
@@ -6173,6 +6187,7 @@ OVERALL SUMMARY:
               messageadded: [],
               messageedited: [],
               messagedeleted: [],
+              messageinserted: [],
               streamingmessagechunk: [],
               streamingmessage: [],
             };
@@ -6496,7 +6511,7 @@ OVERALL SUMMARY:
               if(e.data.type === "event") {
                 let eventName = e.data.eventName.toLowerCase();
                 
-                if(eventName === "messageadded" || eventName === "messageedited"  || eventName === "messagedeleted") {
+                if(eventName === "messageadded" || eventName === "messageedited"  || eventName === "messagedeleted" || eventName === "messageinserted") {
                   currentlyProcessingMessageActionHandlers = true; // <-- we use this variable to pause the normal data update polling.
                   let returnData = null;
                   try {
