@@ -7962,9 +7962,7 @@ OVERALL SUMMARY:
               alreadyGotTextHashModelNamePairs.add(`${e.textHash}-<<-|->>-${e.modelName}`);
               return keep;
             });
-            await db.textEmbeddingCache.bulkAdd(textEmbeddingsToAddToCache).catch(e => {
-              console.warn("Some textEmbeddingCache entries were duplicates somehow? Not a big deal since this is just a cache, but it is a bug.", e);
-            })
+            await db.textEmbeddingCache.bulkAdd(textEmbeddingsToAddToCache);
           }
 
           // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
