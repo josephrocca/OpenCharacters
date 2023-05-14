@@ -1165,9 +1165,12 @@
           keepCharacterCheck = (id) => keepCharacterIds.includes(id);
         }
 
+        
         if(result.exportUserData === "no") {
           json.data.data.find(d => d.tableName === "misc").rows = [];
         }
+        // remove datesApplicationWasUsedInThisBrowser because it's browser-specific 
+        json.data.data.find(d => d.tableName === "misc").rows = json.data.data.find(d => d.tableName === "misc").rows.filter(r => r.key !== "datesApplicationWasUsedInThisBrowser");
 
         let threads = json.data.data.find(d => d.tableName === "threads");
         threads.rows = threads.rows.filter(t => keepThreadCheck(t.id));
@@ -4008,6 +4011,10 @@ OVERALL SUMMARY:
             threadId, // just used to track token usage
             signals,
           });
+          if(!rawResult) {
+            alert("There was an error getting the memory search queries. Please try again.");
+            return {};
+          }
 
           if(signals.stop === true) return {};
 
@@ -5640,6 +5647,13 @@ OVERALL SUMMARY:
         let characterId = thread.characterId;
         let threadCharacter = await db.characters.get(characterId);
         let message = $.messageInput.value;
+
+        // This use used to detect if the browser is not allowing persistent storage, even if the user has been using the app for quite a while.
+        // Can't just use e.g. message count because user could have just imported a bunch of messages.
+        let datesApplicationWasUsedInThisBrowser = (await db.misc.get("datesApplicationWasUsedInThisBrowser"))?.value ?? [];
+        datesApplicationWasUsedInThisBrowser.push(new Date().toISOString().slice(0,10));
+        datesApplicationWasUsedInThisBrowser = [...new Set(datesApplicationWasUsedInThisBrowser)];
+        await db.misc.put({key: "datesApplicationWasUsedInThisBrowser", value: datesApplicationWasUsedInThisBrowser});
 
         // if user sent message history contains message, move it to the end, otherwise add it to the end:
         let userMessageHistoryEntry = thread.userMessagesSentHistory.find(x => x.text === message);
@@ -8267,17 +8281,18 @@ OVERALL SUMMARY:
       }
 
       try {
-        let messageCount = await db.messages.count();
-        if(messageCount > 100) {
-          await navigator.storage.persist().then(async (persistent) => {
-            if(persistent) {
-              console.log("Storage will not be cleared except by explicit user action.");
-            } else {
-              console.warn("Storage may be cleared by the browser under storage pressure.");
-              alert("Your browser is not allowing OpenCharacters to store data in a way that is 100% permanent. Your browser may clear your OpenCharacters data if your hard drive is nearly full. The browser will eventually grant permission once it recognises that you are a regular user of this site (i.e. once you demonstrate that you trust this site), but until then, please be sure to backup/export your data often. If you're a regular user of OpenCharacters and you're still seeing this message, please submit a bug report on our Discord server.");
+        await navigator.storage.persist().then(async (persistent) => {
+          if(persistent) {
+            console.log("Storage will not be cleared except by explicit user action.");
+          } else {
+            console.warn("Storage may be cleared by the browser under storage pressure.");
+            // Can't just use e.g. message count because they could have just imported a bunch of messages.
+            let datesApplicationWasUsedInThisBrowser = (await db.misc.get("datesApplicationWasUsedInThisBrowser"))?.value ?? [];
+            if(datesApplicationWasUsedInThisBrowser.length > 10) {
+              alert("Your browser is not allowing OpenCharacters to store data in a way that is 100% permanent. Your browser may clear your OpenCharacters data if your hard drive is nearly full. The browser will eventually grant permission once it recognises that you are a regular user of this site (i.e. once you demonstrate that you trust this site), but until then, please be sure to backup/export your data often. If you're a regular user of OpenCharacters and you're still seeing this message after a week or so of use, please submit a bug report on our Discord server."); 
             }
-          });
-        }
+          }
+        });
       } catch(e) {
         console.error(e);
       }
