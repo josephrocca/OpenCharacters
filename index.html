@@ -7895,6 +7895,9 @@ OVERALL SUMMARY:
           {
             let existingEntries = await db.textEmbeddingCache.toArray();
             let entries = json.data.data.find(d => d.tableName === "textEmbeddingCache").rows;
+            for(let e of entries) {
+              delete e.id;
+            }
             // remove duplicate embeddings (duplicates were possible in older versions of the app, but are now disallowed)
             let seen = new Set(existingEntries.map(entry => entry.textHash + "-<<-|->>-" + entry.modelName));
             entries = entries.filter(entry => {
