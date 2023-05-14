@@ -7954,7 +7954,7 @@ OVERALL SUMMARY:
                 });
               }
             }
-            let alreadyGotEmbeddings = await db.textEmbeddingCache.where("textHash").anyOf(importedMemoryAndLoreTextHashes).toArray();
+            let alreadyGotEmbeddings = await db.textEmbeddingCache.toArray();
             let alreadyGotTextHashModelNamePairs = new Set(alreadyGotEmbeddings.map(e => `${e.textHash}-<<-|->>-${e.modelName}`));
             
             textEmbeddingsToAddToCache = textEmbeddingsToAddToCache.filter(e => {
