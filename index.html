@@ -392,7 +392,13 @@
         background:var(--button-bg-hover);
       }
 
-
+      #userMessagesSentHistoryCtn {
+        margin-bottom:0.25rem;
+        position:relative;
+      }
+      #userMessagesSentHistoryCtn:empty {
+        display: none;
+      }
       #userMessagesSentHistoryCtn .historyItem {
         cursor: pointer;
         padding: 0.25rem;
@@ -422,6 +428,18 @@
       body:not(.isMobile) #userMessagesSentHistoryCtn .historyItem .pinButton:hover,
       body:not(.isMobile) #userMessagesSentHistoryCtn .historyItem .deleteButton:hover {
         opacity: 1;
+      }
+
+      #shortcutButtonsCtn {
+        margin-bottom:0.25rem;
+        position:relative;
+      }
+      #shortcutButtonsCtn:empty {
+        display:none;
+      }
+
+      #shortcutButtonsCtn button:not(:first-child) {
+        margin-left:0.25rem;
       }
 
       /* typing indicator from https://codepen.io/arthak/pen/rmqvgo */
@@ -503,12 +521,18 @@
               <!-- <div style="display:flex;margin-bottom: 0.25rem;">
                 <button id="editReminderMessageButton" style="font-size:0.7rem;">✏️ reminder msg</button>
               </div> -->
-              <div id="userMessagesSentHistoryCtn" style="margin-bottom:0.25rem; position:relative;"></div>
+              <div id="userMessagesSentHistoryCtn"></div>
+              <div id="shortcutButtonsCtn"></div>
               <div style="display:flex;">
                 <textarea id="messageInput" style="flex-grow:1; min-height:4rem; font-size:100%;" title="commands:&#10;/ai - prompt a reply from ai&#10;/ai &lt;instruction&gt; - prompt reply with instruction&#10;/ai @CharName#123 &lt;instruction&gt; - prompt reply with another character (ID=123)&#10;/user &lt;instruction&gt; - generate a user reply&#10;/sys &lt;message&gt; - reply as system&#10;/sum - open summary editor&#10;/mem - open memory editor&#10;/lore - open lore editor&#10;/lore &lt;text&gt; - add a lore entry&#10;/name &lt;name&gt; - set your name for this thread&#10;/avatar &lt;url&gt; - set your avatar image for this thread&#10;/import - add chat messages in bulk&#10;&#10;• You can add '/ai &lt;instruction&gt;' as the final line in your normal messages to instruct AI for its reply.&#10;• Double-click this text box to show input history"></textarea>
                 <div style="display:flex; flex-direction:column; margin-left:0.25rem;">
                   <button id="sendButton" style="min-width:80px; flex-grow:1;">send</button>
-                  <button id="replyWithButton" onclick="alert(`The 'reply with' feature has changed, and this button will be removed soon. To reply with a certain character, type this in the chat:\n\n/ai @CharName#123 <instruction>\n\nwhere '123' is the character ID. The instruction is used to control how/what the AI writes, but it's optional. Note that once you've sent a message like that, you can double-tap the input text box and you'll see the message in your input history, and you can pin it so you don't need to type it each time.\n\nIf you want the old 'reply with' functionality back, please send a message on the #feature-requests channel on our Discord server detailing your use case.`)" style="min-width:80px; margin-top:0.25rem;">reply with…</button>
+                  <div style="position:relative;">
+                    <div id="threadOptionsPopup" style="position:absolute; display:none; padding:0.5rem; background:var(--background); border-radius:var(--border-radius); width:max-content; right:0; bottom:0; border:1px solid var(--border-color);">
+                      <button id="addShortcutButton">✨ add shortcut</button>
+                    </div>
+                  </div>
+                  <button id="threadOptionsButton" style="min-width:80px; margin-top:0.25rem;">options</button>
                 </div>
               </div>
             </div>
@@ -529,7 +553,7 @@
     <audio id="musicPlayer" style="display:none;"></audio>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadTextOrBlob, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet } from "./utils.js?v=32";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadTextOrBlob, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet, htmlToElement } from "./utils.js?v=32";
 
       let JSON5;
       (async function() {
@@ -744,7 +768,7 @@
 
 
       const dbName = "chatbot-ui-v1";
-      const dbVersion = 77;
+      const dbVersion = 78;
 
       let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
       let dbLoadingModal;
@@ -965,6 +989,7 @@
         if(thread.messageWrapperStyle === undefined) thread.messageWrapperStyle = "";
         if(thread.userMessagesSentHistory === undefined) thread.userMessagesSentHistory = [];
         if(thread.unsentMessageText === undefined) thread.unsentMessageText = "";
+        if(thread.shortcutButtons === undefined) thread.shortcutButtons = [];
         // WARNING: If you add something here, you may need to edit:
         // - addThread
         // - getThreadJSONById
@@ -2519,11 +2544,61 @@
 
         await updateCustomCodeIframeVisibility();
 
+        await renderShortcutButtons(thread);
+
         $.messageInput.value = thread.unsentMessageText;
 
         clearTimeout(loadingModalCreationTimeout);
         if(threadLoadingModal) threadLoadingModal.delete();
 
+      }
+
+      async function renderShortcutButtons(thread=null) {
+        if(!thread) {
+          thread = await db.threads.get(activeThreadId);
+        }
+        shortcutButtonsCtn.innerHTML = "";
+        for(let shortcut of thread.shortcutButtons) {
+          let shortcutBtn = htmlToElement(`<button>${shortcut.name}</button>`);
+          shortcutButtonsCtn.appendChild(shortcutBtn);
+          shortcutBtn.addEventListener("click", async function() {
+            if(shortcut.type === "message") {
+              $.messageInput.value = shortcut.message;
+              if(shortcut.autoSend) {
+                await sendButtonClickHandler();
+              }
+            }
+          });
+        }
+        if(shortcutButtonsCtn.innerHTML !== "") {
+          let bulkEditButton = htmlToElement(`<button>✏️</button>`);
+          bulkEditButton.addEventListener("click", async function() {
+            let shortcutsInTextFormat = thread.shortcutButtons.map(s => `@name=${s.name}\n@message=${s.message}\n@autoSend=${s.autoSend ? "yes" : "no"}`).join("\n\n");
+            let result = await prompt2({
+              shortcutsInTextFormat: {label: "Bulk-edit shortcuts:", type: "text", defaultValue:shortcutsInTextFormat, height:"fit-content"},
+            });
+            if(!result) return;
+
+            // parse shortcuts:
+            const regex = /(?:^|\n+)@name=(.*?)\n@message=(.*?)\n@autoSend=(yes|no)/gs;
+            let matches;
+            let parsedShortcuts = [];
+
+            while((matches = regex.exec(result.shortcutsInTextFormat))) {
+              let shortcut = {
+                name: matches[1],
+                message: matches[2],
+                autoSend: matches[3] === 'yes',
+                type: "message",
+              };
+              parsedShortcuts.push(shortcut);
+            }
+            await db.threads.where({id:thread.id}).modify({shortcutButtons:parsedShortcuts});
+            thread.shortcutButtons = parsedShortcuts;
+            await renderShortcutButtons(thread);
+          });
+          shortcutButtonsCtn.insertBefore(bulkEditButton, shortcutButtonsCtn.firstChild);
+        }
       }
 
       // NOTE: spaces aren't actually allowed by OpenAI - I replace them with underscores in prepareMessagesForBot
@@ -7228,6 +7303,34 @@ OVERALL SUMMARY:
         }
         return true;
       }
+
+      $.threadOptionsButton.addEventListener("click", async function() {
+        showEl($.threadOptionsPopup);
+      });
+
+      // if user clicks anywhere other than $.threadOptionsPopup, hide it:
+      window.addEventListener("click", function(e) {
+        if(!$.threadOptionsPopup.contains(e.target) && !$.threadOptionsButton.contains(e.target)) {
+          hideEl($.threadOptionsPopup);
+        }
+      });
+
+      $.addShortcutButton.addEventListener("click", async function() {
+        let result = await prompt2({
+          intro: {html: `<div style="font-size: 0.85rem;margin-bottom: 0.5rem;">Shortcuts are buttons that appear above the text box which can be used to easily/quickly send a commonly-used message.</div>`, type:"none"},
+          name: {label: "Shortcut name:", type: "textLine", placeholder:"user reply"},
+          message: {label: "Message text:", type: "textLine", placeholder:"/user write an intersting first-person reply"},
+          autoSend: {label: "Auto-send?", type: "select", options:[{content:"Yes, immediately send", value:"yes"}, {content: "No, just put it in the text area", value:"no"}]},
+        });
+        if(!result) return;
+        let {name, message, autoSend} = result;
+        autoSend = autoSend === "yes";
+        let shortcut = {name, message, autoSend, type:"message"};
+        let thread = await db.threads.get(activeThreadId);
+        thread.shortcutButtons.push(shortcut);
+        await db.threads.put(thread);
+        await renderShortcutButtons(thread);
+      });
 
       // let alreadyAutoReplying = false;
       // $.replyWithButton.addEventListener("click", async function() {
