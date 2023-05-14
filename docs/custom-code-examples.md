@@ -195,7 +195,7 @@ Also see the "starter character" called "Python Coder".
 
 # Let your character see the contents of URLs that are in your messages
 
-You'll likely want to edit this example a bit, but it works, and it's enough to give you an idea:
+This will automatically download the content of any URLs that are in your messages, and put that content within a (hidden-from-user) message that the AI is able to see.
 
 ```js
 oc.thread.on("MessageAdded", async function () {
@@ -203,16 +203,18 @@ oc.thread.on("MessageAdded", async function () {
   let lastMessage = messages.at(-1);
   if(lastMessage.author === "user") {
     let urlsInLastMessage = [...lastMessage.content.matchAll(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g)].map(m => m[0]);
-    if(urlsInLastMessage.length === 0) return messages;
-    // just grab contents for last URL
-    let html = await fetch(urlsInLastMessage.at(-1)).then(r => r.text());
-    let doc = new DOMParser().parseFromString(html, "text/html");
-    let text = [...doc.querySelectorAll("h1,h2,h3,h4,p,pre")].map(el => el.textContent).join("\n");
-    text = text.slice(0, 1000); // only grab first 1000 characters
+    if(urlsInLastMessage.length === 0) return;
+    if(!window.Readability) window.Readability = await import("https://esm.sh/@mozilla/readability@0.4.4?no-check").then(m => m.Readability);
+    let url = urlsInLastMessage.at(-1); // we use the last URL in the message, if there are multiple
+    let text = await fetch(url).then(r => r.text());
+    let doc = new DOMParser().parseFromString(text, "text/html");
+    let article = new Readability(doc).parse();
+    let output = `# ${article.title || "(no page title)"}\n\n${article.textContent}`;
+    output = output.slice(0, 5000); // <-- grab only the first 5000 characters
     messages.push({
       author: "system",
       hiddenFrom: ["user"], // hide the message from user so it doesn't get in the way of the conversation
-      content: "Here's the content of the webpage that was linked in the previous message: \n\n"+text,
+      content: "Here's the content of the webpage that was linked in the previous message: \n\n"+output,
     });
   }
 });
