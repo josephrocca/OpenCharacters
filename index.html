@@ -5499,6 +5499,7 @@ OVERALL SUMMARY:
 
         result.hiddenFrom = result.hiddenFrom.split(",").filter(x => x);
         if(!result.instruction || !result.instruction.trim()) result.instruction = null;
+
         await db.messages.update(messageId, result);
 
         let newMessage = await db.messages.get(messageId);
@@ -7962,7 +7963,9 @@ OVERALL SUMMARY:
               alreadyGotTextHashModelNamePairs.add(`${e.textHash}-<<-|->>-${e.modelName}`);
               return keep;
             });
-            await db.textEmbeddingCache.bulkAdd(textEmbeddingsToAddToCache);
+            await db.textEmbeddingCache.bulkAdd(textEmbeddingsToAddToCache).catch(e => {
+              console.error("Something went wrong while adding text embeddings to cache. Not a critical error, but does indicate a bug in above code:", e);
+            });
           }
 
           // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
