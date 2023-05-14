@@ -744,7 +744,7 @@
 
 
       const dbName = "chatbot-ui-v1";
-      const dbVersion = 75;
+      const dbVersion = 76;
 
       let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
       let dbLoadingModal;
@@ -783,7 +783,7 @@
         threads: "++id,name,characterId,creationTime,lastMessageTime,lastViewTime",
         messages: "++id,threadId,characterId,creationTime,order", // characterId is -1 for user, and for system it is -2.
         misc: "key", // key=>value
-        summaries: "hash,threadId", // we keep threadId so when we delete threads, we can delete the associated summaries. we also need it for grabbing summaries for the edit interface.
+        summaries: "hash,threadId,[hash+threadId]", // we keep threadId so when we delete threads, we can delete the associated summaries. we also need it for grabbing summaries for the edit interface.
         memories: "++id,[summaryHash+threadId],[characterId+status],[threadId+status],[threadId+index],threadId", // memories are associated with a summary hash because they are computed alongside the summary. We need to track the hash so that if earlier messages are edited (and therefore the summaries need to be recomputed), we know to only consider "valid"/"current" the memories that are associated with currently-"used". The "type" property is used to track the "currentness", and also to track whether a memory was manually added by the user (in which case it is *always* considered valid)
         lore: "++id,bookId,bookUrl",
         textEmbeddingCache: "++id,textHash,&[textHash+modelName]",
@@ -3340,8 +3340,8 @@ OVERALL SUMMARY:
 
           if(signals.stop) return {};
 
-          // check if we have a summary for this text yet
-          let summaryObj = await db.summaries.get(hash);
+          // check if we have a summary for this text yet (note: we add threadId as part of the query because we want to allow people to delete summaries for a thread so they can compute summaries/memories)
+          let [ summaryObj ] = await db.summaries.where({hash, threadId}).toArray();
           let summary = summaryObj?.summary;
           if(!summary) {
             if(numTokensToSummarize === null) {
@@ -5777,10 +5777,25 @@ OVERALL SUMMARY:
 
             let loadingModal;
 
+            let controls;
+
+            async function regenerateMemoriesHandler() {
+              if(!confirm("This DELETE all SUMMARIES and MEMORIES. Fresh summaries and memories will be regenerated during your character's next reply. Are you sure you want to delete all summaries and memories?")) return;
+              await db.transaction('rw', [db.summaries, db.memories], async tx => {
+                await tx.table("summaries").where({threadId}).delete();
+                await tx.table("memories").where({threadId}).delete();
+              });
+              controls.cancel();
+            }
+
             while(1) {
+
+              controls = {};
+
               let result = await prompt2({
                 generatedMemoriesText: {label: "Edit character 'memories'. Entries should be separated with a blank line. Edits should not significantly change the overall chronology. Use the <b>/lore</b> command to store non-chronological facts/things.", type: "text", height:"fit-content", defaultValue:generatedDefaultValue, placeholder:"If this box is empty, your character hasn't stored any memories yet because the chat thread isn't long enough to warrant it."},
-              }, {submitButtonText:"save"});
+                reloadLoreUrlsButton: {hidden:true, type:"buttons", label:null, buttons:[{text:"delete &amp; regenerate all memories", onClick:regenerateMemoriesHandler}]},
+              }, {submitButtonText:"save", controls});
               if(!result) break;
               
               // we set these so that if there's an error (e.g. while embedding, or with database) the while loop continues and they don't lose their edits
@@ -7874,10 +7889,11 @@ OVERALL SUMMARY:
 
           // if there's just one thread, then we assume it was from a single-thread export
           // and in that case we probably don't want isFav to persist, and we also probably
-          // want that thread to be at the top - i.e. lastViewTime = now
+          // want that thread to be at the top - i.e. lastMessageTime = now
           if(importedThreads.length === 1) {
             importedThreads[0].isFav = false;
             importedThreads[0].lastViewTime = Date.now();
+            importedThreads[0].lastMessageTime = Date.now();
             singleThreadImportId = importedThreads[0].id;
           }
 
