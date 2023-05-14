@@ -207,6 +207,8 @@ export async function prompt2(specs, opts={}) {
     el.addEventListener("input", updateInputVisibilies);
   }
 
+  let promptResolver;
+
   if(opts.controls) {
     // add a proxy to the controls object so that we can read and write spec values from the outside
     opts.controls.data = new Proxy({}, {
@@ -223,6 +225,9 @@ export async function prompt2(specs, opts={}) {
         return el.value;
       }
     });
+    opts.controls.cancel = function() {
+      promptResolver(null);
+    };
   }
 
   function getAllValues() {
@@ -244,6 +249,7 @@ export async function prompt2(specs, opts={}) {
   }
 
   let values = await new Promise((resolve) => {
+    promptResolver = resolve;
     ctn.querySelector("button.submit").onclick = () => {
       let values = getAllValues();
       resolve(values);
@@ -631,6 +637,13 @@ export function importStylesheet(src) {
   });
 }
 
+
+export function htmlToElement(html) {
+  var template = document.createElement('template');
+  html = html.trim();
+  template.innerHTML = html;
+  return template.content.firstChild;
+}
 
 
 
