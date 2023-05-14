@@ -744,7 +744,7 @@
 
 
       const dbName = "chatbot-ui-v1";
-      const dbVersion = 76;
+      const dbVersion = 77;
 
       let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
       let dbLoadingModal;
@@ -783,7 +783,7 @@
         threads: "++id,name,characterId,creationTime,lastMessageTime,lastViewTime",
         messages: "++id,threadId,characterId,creationTime,order", // characterId is -1 for user, and for system it is -2.
         misc: "key", // key=>value
-        summaries: "hash,threadId,[hash+threadId]", // we keep threadId so when we delete threads, we can delete the associated summaries. we also need it for grabbing summaries for the edit interface.
+        summaries: "hash,threadId", // EDIT: This does not make sense, because the `hash` is used as the primary key, so in the case where two threads end up with the same summary hash (which is actually common because you can import a thread which you already have), then you can only have one entry for both threads. So for summary deletion you actually need to (OLD: we track threadId so when we delete threads, we can delete the associated summaries. we also need it for grabbing summaries for the edit interface.)
         memories: "++id,[summaryHash+threadId],[characterId+status],[threadId+status],[threadId+index],threadId", // memories are associated with a summary hash because they are computed alongside the summary. We need to track the hash so that if earlier messages are edited (and therefore the summaries need to be recomputed), we know to only consider "valid"/"current" the memories that are associated with currently-"used". The "type" property is used to track the "currentness", and also to track whether a memory was manually added by the user (in which case it is *always* considered valid)
         lore: "++id,bookId,bookUrl",
         textEmbeddingCache: "++id,textHash,&[textHash+modelName]",
@@ -3159,7 +3159,7 @@
       }
 
 
-      async function computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId, onProgressMessage, signals}) {
+      async function computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId, onProgressMessage, signals, exitOnFirstHashMissAndReturnHashChain}) {
         if(!signals) signals = {};
         // here's the overall idea: "consume" old messages (remove them from the start of the messages array) until you get to `messageTokensToConsumePerSummary` tokens, and then summarize them (use an existing summary if we already have it - it's kinda treated like the first message), and then keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
         // note: upToMessageId is inclusive. it's needed for things like recomputeBotReply, where it may be that not all messages in the thread are visible to the bot.
@@ -3218,6 +3218,7 @@
         let prevSummary;
         let prevSummaryObj;
         let prevInstructionHash;
+        let instructionHashChain = [];
         let i = 0;
         let numSummariesGenerated = 0; // <-- i.e. where we didn't have an existing matching summary
         let alreadyWarnedAboutLoop = false;
@@ -3338,12 +3339,17 @@ OVERALL SUMMARY:
           let textToHash = summarizationVersion + " " + (prevSummary || "") + messageBatchArr.map(m => m.content).join("\n\n\n");
           let hash = await sha256Text(textToHash);
 
+          instructionHashChain.push(hash);
+
           if(signals.stop) return {};
 
-          // check if we have a summary for this text yet (note: we add threadId as part of the query because we want to allow people to delete summaries for a thread so they can compute summaries/memories)
-          let [ summaryObj ] = await db.summaries.where({hash, threadId}).toArray();
+          // check if we have a summary for this text yet
+          let summaryObj = await db.summaries.get(hash);
           let summary = summaryObj?.summary;
           if(!summary) {
+            if(exitOnFirstHashMissAndReturnHashChain) {
+              return {instructionHashChain};
+            }
             if(numTokensToSummarize === null) {
               numTokensToSummarize = currentTokenCount;
             }
@@ -3486,7 +3492,7 @@ OVERALL SUMMARY:
         if(signals.stop) return {};
 
         // NOTE: prevSummary can be undefined - i.e. no summaries were needed to get messages under the tokenLimitForSummaryAndMessages limit
-        return {summary:prevSummary, instructionHash:prevInstructionHash, remainingMessages}; // remainingMessages = unsummarized messages (the ones that follow the summary)
+        return {summary:prevSummary, instructionHash:prevInstructionHash, instructionHashChain, remainingMessages}; // remainingMessages = unsummarized messages (the ones that follow the summary)
       }
 
       
@@ -5781,8 +5787,9 @@ OVERALL SUMMARY:
 
             async function regenerateMemoriesHandler() {
               if(!confirm("This DELETE all SUMMARIES and MEMORIES. Fresh summaries and memories will be regenerated during your character's next reply. Are you sure you want to delete all summaries and memories?")) return;
+              let { instructionHashChain } = await computeAndSaveThreadSummaryIfNeeded({threadId, exitOnFirstHashMissAndReturnHashChain:true});
               await db.transaction('rw', [db.summaries, db.memories], async tx => {
-                await tx.table("summaries").where({threadId}).delete();
+                await tx.table("summaries").where("hash").anyOf(instructionHashChain).delete();
                 await tx.table("memories").where({threadId}).delete();
               });
               controls.cancel();
@@ -7866,6 +7873,7 @@ OVERALL SUMMARY:
               summary.threadId = threadIdMap[summary.threadId];
               summary.messageIds = summary.messageIds.map(id => messageIdMap[id]);
             }
+
             // get existing summary hashes from db
             let existingSummaryHashes = new Set((await db.summaries.toArray()).map(s => s.hash));
             // remove summaries we already have
