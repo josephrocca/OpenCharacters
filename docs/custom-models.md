@@ -63,7 +63,7 @@ let proxyHandler = {
     let url = argumentsList[0];
     let opts = argumentsList[1];
     if(url.startsWith("https://api.openai.com")) {
-      url = url.replace("api.openai.com", "api.example.com");
+      url = url.replace("https://api.openai.com", "https://api.example.com");
       opts.headers.authorization = `Bearer YOUR_API_KEY_HERE`;
     }
     return target.call(thisArg, url, opts, ...argumentsList.slice(2));
