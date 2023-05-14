@@ -626,7 +626,10 @@
         }
       }
 
-      const isMobile = window.innerWidth < 470; // TODO: improve this heuristic. this isn't just about screen width - it's also about touch screens (no pointer hover events).
+      // TODO: improve this heuristic. this isn't just about screen width - it's also about touch screens (no pointer hover events).
+      // ALSO: This is a bit of a misnomer. It's used for stuff like determining how to show the right column, which is really about screen width, not mobile/touchscreen stuff.
+      const isMobile = window.innerWidth < 700;
+
       if(isMobile) {
         document.body.classList.add("isMobile"); // to use in CSS selectors
       }
@@ -4950,7 +4953,7 @@ OVERALL SUMMARY:
             if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
             
             messageEl.dataset.canDelete = "true";
-            await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
+            await triggerMessageActionCustomCodeEvent({threadId, eventData:{}, eventName:"MessageAdded"});
           }
 
         } catch(e) {
@@ -5066,14 +5069,7 @@ OVERALL SUMMARY:
             }
 
             if(!signals.stop) { // <-- don't call custom code if they stopped the message
-              await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageEdited"});
-
-              // // if this is the last message in the feed, then we treat it as an "added" message, rather than an edited message, so we trigger the custom code MessageAdded event:
-              // if(isLastMessage) {
-              //   await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
-              // } else {
-              //   await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageEdited"});
-              // }
+              await triggerMessageActionCustomCodeEvent({threadId, eventData:{messageId:messageObj.id}, eventName:"MessageEdited"});
             }
           }
         } catch(e) {
@@ -5508,7 +5504,7 @@ OVERALL SUMMARY:
         await addMessageToFeed(newMessage, {inPlaceOf:messageEl});
         if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
-        await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageEdited"});
+        await triggerMessageActionCustomCodeEvent({threadId, eventData:{messageId}, eventName:"MessageEdited"});
       }
 
 
@@ -5554,7 +5550,7 @@ OVERALL SUMMARY:
         }
         await updateInlineReminderMessage();
         await updateThreadScene();
-        await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageDeleted", triggerBotReply:false});
+        await triggerMessageActionCustomCodeEvent({threadId, eventData:{messageId}, eventName:"MessageDeleted", triggerBotReply:false});
       }
 
       const defaultUserName = "Anon";
@@ -6003,7 +5999,7 @@ OVERALL SUMMARY:
             
             $.messageInput.value = "";
             $.messageInput.style.height = "";
-            await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded", triggerBotReply:false});
+            await triggerMessageActionCustomCodeEvent({threadId, eventData:{}, eventName:"MessageAdded", triggerBotReply:false});
 
             if(lastLineCommand) {
               $.messageInput.value = lastLineCommand;
@@ -6504,13 +6500,31 @@ OVERALL SUMMARY:
                   currentlyProcessingMessageActionHandlers = true; // <-- we use this variable to pause the normal data update polling.
                   let returnData = null;
                   try {
-                    let data = e.data.data;
+                    let updates = e.data.data.updates;
+                    let eventData = e.data.data.eventData;
+
+                    let userFacingEventData = {};
+
+                    // this must come *before* overwriting oc.thread.messages because after that point we can't get the original message object
+                    if(eventName === "messagedeleted") {
+                      userFacingEventData.message = oc.thread.messages.find(m => m.id === eventData.messageId);
+                      userFacingEventData.originalIndex = oc.thread.messages.findIndex(m => m.id === eventData.messageId);
+                    }
                     
                     let origFlag = dataChangedByCustomCode;
-                    oc.thread.messages = data.thread.messages;
+                    oc.thread.messages = updates.thread.messages;
                     dataChangedByCustomCode = origFlag;
+
+                    // this must come *after* overwriting oc.thread.messages because we want event.message to be an actual reference to the message object that's currently in the oc.thread.messages array.
+                    if(eventName !== "messagedeleted") {
+                      if(eventName === "messageadded") {
+                        userFacingEventData.message = oc.thread.messages.at(-1);
+                      } else {
+                        userFacingEventData.message = oc.thread.messages.find(m => m.id === eventData.messageId);
+                      }
+                    }
                     
-                    await Promise.all(userHandlers[eventName].map(handler => handler(data)));
+                    await Promise.all(userHandlers[eventName].map(handler => handler(userFacingEventData)));
                     
                     if(dataChangedByCustomCode) {
                       returnData = getChangedData();
@@ -6892,7 +6906,7 @@ OVERALL SUMMARY:
       }
 
       // this function runs after every message is added: https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md
-      async function triggerMessageActionCustomCodeEvent({threadId, eventName, triggerBotReply=true}={}) {
+      async function triggerMessageActionCustomCodeEvent({threadId, eventData, eventName, triggerBotReply=true}={}) {
         let thread = await db.threads.get(threadId);
         let threadCharacter = await db.characters.get(thread.characterId);
 
@@ -6902,8 +6916,9 @@ OVERALL SUMMARY:
         showEl($.statusNotifier);
 
         let { data, originalMessages } = await getDataForCustomCode(threadId);
-        console.log(`@@@@@@@@@@@ Data sent to custom code for ${eventName} handler:`, data);
-        let receivedData = await sendCustomCodeIframeMessage(threadId, {type:"event", eventName:eventName.toLowerCase(), data});
+        let updates = data;
+        console.log(`@@@@@@@@@@@ Data sent to custom code for ${eventName} handler:`, updates);
+        let receivedData = await sendCustomCodeIframeMessage(threadId, {type:"event", eventName:eventName.toLowerCase(), data:{updates, eventData}});
         console.log(`@@@@@@@@@@@ Data received from custom code after ${eventName} handler:`, receivedData);
         if(receivedData) await updateDbWithNewDataFromCustomCode({threadId, receivedData, originalMessages});
         $.statusNotifier.innerHTML = "";
@@ -7158,7 +7173,7 @@ OVERALL SUMMARY:
           await addMessageToFeed(messageObj, {character:characterToReplyWith, inPlaceOf:messageEl});
           if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
-          await triggerMessageActionCustomCodeEvent({threadId, eventName:"MessageAdded"});
+          await triggerMessageActionCustomCodeEvent({threadId, eventData:{}, eventName:"MessageAdded"});
         }
         return true;
       }
@@ -7330,8 +7345,17 @@ OVERALL SUMMARY:
         $.messageInput.style.height = height + "px";
       }
 
+      // this executes on page load, so it should give us the full height.
+      // note that if the user zooms on the page, it will change, so it's not full-proof for detecting e.g. on-screen keyboard, as we do below
+      window.fullVisualViewportHeight = window.visualViewport.height;
+
+      function isTouchDevice() {
+        return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
+      }
+
       $.messageInput.addEventListener("keydown", async e => {
         if(isMobile) return; // on mobile, if enter/returns triggers send, then people can't add linebreaks
+        if(isTouchDevice() && window.visualViewport.height < window.fullVisualViewportHeight*0.9) return; // likely indicates that onscreen keyboard is open, so we want to allow them to create a new line with 'enter' (shift+enter on a touch-screen keyboard is not ergonomic/possible)
 
         if(e.key === "Enter") {
           if(e.shiftKey) {
@@ -7514,7 +7538,7 @@ OVERALL SUMMARY:
           openAiApiKey: {label: "OpenAI API secret key (<a href='https://platform.openai.com/account/api-keys' target='_blank'>from here</a>):", type: "textLine", placeholder:"sk-...", defaultValue: openAiApiKeyOriginal},
           showInlineReminder: {hidden:true, label: "Show 'inline' reminder edit button:", type: "select", options:[{value:"yes"}, {value:"no"}], defaultValue: showInlineReminderOriginal},
           customModelConfigs: {hidden:true, cssText:"white-space:pre; font-family:monospace;", label: "Custom model configs (<a href='https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-models.md' target='_blank'>follow this guide</a>):", type: "text", placeholder:`{name:"...", endpointUrl:"..."}\n{name:"...", endpointUrl:"...", apiKey:"..."}\n...`, defaultValue: customModelConfigsOriginal.map(o => JSON5.stringify(o)).join("\n")},
-          customPostPageLoadMainThreadCode: {hidden:true, cssText:"white-space:pre; font-family:monospace;", label: "This code will be run on this page after page load. You can use it to mod the OpenCharacters UI, or to e.g. <a href='https://gist.github.com/josephrocca/a82216e2f2fdf54ad8dd79dbd4cfd625' target='_blank'>proxy all `fetch` requests</a>, or whatever. Note that there are no backwards-compatibility guarantees on the main thread UI, so your code may break eventually. <b>This code can access all your data</b> - make sure it's from a trustworthy source if you didn't write it yourself (maybe ask GPT-4 what it does if you don't know how to code and are weary). Refresh the page after saving for your code to take effect.", placeholder:"// add code here", type: "text", defaultValue: customPostPageLoadMainThreadCodeOriginal},
+          customPostPageLoadMainThreadCode: {hidden:true, height:"fit-content", cssText:"white-space:pre; font-family:monospace;", label: "This code will be run on this page after page load. You can use it to mod the OpenCharacters UI, or to e.g. <a href='https://gist.github.com/josephrocca/a82216e2f2fdf54ad8dd79dbd4cfd625' target='_blank'>proxy all `fetch` requests</a>, or whatever. Note that there are no backwards-compatibility guarantees on the main thread UI, so your code may break eventually. <b>This code can access all your data</b> - make sure it's from a trustworthy source if you didn't write it yourself (maybe ask GPT-4 what it does if you don't know how to code and are weary). Refresh the page after saving for your code to take effect.", placeholder:"// add code here", type: "text", defaultValue: customPostPageLoadMainThreadCodeOriginal},
         }, {showHiddenInputsText: "show advanced settings"});
         if(!result) return;
         let { userName, userAvatarUrl, openAiApiKey, customModelConfigs, customPostPageLoadMainThreadCode } = result;
