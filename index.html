@@ -3080,6 +3080,7 @@
       }
 
       async function countTokens(str, modelName) {
+        if(!str) return 0;
         let tokenizer = await getTokenizerByModelName(modelName);
         
         // We just use GPT-3 tokenizer for all models as an ESTIMATE for now.
@@ -4407,7 +4408,6 @@ OVERALL SUMMARY:
             }
           }
           triggerStreamingMessageChunkCustomCodeEvent(threadId, {text:prevText, index:chunkI-1, last:true, streamId});
-          return result;
         }
 
 
@@ -4527,7 +4527,7 @@ OVERALL SUMMARY:
             
             if(response) { // <-- e.g. request was aborted by user
               const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
-              result = await handleStreamingResponse(reader).catch(e => {  // this appends chunks to the `result` variable
+              await handleStreamingResponse(reader).catch(e => {  // this appends chunks to the `result` variable
                 if(!signals.stop) alert("getBotReply > modelType:chat > handleStreamingResponse:\n\n"+e.stack);
               });
               apiTokenUsage.completion += await countTokens(result, modelName);
