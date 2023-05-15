@@ -2345,6 +2345,18 @@
         for(let thread of threads) {
           await safelyDeleteThreadById(thread.id)
         }
+
+
+        // for any message that has this character's id as its message.characterId, set message.characterId to the thread character id
+        // messages can have non-thread-character ids because of the `/ai @CharName#123` command
+        let threadIdToCharacterId = {};
+        let allThreads = await db.threads.toArray();
+        for(let thread of allThreads) {
+          threadIdToCharacterId[thread.id] = thread.characterId;
+        }
+        await db.messages.toCollection().modify(function(message) {
+          if(message.characterId === characterId) message.characterId = threadIdToCharacterId[message.threadId];
+        });
       }
 
       window.safelyDeleteThreadById = async function safelyDeleteThreadById(threadId) {
@@ -7949,6 +7961,11 @@ OVERALL SUMMARY:
             }
           }
 
+          let importedThreadIdToCharacterId = {};
+          for(let thread of importedThreads) {
+            importedThreadIdToCharacterId[thread.id] = thread.characterId;
+          }
+
           // re-number message ids
           for(let message of importedMessages) {
             maxMessageId++;
@@ -7959,7 +7976,9 @@ OVERALL SUMMARY:
             // re-number author/character id of each message
             if(message.characterId >= 0) { // remember, user messages have characterId = -1, and system messages have characterId = -2
               message.characterId = characterIdMap[message.characterId];
-              if(message.characterId === undefined) throw new Error("The character for a message.characterId is missing from imported data.");
+              if(message.characterId === undefined) { // this is possible due to an old bug in safelyDeleteCharacterById where I wasn't updating the characterId of messages in threads where the deleted character was included in a thread via `/ai @CharName#123` rather than actually being the main character of the thread.
+                message.characterId = importedThreadIdToCharacterId[message.threadId]; // just set the ID to the characterId of the thread's main character
+              }
             }
           }
 
