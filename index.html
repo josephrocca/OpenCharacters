@@ -530,6 +530,7 @@
                   <div style="position:relative;">
                     <div id="threadOptionsPopup" style="position:absolute; display:none; padding:0.5rem; background:var(--background); border-radius:var(--border-radius); width:max-content; right:0; bottom:0; border:1px solid var(--border-color);">
                       <button id="addShortcutButton">✨ add shortcut</button>
+                      <!-- <button id="replyLoopButton">➰ reply loop</button> -->
                     </div>
                   </div>
                   <button id="threadOptionsButton" style="min-width:80px; margin-top:0.25rem;">options</button>
@@ -768,7 +769,7 @@
 
 
       const dbName = "chatbot-ui-v1";
-      const dbVersion = 78;
+      const dbVersion = 79;
 
       let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
       let dbLoadingModal;
@@ -2954,6 +2955,7 @@
           textEmbeddingModelName: aiCharacter.textEmbeddingModelName,
           userMessagesSentHistory: [],
           unsentMessageText: "",
+          shortcutButtons: [],
         };
 
         await ensureLoreUrlsAreLoaded({loreBookUrls:aiCharacter.loreBookUrls, modelName:aiCharacter.textEmbeddingModelName});
@@ -7331,6 +7333,10 @@ OVERALL SUMMARY:
         await db.threads.put(thread);
         await renderShortcutButtons(thread);
       });
+
+      // $.replyLoopButton.addEventListener("click", async function() {
+        
+      // });
 
       // let alreadyAutoReplying = false;
       // $.replyWithButton.addEventListener("click", async function() {
