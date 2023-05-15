@@ -2338,7 +2338,7 @@
 
 
       async function safelyDeleteCharacterById(characterId) {
-        // let character = await db.characters.get(characterId);
+        let character = await db.characters.get(characterId);
         await db.characters.delete(characterId);
         // delete all threads and messages associated with this character
         const threads = await db.threads.where("characterId").equals(characterId).toArray();
@@ -2347,7 +2347,7 @@
         }
 
 
-        // for any message that has this character's id as its message.characterId, set message.characterId to the thread character id
+        // for any message that has this character's id as its message.characterId, set message.characterId to the thread character id and embed the name and avatar of the character in the message
         // messages can have non-thread-character ids because of the `/ai @CharName#123` command
         let threadIdToCharacterId = {};
         let allThreads = await db.threads.toArray();
@@ -2355,7 +2355,11 @@
           threadIdToCharacterId[thread.id] = thread.characterId;
         }
         await db.messages.toCollection().modify(function(message) {
-          if(message.characterId === characterId) message.characterId = threadIdToCharacterId[message.threadId];
+          if(message.characterId === characterId) {
+            message.characterId = threadIdToCharacterId[message.threadId];
+            message.name = character.name;
+            message.avatar.url = character.avatar.url;
+          }
         });
       }
 
@@ -5774,6 +5778,9 @@ OVERALL SUMMARY:
                 // let charName = charNameAndId[1];
                 let characterId = parseInt(charNameAndId[2]);
                 characterOverride = await db.characters.get(characterId);
+                if(!characterOverride) {
+                  alert(`CharacterID not found: #${characterId}`);
+                }
                 replyInstruction = replyInstruction.replace(/^@([^#]+)#([0-9]+)/, "").trim() || null;
               }
               await doBotReplyIfNeeded({forceReply:true, replyInstruction, characterOverride, expectsReply:false});
@@ -5794,6 +5801,9 @@ OVERALL SUMMARY:
                 // let charName = charNameAndId[1];
                 let characterId = parseInt(charNameAndId[2]);
                 characterToReplyWith = await db.characters.get(characterId);
+                if(!characterToReplyWith) {
+                  alert(`CharacterID not found: #${characterId}`);
+                }
                 replyInstruction = replyInstruction.replace(/^@([^#]+)#([0-9]+)/, "").trim() || null;
               }
               if(!characterToReplyWith) {
