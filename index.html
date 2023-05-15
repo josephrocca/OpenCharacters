@@ -3066,13 +3066,17 @@
         if(!modelObj.modelUrl) throw new Error("Model doesn't have a modelUrl: "+modelName);
 
         if(!window.AutoTokenizer) {
-          await import("https://cdn.jsdelivr.net/npm/@xenova/transformers@1.4.2/dist/transformers.min.js");
+          let { AutoTokenizer } = await import("https://cdn.jsdelivr.net/npm/@xenova/transformers@2.0.0-alpha.0/dist/transformers.js");
+          window.AutoTokenizer = AutoTokenizer;
         }
-
+        
         let modelUrl = modelObj.modelUrl;
-        let tokenizer = await AutoTokenizer.from_pretrained(modelUrl+"/resolve/main");
-        modelNameToTokenizerCache[modelName] = tokenizer;
-        return tokenizer;
+        let tokenizer = await window.AutoTokenizer.from_pretrained(modelUrl+"/resolve/main"); // returns data in this form: { data: [1, 15043, 3186], dims: [1, 3], size: 3, type: "int64" } where 'int64' ==> BigInt64
+        function textToTokenIds(text) {
+          return [...tokenizer(text).input_ids.data].map(n => Number(n)); // cast BigInt64 to Number
+        }
+        modelNameToTokenizerCache[modelName] = textToTokenIds;
+        return textToTokenIds;
       }
 
       async function countTokens(str, modelName) {
