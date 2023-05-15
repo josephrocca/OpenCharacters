@@ -128,9 +128,17 @@ oc.character.stopSequences = [":)"];
 oc.character.presencePenalty = 1;
 ```
 
-Here's some custom code which allows the AI to see the contents of webpages if you put URLs in your messages:
+Here's some custom code which allows the AI to see the contents of webpages/PDFs if you put URLs in your messages:
 
 ```js
+async function getPdfText(data) {
+  let doc = await window.pdfjsLib.getDocument({data}).promise;
+  let pageTexts = Array.from({length: doc.numPages}, async (v,i) => {
+    return (await (await doc.getPage(i+1)).getTextContent()).items.map(token => token.str).join('');
+  });
+  return (await Promise.all(pageTexts)).join(' ');
+}
+      
 oc.thread.on("MessageAdded", async function () {
   let messages = oc.thread.messages;
   let lastMessage = messages.at(-1);
@@ -139,11 +147,22 @@ oc.thread.on("MessageAdded", async function () {
     if(urlsInLastMessage.length === 0) return;
     if(!window.Readability) window.Readability = await import("https://esm.sh/@mozilla/readability@0.4.4?no-check").then(m => m.Readability);
     let url = urlsInLastMessage.at(-1); // we use the last URL in the message, if there are multiple
-    let text = await fetch(url).then(r => r.text());
-    let doc = new DOMParser().parseFromString(text, "text/html");
-    let article = new Readability(doc).parse();
-    let output = `# ${article.title || "(no page title)"}\n\n${article.textContent}`;
-    output = output.slice(0, 5000); // <-- grab only the first 5000 characters
+    let blob = await fetch(url).then(r => r.blob());
+    let output;
+    if(blob.type === "application/pdf") {
+      if(!window.pdfjsLib) {
+        window.pdfjsLib = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@3.6.172/+esm").then(m => m.default);
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.6.172/build/pdf.worker.min.js";
+      }
+      let text = await getPdfText(await blob.arrayBuffer());
+      output = text.slice(0, 5000); // <-- grab only the first 5000 characters (you can change this)
+    } else {
+      let html = await blob.text();
+      let doc = new DOMParser().parseFromString(html, "text/html");
+      let article = new Readability(doc).parse();
+      output = `# ${article.title || "(no page title)"}\n\n${article.textContent}`;
+      output = output.slice(0, 5000); // <-- grab only the first 5000 characters (you can change this)
+    }
     messages.push({
       author: "system",
       hiddenFrom: ["user"], // hide the message from user so it doesn't get in the way of the conversation
