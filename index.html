@@ -433,6 +433,7 @@
       #shortcutButtonsCtn {
         margin-bottom:0.25rem;
         position:relative;
+        overflow-y: auto;
       }
       #shortcutButtonsCtn:empty {
         display:none;
@@ -2575,19 +2576,23 @@
           thread = await db.threads.get(activeThreadId);
         }
         shortcutButtonsCtn.innerHTML = "";
-        for(let shortcut of thread.shortcutButtons) {
-          let shortcutBtn = htmlToElement(`<button>${shortcut.name}</button>`);
-          shortcutButtonsCtn.appendChild(shortcutBtn);
-          shortcutBtn.addEventListener("click", async function() {
-            if(shortcut.type === "message") {
-              $.messageInput.value = shortcut.message;
-              if(shortcut.autoSend) {
-                await sendButtonClickHandler();
+        let buttonWrapper = htmlToElement(`<div style="width:max-content;"></div>`);
+        if(thread.shortcutButtons.length > 0) {
+          shortcutButtonsCtn.appendChild(buttonWrapper);
+          for(let shortcut of thread.shortcutButtons) {
+            let shortcutBtn = htmlToElement(`<button>${shortcut.name}</button>`);
+            buttonWrapper.appendChild(shortcutBtn);
+            shortcutBtn.addEventListener("click", async function() {
+              if(shortcut.type === "message") {
+                $.messageInput.value = shortcut.message;
+                if(shortcut.autoSend) {
+                  await sendButtonClickHandler();
+                }
               }
-            }
-          });
-        }
-        if(shortcutButtonsCtn.innerHTML !== "") {
+            });
+          }
+       }
+       if(shortcutButtonsCtn.innerHTML !== "") {
           let bulkEditButton = htmlToElement(`<button>✏️</button>`);
           bulkEditButton.addEventListener("click", async function() {
             let shortcutsInTextFormat = thread.shortcutButtons.map(s => `@name=${s.name}\n@message=${s.message}\n@autoSend=${s.autoSend ? "yes" : "no"}`).join("\n\n");
@@ -2614,7 +2619,7 @@
             thread.shortcutButtons = parsedShortcuts;
             await renderShortcutButtons(thread);
           });
-          shortcutButtonsCtn.insertBefore(bulkEditButton, shortcutButtonsCtn.firstChild);
+          buttonWrapper.insertBefore(bulkEditButton, buttonWrapper.firstChild);
         }
       }
 
@@ -7062,7 +7067,7 @@ OVERALL SUMMARY:
 
         if(!threadCharacter.customCode) return;
 
-        $.statusNotifier.innerHTML = "<span style='opacity: 0.6; font-size: 0.9rem;'>custom code processing</span><div style='width:0.5rem;'></div>"+createTypingIndicatorHtml();
+        $.statusNotifier.innerHTML = "<span style='opacity: 0.6; font-size: 0.9rem;'>⌛ custom code processing</span><div style='width:0.5rem;'></div>"+createTypingIndicatorHtml();
         showEl($.statusNotifier);
 
         let { data, originalMessages } = await getDataForCustomCode(threadId);
