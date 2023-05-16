@@ -210,7 +210,7 @@ oc.thread.on("MessageAdded", function({message}) {
   message.content += "blah";
 })
 ```
-**But note** that you **cannot** directly check the equality of the message against a message in the `oc.thread.message` array due to technical reasons related to JavaScript [`Proxy`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy)s, so:
+**But note** that you **cannot** directly check the equality of the `message` against a message in the `oc.thread.messages` array due to technical reasons related to JavaScript [`Proxy`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy)s, so:
 ```js
 oc.thread.on("MessageAdded", function({message}) {
   if(message === oc.thread.messages.at(-1)) {
