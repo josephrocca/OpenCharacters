@@ -190,8 +190,8 @@ oc.thread.on("MessageAdded", async function () {
 Each of these events has a `message` object, and for all except `MessageDeleted` you can use the `message.id` to find the index of the message in the array:
 
  * `oc.thread.on("MessageAdded", function({message}) { ... })` - a message was added to the end of the thread
- * `oc.thread.on("MessageEdited", function({message}) { ... })` - user edited their message or an ai message (pencil button)
- * `oc.thread.on("MessageInserted", function({message}) { ... })` - user inserted a message (see advanced options in message editing popup)
+ * `oc.thread.on("MessageEdited", function({message}) { ... })` - message was edited or regenerated
+ * `oc.thread.on("MessageInserted", function({message}) { ... })` - message was inserted (see message editing popup)
  * `oc.thread.on("MessageDeleted", function({message, originalIndex}) { ... })` - user deleted a message (trash button)
 
 For example, you could get the index of an edited message like this:
