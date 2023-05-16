@@ -189,10 +189,10 @@ oc.thread.on("MessageAdded", async function () {
 
 Each of these events has a `message` object, and for all except `MessageDeleted` you can use the `message.id` to find the index of the message in the array:
 
- * `oc.thread.on("MessageAdded", function({message}) {})` 
- * `oc.thread.on("MessageEdited", function({message}) {})` 
- * `oc.thread.on("MessageInserted", function({message}) {})` 
- * `oc.thread.on("MessageDeleted", function({message, originalIndex}) {})`
+ * `oc.thread.on("MessageAdded", function({message}) { ... })` 
+ * `oc.thread.on("MessageEdited", function({message}) { ... })` 
+ * `oc.thread.on("MessageInserted", function({message}) { ... })` 
+ * `oc.thread.on("MessageDeleted", function({message, originalIndex}) { ... })`
 
 For example, you could get the index of an edited message like this:
 
