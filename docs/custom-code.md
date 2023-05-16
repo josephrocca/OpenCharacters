@@ -184,7 +184,43 @@ oc.thread.on("MessageAdded", async function () {
   }
 });
 ```
-There are also `MessageEdited` and `MessageDeleted` events.
+
+### Events
+
+Each of these events has a `message` object, and for all except `MessageDeleted` you can use the `message.id` to find the index of the message in the array:
+
+ * `oc.thread.on("MessageAdded", function({message}) {})` 
+ * `oc.thread.on("MessageEdited", function({message}) {})` 
+ * `oc.thread.on("MessageInserted", function({message}) {})` 
+ * `oc.thread.on("MessageDeleted", function({message, originalIndex}) {})`
+
+For example, you could get the index of an edited message like this:
+
+```js
+oc.thread.on("MessageEdited", function({message}) {
+  let index = oc.thread.messages.find(m => m.id === message.id);
+  // ...
+})
+```
+
+**Note:** The `message` object is an actual reference to the object, so you can edit it directly like this:
+
+```js
+oc.thread.on("MessageAdded", function({message}) {
+  message.content += "blah";
+})
+```
+**But note** that you **cannot** directly check the equality of the message against a message in the `oc.thread.message` array due to technical reasons related to JavaScript [`Proxy`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy)s, so:
+```js
+oc.thread.on("MessageAdded", function({message}) {
+  if(message === oc.thread.messages.at(-1)) {
+    // THIS WILL NOT WORK AS EXPECTED! Because `message` is actually `Proxy`ed
+  }
+  if(message.id === oc.thread.messages.at(-1).id) {
+    // this is the CORRECT way to check if the `message` that was added is the last message in the thread
+  }
+})
+``` 
 
 ### Message Rendering
 Sometimes you may want to display different text to the user than what the AI sees. For that, you can use `oc.messageRenderingPipeline`. It's an array that you `.push()` a function into, and that function is used to process messages. Your function should use the `reader` parameter to determine who is "reading" the message (either `user` or `ai`), and then "render" the message `content` accordingly. Here's an example to get you started:
