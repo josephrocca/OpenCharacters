@@ -602,6 +602,10 @@
         alert("Hey, looks like you're trying to host this locally, but you have hosted it in an insecure context - i.e. you're serving it on HTTP instead of HTTPS. Unfortunately there are a bunch of features that are disabled on HTTP connections for modern browsers. localhost is treated as a secure context for development purposes, but if you want to server it on the internet, then I recommend using Cloudflare - you just switch your domain's nameservers to them and then it's basically a button click and you've got HTTPS. Much easier than setting up your own certificate stuff.");
       }
 
+      $.messageFeed.addEventListener("keydown", async function(e) {
+        debugger;
+      });
+
       // polyfill for navigator.userActivation
       if(!navigator.userActivation) {
         navigator.userActivation = {hasBeenActive:false};
@@ -771,9 +775,12 @@
 
 
       const dbName = "chatbot-ui-v1";
-      const dbVersion = 81;
+      const dbVersion = 83;
 
-      let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
+      let db = await new Dexie(dbName).open().catch(e => {
+        console.warn(e);
+        return false;
+      }); // throws if db doesn't exist
       let dbLoadingModal;
       if(db) {
         console.log("Existing user, checking database version...");
@@ -1331,23 +1338,36 @@
         }
         // $.chatThreadFolders.innerHTML = foldersHtml;
 
-        let threadsHtml = threads.map(thread => `
-          <div class="thread" data-thread-id="${sanitizeHtml(thread.id)}">
-            <span class="favStar" data-is-fav="${thread.isFav}">⭐</span>
-            <span class="changeFolderPath">📁</span>
-            <div class="avatar" style="${thread.character.avatar.url ? `background-image:url(${sanitizeHtml(thread.character.avatar.url)})` : ""}; border:1px solid var(--border-color);"></div>
-            <div class="info" style="flex-grow:1; padding-left:0.5rem;">
-              <div class="nameWrapper" style="font-weight:bold; font-size:0.8rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
-              <div class="characterName" style="font-size:0.8rem;">${thread.character.name.length > 15 ? sanitizeHtml(thread.character.name.slice(0, 15)+"…") : sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span> <span class="characterEditButton">✏️</span></div>
-              <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span style="font-size:0.65rem;" title="${sanitizeHtml(thread.modelName)}">${thread.modelName.length > 13 ? sanitizeHtml(thread.modelName.slice(0, 13))+"…" : sanitizeHtml(thread.modelName)}</span><span class="usageStatsSpend" title="API usage/spend" style="font-size:0.65rem;display:flex;align-items:center;">$${threadIdToMoneySpent[thread.id].toFixed(2)}</span><span style="font-size:0.65rem; display:flex; align-items:center; filter:grayscale(1);" title="Thread ID">🧵#${sanitizeHtml(thread.id)}</span></div>
-            </div>
-            <div style="display:flex; flex-direction:column; justify-content:space-between; font-size:0.65rem;">
-              <span class="button nameEditButton">✏️</span>
-              <span class="button exportButton">💾</span>
-              <span class="button deleteButton">🗑️</span>
-            </div>
-          </div>
-        `).join("");
+        let dataUrlToCachedBlobUrlMap = {};
+        for(let thread of threads) {
+          let avatarUrl = thread.character.avatar.url;
+          if(avatarUrl && avatarUrl.startsWith("data:")) {
+            dataUrlToCachedBlobUrlMap[avatarUrl] = await dataUrlToCachedBlobUrl(avatarUrl);
+          }
+        }
+
+        let threadsHtml = threads.map(thread => {
+          let avatarUrl = thread.character.avatar.url;
+          if(avatarUrl && avatarUrl.startsWith("data:")) {
+            avatarUrl = dataUrlToCachedBlobUrlMap[avatarUrl];
+          }
+          return `
+            <div class="thread" data-thread-id="${sanitizeHtml(thread.id)}">
+              <span class="favStar" data-is-fav="${thread.isFav}">⭐</span>
+              <span class="changeFolderPath">📁</span>
+              <div class="avatar" style="${avatarUrl ? `background-image:url(${sanitizeHtml(avatarUrl)})` : ""}; border:1px solid var(--border-color);"></div>
+              <div class="info" style="flex-grow:1; padding-left:0.5rem;">
+                <div class="nameWrapper" style="font-weight:bold; font-size:0.8rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
+                <div class="characterName" style="font-size:0.8rem;">${thread.character.name.length > 15 ? sanitizeHtml(thread.character.name.slice(0, 15)+"…") : sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span> <span class="characterEditButton">✏️</span></div>
+                <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span style="font-size:0.65rem;" title="${sanitizeHtml(thread.modelName)}">${thread.modelName.length > 13 ? sanitizeHtml(thread.modelName.slice(0, 13))+"…" : sanitizeHtml(thread.modelName)}</span><span class="usageStatsSpend" title="API usage/spend" style="font-size:0.65rem;display:flex;align-items:center;">$${threadIdToMoneySpent[thread.id].toFixed(2)}</span><span style="font-size:0.65rem; display:flex; align-items:center; filter:grayscale(1);" title="Thread ID">🧵#${sanitizeHtml(thread.id)}</span></div>
+              </div>
+              <div style="display:flex; flex-direction:column; justify-content:space-between; font-size:0.65rem;">
+                <span class="button nameEditButton">✏️</span>
+                <span class="button exportButton">💾</span>
+                <span class="button deleteButton">🗑️</span>
+              </div>
+            </div>`;
+        }).join("");
 
         $.chatThreads.innerHTML = foldersHtml + threadsHtml;
 
@@ -2319,6 +2339,12 @@
               if(key === "PUBLIC") continue; // data within oc.character.customData.PUBLIC is shared within share links - all other data is not
               delete character.customData[key];
             }
+            let warnThatAvatarUrlWasRemoved = false;
+            let avatarUrl = character.avatar.url;
+            if(avatarUrl && avatarUrl.startsWith("data:")) {
+              character.avatar.url = "";
+              warnThatAvatarUrlWasRemoved = true;
+            }
             let urlHashData = encodeURIComponent(JSON.stringify({addCharacter:character})).replace(/[!'()*]/g, function(c) {
               return '%' + c.charCodeAt(0).toString(16); // since encodeURIComponent doesn't encode some characters (like parentheses) and I think they mess up markdown links
             });
@@ -2326,6 +2352,18 @@
             await navigator.clipboard.writeText(url);
             $.topNotificationContent.innerHTML = `Copied character link to clipboard!`;
             showEl($.topNotification);
+
+            if(warnThatAvatarUrlWasRemoved) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              let result = await prompt2({
+                message: {type:"none", "html":`<p style="margin:0;">All character data is embedded within OpenCharacters share links, but this character's avatar image was stored as text (using a <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/Data_URLs" target="_blank">'data' URL</a>), and that would result in a huge share URL, so the avatar image was removed from the share link.<br><br>If you click 'Open avatar in new tab', then you can right-click/long-press it and save the avatar image, and then upload it to catbox.moe or a similar website, and then edit your character and replacing the 'data:' avatar URL with the new 'https:' URL that you got from the image hosting service. That way your share link will include the avatar image.</p>`},
+              }, {cancelButtonText:"Share charater without avatar", submitButtonText:"Open avatar in new tab"});
+              if(result !== null) {
+                let blobUrl = await dataUrlToCachedBlobUrl(avatarUrl);
+                window.open(blobUrl, "_blank");
+              }
+            }
+
             setTimeout(() => hideEl($.topNotification), 3000);
           });
 
@@ -2961,7 +2999,11 @@
         await db.threads.update(messageObj.threadId, { lastMessageTime: messageObj.creationTime });
         
         // if this isn't at the top of the thread list, re-render the thread list
-        if($.chatThreads.firstElementChild && $.chatThreads.firstElementChild.dataset.threadId !== messageObj.threadId.toString()) {
+        let threadId = messageObj.threadId;
+        let thread = await db.threads.get(threadId);
+        let threadElements = [...$.chatThreads.querySelectorAll(".thread")];
+        if(!thread.isFav) threadElements = threadElements.filter(el => el.querySelector(".favStar").dataset.isFav==="false");
+        if(threadElements[0].dataset.threadId !== threadId.toString()) {
           await renderThreadList();
         }
 
@@ -3025,6 +3067,7 @@
           creationTime: Date.now(),
           lastMessageTime: Date.now(),
           lastViewTime: Date.now(),
+          isFav: false,
           userCharacter: { // note: we don't use await getUserCharacterObj because that is for *existing* threads (requires threadId as input param)
             name: (await db.misc.get("userName"))?.value || defaultUserName,
             avatar: {
@@ -3058,6 +3101,7 @@
 
       async function ensureLoreUrlsAreLoaded({loreBookUrls, modelName}) {
         let loadingModal = createLoadingModal("Downloading lore...");
+        let urlI = 0;
         for(let url of loreBookUrls) {
           let downloadUrl;
           if(origin.endsWith("jsdelivr.net")
@@ -3083,7 +3127,7 @@
           }));
           
           // Add embeddings to entries:
-          let onProgressMessage = (data) => loadingModal.updateContent("Adding lore entries..." + Math.round(data.progress * 100) + "%");
+          let onProgressMessage = (data) => loadingModal.updateContent(`Adding lore entries (URL #${urlI})... ` + Math.round(data.progress * 100) + "%");
           // Note that `embedTexts` will try to get embeddings from textEmbeddingCache first
           let embeddings = await embedTexts({textArr:entries.map(e => e.text), modelName, onProgressMessage, shouldCache:true});
           entries.forEach((e, i) => {
@@ -3111,6 +3155,7 @@
             await db.lore.bulkAdd(entriesToAdd);
             console.log(`Added lore entries for ${url}:`, entriesToAdd);
           }
+          urlI++;
         }
         loadingModal.delete();
       }
@@ -3232,12 +3277,14 @@
         let embeddingVectorsToReturn = embeddings.map(e => e.embedding);
 
         // add to cache:
+        let alreadyGotTexts = new Set(); // just in case textArr contains duplicates
         let entriesToAddToCache = [];
         for(let entry of embeddings) {
-          if(entry.notFromCache) {
+          if(entry.notFromCache && !alreadyGotTexts.has(entry.text)) {
             delete entry.order;
             delete entry.notFromCache;
             entriesToAddToCache.push(entry);
+            alreadyGotTexts.add(entry.text);
           }
         }
         if(shouldCache) {
@@ -3352,7 +3399,7 @@
 
           if(!signals) signals = {};
           // here's the overall idea: "consume" old messages (remove them from the start of the messages array) until you get to `messageTokensToConsumePerSummary` tokens, and then summarize them (use an existing summary if we already have it - it's kinda treated like the first message), and then keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
-          // note: upToMessageId is inclusive. it's needed for things like recomputeBotReply, where it may be that not all messages in the thread are visible to the bot.
+          // note: upToMessageId is inclusive. it's needed for things like regenerateMessage, where it may be that not all messages in the thread are visible to the bot.
 
           let thread = await db.threads.get(threadId);
           let aiCharacter = await db.characters.get(thread.characterId);
@@ -4022,7 +4069,7 @@
       };
 
       let currentBotReplySignals;
-      // Note: the reason this doesn't just take threadId as a param is because we use it for recomputeBotReply() which doesn't necessarily use all messages in a thread, and we also use it for "reply with..." which can use a different AI character
+      // Note: the reason this doesn't just take threadId as a param is because we use it for regenerateMessage() which doesn't necessarily use all messages in a thread, and we also use it for "reply with..." which can use a different AI character
       async function getBotReply({messages, threadId, replyingCharacter=null, replyInstruction=null, onStreamingReplyChunk, onProgressMessage, signals={}, modelNameOverride}={}) {
         currentBotReplySignals = signals;
 
@@ -4074,7 +4121,7 @@
             }
           } else if(fitMessagesInContextMethod === "summarizeOld") {
             
-            // note: we need upToMessageId because this could be a call from recomputeBotReply() which doesn't necessarily use all messages in a thread
+            // note: we need upToMessageId because this could be a call from regenerateMessage() which doesn't necessarily use all messages in a thread
             // upToMessageId is inclusive.
             let {summary, instructionHash, remainingMessages} = await computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId: fullMessagesArr.at(-1).id, onProgressMessage, signals});
             if(signals.stop) return {};
@@ -4363,7 +4410,7 @@
           console.log("memoryBatches:", memoryBatches.slice(0));
           console.log("relevantLore:", relevantLore.slice(0));
           if(memoryBatches.length > 0 || relevantLore.length > 0) {
-            const createMemoriesAndLoreMessageContent = () => {
+            const createMemoriesAndLoreMessageContentChunks = () => {
               let chunks = [`Some potentially helpful things/facts/happenings that may or may not be relevant:`];
               if(memoryBatches.length > 0) {
                 for(let batch of memoryBatches) {
@@ -4375,13 +4422,29 @@
                   chunks.push(`A fact or piece of world 'lore':\n${entry.text}`);
                 }
               }
-              return chunks.join("\n\n");
+              return chunks;
             };
+            let textChunkToTokenCountCache = {};
+            async function countTokensInAllChunks() {
+              let chunks = createMemoriesAndLoreMessageContentChunks();
+              let joinerTokens = await countTokens("\n\n", modelName);
+              let totalTokens = 0;
+              for(let chunk of chunks) {
+                if(textChunkToTokenCountCache[chunk] === undefined) {
+                  textChunkToTokenCountCache[chunk] = await countTokens(chunk, modelName);
+                }
+                totalTokens += textChunkToTokenCountCache[chunk];
+                totalTokens += joinerTokens;
+              }
+              return totalTokens;
+            }
 
             onProgressMessage({message:"dropping mem/lore"});
+            await delay(10); // to ensure progress message is rendered in case of infinite loop below
 
             // drop worst entries/batches until we're under token limit allocated to memories:
-            while(await countTokens(createMemoriesAndLoreMessageContent(), modelName) > retrievedMemoriesTokenLimitFraction * availableModels[modelName].maxSequenceLength) {
+            while(await countTokensInAllChunks() > retrievedMemoriesTokenLimitFraction * availableModels[modelName].maxSequenceLength) {
+              console.log("dropping...")
               if(relevantLore.length === 0) {
                 memoryBatches.pop();
               } else if(memoryBatches.length === 0) {
@@ -4389,6 +4452,7 @@
               } else {
                 if(memoryBatches.at(-1)._relevanceScore < relevantLore.at(-1)._relevanceScore) memoryBatches.pop();
                 else if(memoryBatches.at(-1)._relevanceScore >= relevantLore.at(-1)._relevanceScore) relevantLore.pop();
+                else throw new Error("This shouldn't happen - weird relevance score bug while dropping memories/lore.");
               }
             }
             // put memoryBatches in chronological order:
@@ -4402,7 +4466,7 @@
               }
 
               let summaryMessageIndex = messagesArr.findIndex(m => m._isSummary);
-              let memoriesMessage = {role:"system", content:createMemoriesAndLoreMessageContent()};
+              let memoriesMessage = {role:"system", content:createMemoriesAndLoreMessageContentChunks().join("\n\n")};
               if(summaryMessageIndex === -1) {
                 // this can happen if the user has manually added memories before the summarization stuff has started
                 messagesArr.unshift(memoriesMessage);
@@ -4575,7 +4639,10 @@
               method: "POST",
               signal: abortSignal,
             }).catch(e => {
-              if(!signals.stop) alert("getBotReply > modelType:chat > fetch:\n\n"+e.stack);
+              if(!signals.stop) {
+                if(e.stack.toString().toLowerCase().includes("failed to fetch")) alert("Looks like there was a network error. This can happen now and then - you may need to refresh the page. If it's happening quite often, please report this on Github or Discord.\n\ngetChatCompletion: "+e.stack);
+                else alert("getBotReply > modelType:chat:streaming > fetch: \n\n"+e.stack);
+              }
             });
             
             if(response) { // <-- e.g. request was aborted by user
@@ -4594,7 +4661,10 @@
               body: JSON.stringify(data),
               signal: abortSignal,
             }).then(r => r.json()).catch(e => {
-              if(!signals.stop) alert("getBotReply > modelType:chat > fetch:\n\n"+e.stack);
+              if(!signals.stop) {
+                if(e.stack.toString().toLowerCase().includes("failed to fetch")) alert("Looks like there was a network error. This can happen now and then - you may need to refresh the page. If it's happening quite often, please report this on Github or Discord.\n\ngetChatCompletion: "+e.stack);
+                else alert("getBotReply > modelType:chat:non-streaming > fetch: \n\n"+e.stack);
+              }
             });
 
             if(json?.error) {
@@ -4642,7 +4712,10 @@
               method: "POST",
               signal: abortSignal,
             }).catch(e => {
-              if(!signals.stop) alert("getBotReply > modelType:chat > fetch:\n\n"+e.stack);
+              if(!signals.stop) {
+                if(e.stack.toString().toLowerCase().includes("failed to fetch")) alert("Looks like there was a network error. This can happen now and then - you may need to refresh the page. If it's happening quite often, please report this on Github or Discord.\n\ngetChatCompletion: "+e.stack);
+                else alert("getBotReply > modelType:general:streaming > fetch: \n\n"+e.stack);
+              }
             });
             
             if(response) { // <-- e.g. request was aborted by user
@@ -4661,7 +4734,10 @@
               body: JSON.stringify(data),
               signal: abortSignal,
             }).then(r => r.json()).catch(e => {
-              if(!signals.stop) alert("getBotReply > modelType:general > fetch:\n\n"+e.stack);
+              if(!signals.stop) {
+                if(e.stack.toString().toLowerCase().includes("failed to fetch")) alert("Looks like there was a network error. This can happen now and then - you may need to refresh the page. If it's happening quite often, please report this on Github or Discord.\n\ngetChatCompletion: "+e.stack);
+                else alert("getBotReply > modelType:general:non-streaming > fetch: \n\n"+e.stack);
+              }
             });
             
             if(json?.error) {
@@ -4786,7 +4862,10 @@
             body: JSON.stringify(data),
             signal: abortSignal,
           }).then(r => r.json()).catch(e => {
-            if(!signals.stop) alert("getChatCompletion: "+e.stack);
+            if(!signals.stop) {
+              if(e.stack.toString().toLowerCase().includes("failed to fetch")) alert("Looks like there was a network error. This can happen now and then - you may need to refresh the page. If it's happening quite often, please report this on Github or Discord.\n\ngetChatCompletion: "+e.stack);
+              else alert("getChatCompletion: "+e.stack);
+            }
           });
           
           if(json?.error) {
@@ -4827,7 +4906,10 @@
             body: JSON.stringify(data),
             signal: abortSignal,
           }).then(r => r.json()).catch(e => {
-            if(!signals.stop) alert("getChatCompletion > modelType:general > fetch: \n\n"+e.stack);
+            if(!signals.stop) {
+              if(e.stack.toString().toLowerCase().includes("failed to fetch")) alert("Looks like there was a network error. This can happen now and then - you may need to refresh the page. If it's happening quite often, please report this on Github or Discord.\n\ngetChatCompletion: "+e.stack);
+              else alert("getChatCompletion > modelType:general > fetch: \n\n"+e.stack);
+            }
           });
           
           if(json?.error) {
@@ -5212,7 +5294,7 @@
       }
 
       let alreadyRecomputingBotReply = false;
-      async function recomputeBotReply(messageEl, opts={}) {
+      async function regenerateMessage(messageEl, opts={}) {
         if(alreadyRecomputingBotReply) return;
         alreadyRecomputingBotReply = true;
         try {
@@ -5239,6 +5321,12 @@
           let contextMessages = messages.slice(0, messages.findIndex(m => m.id === messageObj.id));
 
           const threadCharacter = await db.characters.get(thread.characterId);
+          let replyingCharacter; // <-- can of course be the same as the thread character
+          if(messageObj.characterId === -1) {
+            replyingCharacter = await getUserCharacterObj(threadId);
+          } else {
+            replyingCharacter = await db.characters.get(messageObj.characterId);
+          }
 
           let signals = {stop:false, wasDeleted:false};
 
@@ -5246,10 +5334,6 @@
           $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
             e.preventDefault(); e.stopPropagation();
             signals.stop = true;
-            if(!threadCharacter.streamingResponse || (threadCharacter.streamingResponse && streamingChunkCount === 0)) {
-              messageEl.remove();
-              signals.wasDeleted = true;
-            }
             $.statusNotifier.innerHTML = "";
             hideEl($.statusNotifier);
           });
@@ -5266,7 +5350,9 @@
           let botReplyOpts = {messages:contextMessages, threadId, signals, onProgressMessage, onStreamingReplyChunk};
           if(opts.modelNameOverride) botReplyOpts.modelNameOverride = opts.modelNameOverride;
           if(messageObj.instruction) botReplyOpts.replyInstruction = messageObj.instruction;
-          if(messageObj.characterId !== threadCharacter.id) botReplyOpts.replyingCharacter = await db.characters.get(messageObj.characterId);
+          if(messageObj.characterId !== threadCharacter.id) {
+            botReplyOpts.replyingCharacter = replyingCharacter;
+          }
           
           const {message, memoryIdBatchesUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply(botReplyOpts);
           messageEl.querySelector(".statusMessage").innerHTML = "";
@@ -5274,7 +5360,8 @@
           hideEl($.statusNotifier);
           $.statusNotifier.innerHTML = "";
 
-          if(signals.wasDeleted || message === undefined) {
+          if(message === undefined) {
+            await addMessageToFeed(messageObj, {inPlaceOf:messageEl});
             return;
           }
 
@@ -5301,8 +5388,11 @@
             await db.messages.put(messageObj);
             // update thread's lastMessageTime
             await db.threads.update(threadId, { lastMessageTime: Date.now() });
+
             // if this isn't at the top of the thread list, re-render the thread list
-            if($.chatThreads.firstElementChild.dataset.threadId !== threadId.toString()) {
+            let threadElements = [...$.chatThreads.querySelectorAll(".thread")];
+            if(!thread.isFav) threadElements = threadElements.filter(el => el.querySelector(".favStar").dataset.isFav==="false");
+            if(threadElements[0].dataset.threadId !== threadId.toString()) {
               await renderThreadList();
             }
 
@@ -5380,20 +5470,8 @@
         mousePos = {x:e.clientX, y:e.clientY};
       });
 
-      function attachEventHandlersToMessageEl(messageEl, opts={}) {
-        const recomputeButton = messageEl.querySelector(".recomputeButton");
-
-        messageEl.querySelector(".editButton").addEventListener("click", messageEditButtonClickHandler);
-        recomputeButton.addEventListener("click", async function() {
-          await recomputeBotReply(messageEl);
-        });
-
-        messageEl.querySelector(".recomputeWithAltModelButton").addEventListener("click", async function() {
-          await recomputeBotReply(messageEl, {modelNameOverride:"text-davinci-003"});
-        });
-
-
-        messageEl.querySelector(".prevMessageVariantButton").addEventListener("click", async function() {
+      async function switchMessageVariant(messageEl, nextOrPrevious) {
+        if(nextOrPrevious === "previous") {
           let message = await db.messages.get(parseInt(messageEl.dataset.id));
           let currentIndex = message.variants.findIndex(v => v===null); // current message is represented with `null` in variant array
           message.variants[currentIndex] = message.message;
@@ -5403,8 +5481,7 @@
           await db.messages.put(message);
           let newMessageEl = await addMessageToFeed(message, {inPlaceOf:messageEl, showVariantsSelector:true});
           newMessageEl.querySelector(".currentVariantNumber").innerHTML = `${(currentIndex-1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
-        });
-        messageEl.querySelector(".nextMessageVariantButton").addEventListener("click", async function() {
+        } else if(nextOrPrevious === "next") {
           let message = await db.messages.get(parseInt(messageEl.dataset.id));
           let currentIndex = message.variants.findIndex(v => v===null); // current message is represented with `null` in variant array
           message.variants[currentIndex] = message.message;
@@ -5414,6 +5491,29 @@
           await db.messages.put(message);
           let newMessageEl = await addMessageToFeed(message, {inPlaceOf:messageEl, showVariantsSelector:true});
           newMessageEl.querySelector(".currentVariantNumber").innerHTML = `${(currentIndex+1) + 1}<span style="opacity:0.5">/${message.variants.length}</span>`; // +1 because 1-indexed
+        } else {
+          throw new Error("Invalid nextOrPrevious value: "+nextOrPrevious);
+        }
+      }
+
+      function attachEventHandlersToMessageEl(messageEl, opts={}) {
+        const recomputeButton = messageEl.querySelector(".recomputeButton");
+
+        messageEl.querySelector(".editButton").addEventListener("click", messageEditButtonClickHandler);
+        recomputeButton.addEventListener("click", async function() {
+          await regenerateMessage(messageEl);
+        });
+
+        messageEl.querySelector(".recomputeWithAltModelButton").addEventListener("click", async function() {
+          await regenerateMessage(messageEl, {modelNameOverride:"text-davinci-003"});
+        });
+
+
+        messageEl.querySelector(".prevMessageVariantButton").addEventListener("click", async function() {
+          await switchMessageVariant(messageEl, "previous");
+        });
+        messageEl.querySelector(".nextMessageVariantButton").addEventListener("click", async function() {
+          await switchMessageVariant(messageEl, "next");
         });
 
         if(!isMobile) { // on mobile the variants container is always visible after user has created at least 1 variant
@@ -5536,10 +5636,58 @@
         });
       }
 
+      // right/left arrow to switch message variants:
+      window.addEventListener("keydown", async function(e) {
+        // if active element is a textarea/input, then return
+        if(document.activeElement.tagName === "TEXTAREA" || document.activeElement.tagName === "INPUT") {
+          return;
+        }
+        if($.messageFeed.offsetWidth === 0 || activeThreadId === null) {
+          return;
+        }
+
+        // if they press right arrow, and the last message is on the final variant, then recompute the final message:
+        if(e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          let threadId = parseInt($.messageFeed.dataset.threadId);
+          let thread = await db.threads.get(threadId);
+          let messages = await db.messages.where("threadId").equals(threadId).toArray();
+          messages.sort((a,b) => a.order - b.order);
+          let lastMessage = messages[messages.length-1];
+          let lastMessageEl = $.messageFeed.querySelector(".message:last-child");
+          if(e.key === "ArrowRight") {
+            // the `lastMessage.variants` array has `null` in the position of the 'current' message, so if null is at the end of the array, and they pressed right arrow, then we recompute:
+            if(lastMessage.variants[lastMessage.variants.length-1] === null) {
+              await regenerateMessage(lastMessageEl);
+            } else {
+              // otherwise we just move to the next variant:
+              await switchMessageVariant(lastMessageEl, "next");
+            }
+          }
+          if(e.key === "ArrowLeft") {
+            // if the first variant is null, then we recompute:
+            if(lastMessage.variants[0] === null) {
+              await regenerateMessage(lastMessageEl);
+            } else {
+              // otherwise we just move to the previous variant:
+              await switchMessageVariant(lastMessageEl, "previous");
+            }
+          }
+        }
+      });
+
       async function showHiddenMessageClickHandler() {
         let messageEl = this.closest(".message");
         let messageObj = db.messages.get(parseInt(messageEl.dataset.id));
         messageEl.classList.remove("hiddenFromUser");
+      }
+
+      let dataUrlToBlobUrlCache = new Map();
+      async function dataUrlToCachedBlobUrl(dataUrl) {
+        if(dataUrlToBlobUrlCache.has(dataUrl)) return dataUrlToBlobUrlCache.get(dataUrl);
+        let blob = await fetch(dataUrl).then(r => r.blob()); 
+        let blobUrl = URL.createObjectURL(blob);
+        dataUrlToBlobUrlCache.set(dataUrl, blobUrl);
+        return blobUrl;
       }
 
       async function createMessageElement(messageObj, opts={}) {
@@ -5575,6 +5723,9 @@
         let avatarUrl = character.avatar.url;
         if(thread.character.avatar.url) avatarUrl = thread.character.avatar.url;
         if(messageObj.avatar?.url) avatarUrl = messageObj.avatar.url;
+        if(avatarUrl && avatarUrl.startsWith("data:")) {
+          avatarUrl = await dataUrlToCachedBlobUrl(avatarUrl);
+        }
 
         let avatarShape = character.avatar.shape;
         if(thread.character.avatar.shape) avatarShape = thread.character.avatar.shape;
@@ -5611,13 +5762,18 @@
 
         let characterName = messageObjToCharacterName(messageObj, {thread, character});
 
-        let showRecomputeWithAltButtonModel = (thread.modelName === "gpt-3.5-turbo" || thread.modelName === "gpt-4") && textContainsAsALanguageModelText(messageObj.message + messageObj.variants.join(" "));
+        let showRecomputeWithAltButtonModel = false;
+        if(thread.modelName === "gpt-3.5-turbo" || thread.modelName === "gpt-4") {
+          if(textContainsAsALanguageModelText(messageObj.message + messageObj.variants.join(" "))) {
+            showRecomputeWithAltButtonModel = true;
+          }
+        }
 
         tmp.innerHTML = `
           <div class="message ${messageObj.hiddenFrom?.includes("user") ? "hiddenFromUser" : ""}" data-id="${sanitizeHtml(messageObj.id)}" data-order="${sanitizeHtml(messageObj.order)}" data-character-id="${sanitizeHtml(messageObj.characterId)}" data-can-delete="true" data-hash="${messageObjHash}" style="${sanitizeHtml(wrapperStyle)}; position:relative;">
             <div style="text-align:center;"><button class="showHiddenMessageButton" style="cursor:pointer; font-size:0.65rem;">Show hidden message</button></div>
             <div class="bottomButtons">
-              ${messageObj.characterId >= 0 ? `<div class="brainButton emojiButton">🧠</div>` : ""}
+              <div class="brainButton emojiButton">🧠</div>
             </div>
             <div class="messageWrap">
               <div class="avatar" style="${avatarUrl ? `background-image:url(${sanitizeHtml(avatarUrl)})` : ""};width:${sanitizeHtml(avatarWidth)}px; min-width:${sanitizeHtml(avatarWidth)}px; height:${sanitizeHtml(avatarHeight)}px; border-radius:${sanitizeHtml(avatarBorderRadius)};"></div>
@@ -5628,8 +5784,8 @@
                   <div class="editButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">✏️</div>
                   <div class="deleteButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display: flex; align-items: center; cursor:pointer;">🗑️</div>
                   <div style="position:relative;display:flex; align-items:center;">
-                    <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display:${character.id < 0 ? "none" : "flex"}; align-items: center; cursor:pointer;">🔁</div>
-                    <div class="recomputeWithAltModelButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display:${showRecomputeWithAltButtonModel ? "flex" : "none"}; align-items: center; cursor:pointer;" title="Click to recompute with the davinci model">🙄</div>
+                    <div class="recomputeButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display:flex; align-items: center; cursor:pointer;">🔁</div>
+                    <div class="recomputeWithAltModelButton emojiButton" style="font-size:0.8rem; margin-left:1rem; display:${showRecomputeWithAltButtonModel ? "flex" : "none"}; align-items: center; cursor:pointer;" title="Regenerate this message with the davinci model (10x more expensive, but less filtered)">🙄</div>
                     <div class="messageVariantsCtn" style="user-select:none; background: var(--button-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); min-width:max-content; ${sanitizeHtml(variantCtnCss)}">
                       <span class="prevMessageVariantButton emojiButton">◄</span>
                       <span class="currentVariantNumber">${sanitizeHtml(currentVariantNumber)}<span style="opacity:0.5">/${sanitizeHtml(messageObj.variants.length)}</span></span>
@@ -5680,6 +5836,7 @@
           || t.includes("as a large language model")
           || t.includes("language model trained")
           || /\bas an ai\b/.test(t)
+          || /\bi'm sorry.+(appropriate|acceptable)\b/.test(t)
       }
 
       async function messageEditButtonClickHandler(e) {
@@ -8372,6 +8529,17 @@
               json = JSON5.parse(atob(tags.chara.value));
             } else if(tags.UserComment) {
               json = JSON5.parse(tags.UserComment.value[0]);
+            }
+            // the image file itself is the avatar image, so:
+            if(!json.avatar || json.avatar === "none") {
+              // convert `file` to a data URL:
+              let reader = new FileReader();
+              let dataUrl = await new Promise((resolve, reject) => {
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+              });
+              json.avatar = dataUrl;
             }
           } catch(e) {
             return "fail";
