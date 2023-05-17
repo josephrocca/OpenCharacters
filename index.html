@@ -769,7 +769,7 @@
 
 
       const dbName = "chatbot-ui-v1";
-      const dbVersion = 79;
+      const dbVersion = 80;
 
       let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
       let dbLoadingModal;
@@ -930,7 +930,8 @@
         if(character.autoGenerateMemories === undefined) {
           character.autoGenerateMemories = "none"; // we need this because very old characters could have had not had a associativeMemoryMethod property at all (it didn't exist in the original schema)
         }
-        // if(character.publicId === undefined) character.publicId = "";
+        if(character.maxTokensPerMessage === undefined) character.maxTokensPerMessage = null;
+        
         // WARNING: If you add something here, you'll likely have to edit:
         //  - characterDetailsPrompt (characterDetailsPrompt should return a valid character object - addCharacter only adds creationTime and lastMessageTime, so characterDetailsPrompt should fill in everything else, even if it's not visible in the editor)
         //  - getUserCharacterObj
@@ -1307,13 +1308,16 @@
           return 0;
         });
 
+        let threadFolderData = (await db.misc.get("threadFolderData"))?.value || {};
+
         let foldersHtml = "";
         if(!opts.filterWithQuery) { // don't do folder stuff if they're searching
           if(currentFolderPath !== "") {
             foldersHtml += `<div class="threadFolder" data-folder-path="${sanitizeHtml(currentFolderPath.split("/").slice(0, -1).join("/"))}">🔙 up one level</div>`;
           }
           foldersHtml += currentSubfolderNames.map(name => {
-            return `<div class="threadFolder" data-folder-path="${sanitizeHtml(currentFolderPath ? currentFolderPath+"/"+name : name)}">📁 ${sanitizeHtml(name)} <span class="editFolderName emojiButton" style="font-size:0.7rem; display:flex; align-items:center;">✏️</span></div>`;
+            let folderPath = currentFolderPath ? currentFolderPath+"/"+name : name;
+            return `<div class="threadFolder" data-folder-path="${sanitizeHtml(folderPath)}">${threadFolderData[folderPath]?.emoji ?? "📁"} ${sanitizeHtml(name)} <span class="editFolderName emojiButton" style="font-size:0.7rem; display:flex; align-items:center;">✏️</span></div>`;
           }).join("");
         }
         // $.chatThreadFolders.innerHTML = foldersHtml;
@@ -1326,7 +1330,7 @@
             <div class="info" style="flex-grow:1; padding-left:0.5rem;">
               <div class="nameWrapper" style="font-weight:bold; font-size:0.8rem;"><span class="name" title="${sanitizeHtml(thread.name)}">${sanitizeHtml(thread.name)}</span></div>
               <div class="characterName" style="font-size:0.8rem;">${thread.character.name.length > 15 ? sanitizeHtml(thread.character.name.slice(0, 15)+"…") : sanitizeHtml(thread.character.name)} <span style="opacity:0.5; font-weight:normal;" title="Character ID">#${sanitizeHtml(thread.character.id)}</span> <span class="characterEditButton">✏️</span></div>
-              <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span>${thread.modelName.length > 15 ? sanitizeHtml(thread.modelName.slice(0, 15))+"…" : sanitizeHtml(thread.modelName)}</span><span class="usageStatsSpend" title="API usage/spend" style="font-size:0.7rem;display:flex;align-items:center;">$${threadIdToMoneySpent[thread.id].toFixed(2)}</span><span style="font-size:0.7rem; display:flex; align-items:center; filter:grayscale(1);" title="Thread ID">🧵#${sanitizeHtml(thread.id)}</span></div>
+              <div style="font-size:0.8rem; opacity:0.5; padding-right:0.5rem; display:flex; justify-content:space-between;"><span style="font-size:0.65rem;" title="${sanitizeHtml(thread.modelName)}">${thread.modelName.length > 13 ? sanitizeHtml(thread.modelName.slice(0, 13))+"…" : sanitizeHtml(thread.modelName)}</span><span class="usageStatsSpend" title="API usage/spend" style="font-size:0.65rem;display:flex;align-items:center;">$${threadIdToMoneySpent[thread.id].toFixed(2)}</span><span style="font-size:0.65rem; display:flex; align-items:center; filter:grayscale(1);" title="Thread ID">🧵#${sanitizeHtml(thread.id)}</span></div>
             </div>
             <div style="display:flex; flex-direction:column; justify-content:space-between; font-size:0.65rem;">
               <span class="button nameEditButton">✏️</span>
@@ -1349,13 +1353,29 @@
             e.stopPropagation();
             const folderPath = btn.closest(".threadFolder").dataset.folderPath;
             let newFolderPath;
+            
+            let label;
             if(folderPath.split("/").length === 1) {
-              newFolderPath = prompt(`Edit the name of this folder:`, folderPath);
+              label = `Edit the name of this folder:`;
             } else {
-              newFolderPath = prompt(`Edit the name of this folder by changing '${folderPath.split("/").at(-1)}' to something else, or move all items inside the '${folderPath.split("/").at(-1)}' folder to a new location by editing the whole folder path:`, folderPath);
+              label = `Edit the name of this folder by changing '${folderPath.split("/").at(-1)}' to something else, or move all items inside the '${folderPath.split("/").at(-1)}' folder to a new location by editing the whole folder path:`;
             }
-            if(newFolderPath === null) return;
-            newFolderPath = newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
+            let threadFolderData = (await db.misc.get("threadFolderData"))?.value || {};
+
+            let result = await prompt2({
+              newFolderPath: {type:"textLine", label, defaultValue:folderPath},
+              emoji: {type:"textLine", label:"Folder emoji:", defaultValue:threadFolderData[folderPath]?.emoji || ""},
+            });
+            if(!result) return;
+
+            if(result.emoji) {
+              if(!threadFolderData[folderPath]) threadFolderData[folderPath] = {};
+              threadFolderData[folderPath].emoji = result.emoji;
+            }
+
+            await db.misc.put({key:"threadFolderData", value:threadFolderData});
+
+            newFolderPath = result.newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
             // each thread has a folderPath property, which is a string like "folder1/folder2/folder3" or just "" (empty string) if it's in the root folder
             await db.threads.toCollection().modify(function(thread) {
               // we need to move all threads that start with folderPath to newFolderPath
@@ -1390,7 +1410,7 @@
             e.stopPropagation();
             const threadId = parseInt(changeFolderPathEl.closest(".thread").dataset.threadId);
             let thread = await db.threads.get(threadId);
-            let newFolderPath = prompt("Enter new folder path for this thread. You can add subfolders with forward-slashes like 'folder/subfolder/...'", thread.folderPath);
+            let newFolderPath = prompt(`Enter new folder path for this thread. You can add subfolders with forward-slashes like 'folder/subfolder/...'`, thread.folderPath);
             if(newFolderPath !== null) {
               newFolderPath = newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
               await db.threads.update(threadId, { folderPath: newFolderPath });
@@ -1963,12 +1983,15 @@
         let currentSubfolderNames = [...new Set(allFolderPaths.filter(p => p.startsWith(currentFolderPath) && p !== currentFolderPath).map(p => p.split("/").slice(currentFolderPath.split("/").length-(currentFolderPath === "" ? 1 : 0)).filter(s => s)[0]))];
         characters = characters.filter(t => t.folderPath === currentFolderPath);
 
+        let characterFolderData = (await db.misc.get("characterFolderData"))?.value || {};
+
         let foldersHtml = "";
         if(currentFolderPath !== "") {
           foldersHtml += `<div class="characterFolder" data-folder-path="${sanitizeHtml(currentFolderPath.split("/").slice(0, -1).join("/"))}">🔙 up one level</div>`;
         }
         foldersHtml += currentSubfolderNames.map(name => {
-          return `<div class="characterFolder" data-folder-path="${sanitizeHtml(currentFolderPath ? currentFolderPath+"/"+name : name)}">📁 ${sanitizeHtml(name)} <span class="editFolderName emojiButton" style="font-size:0.7rem; display:flex; align-items:center;">✏️</span></div>`;
+          let folderPath = currentFolderPath ? currentFolderPath+"/"+name : name;
+          return `<div class="characterFolder" data-folder-path="${sanitizeHtml(folderPath)}">${characterFolderData[folderPath]?.emoji ?? "📁"} ${sanitizeHtml(name)} <span class="editFolderName emojiButton" style="font-size:0.7rem; display:flex; align-items:center;">✏️</span></div>`;
         }).join("");
 
         $.characterFoldersList.innerHTML = foldersHtml;
@@ -2185,7 +2208,7 @@
                 message.content += \`<!--hidden-from-ai-start--><br>\${image}<!--hidden-from-ai-end-->\`;
               }
               oc.thread.on("MessageEdited", async function({message}) {
-                if(oc.thread.messages.at(-1).id === message.id) {
+                if(oc.thread.messages.at(-1) === message) {
                   await processMessage({message});
                 }
               });
@@ -2233,12 +2256,28 @@
             e.stopPropagation();
             const folderPath = btn.closest(".characterFolder").dataset.folderPath;
             let newFolderPath;
+            
+            let label;
             if(folderPath.split("/").length === 1) {
-              newFolderPath = prompt(`Edit the name of this folder:`, folderPath);
+              label = `Edit the name of this folder:`;
             } else {
-              newFolderPath = prompt(`Edit the name of this folder by changing '${folderPath.split("/").at(-1)}' to something else, or move all items inside the '${folderPath.split("/").at(-1)}' folder to a new location by editing the whole folder path:`, folderPath);
+              label = `Edit the name of this folder by changing '${folderPath.split("/").at(-1)}' to something else, or move all items inside the '${folderPath.split("/").at(-1)}' folder to a new location by editing the whole folder path:`;
             }
-            if(newFolderPath === null) return;
+            let characterFolderData = (await db.misc.get("characterFolderData"))?.value || {};
+
+            let result = await prompt2({
+              newFolderPath: {type:"textLine", label, defaultValue:folderPath},
+              emoji: {type:"textLine", label:"Folder emoji:", defaultValue:characterFolderData[folderPath]?.emoji || ""},
+            });
+            if(!result) return;
+
+            if(result.emoji) {
+              if(!characterFolderData[folderPath]) characterFolderData[folderPath] = {};
+              characterFolderData[folderPath].emoji = result.emoji;
+            }
+
+            await db.misc.put({key:"characterFolderData", value:characterFolderData});
+
             newFolderPath = newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
             // each character has a folderPath property, which is a string like "folder1/folder2/folder3" or just "" (empty string) if it's in the root folder
             await db.characters.toCollection().modify(function(character) {
@@ -2655,6 +2694,7 @@
           initialMessagesText: { label: `💬 Initial chat messages (optional). Useful for extra alignment to character. Follow the format explained <a href="https://github.com/josephrocca/OpenCharacters/blob/main/docs/initial-messages.md" target='blank'>here</a>.`, infoTooltip:"During the initialization of every new thread with this character, these messages will be created and placed at the start of the thread. Note that the summarization algorithm will eventually summarize these messages - so they won't stay around forever (unlike the instruction and reminder messages, which *do* stay around forever). Also note that if you edit the initial messages, only *new* threads will have the updated initial messages. In other words, once a chat thread has been created, the initial messages that are added to a thread during init 'belong' to that thread, not to the character.", type:"text", height:"fit-content", placeholder: "[USER]: Hey Sammy, do you have opinions?\n[SYSTEM]: The next message will include an emoji.\n[AI]: Yes! I have lots of opinions. 🤔\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions.", defaultValue: initialMessagesText ?? "" },
           avatarUrl: { label: "👤 Avatar URL (png/jpg/etc):", type:"textLine", placeholder: "(optional)", defaultValue: defaultValues.avatar?.url || "" },
           modelName: { hidden:true, label: "🤖 Model name:", infoTooltip:"GPT-4 is really smart, but expensive (about 15x price of gpt-3.5-turbo), and you need to have have access via the GPT-4 waitlist. If you use gpt-3.5-turbo and set the 'temperature' option (see advanced settings) to 1, then apparently (according to community members) it's pretty close to DaVinci in terms of creativity and overall quality. DaVinci is overpriced given its performance - GPT-4 is significantly better and only ~1.5x the price.", type:"select", options:[{content:"good, cheap (currently: gpt-3.5-turbo)", value:"good"}, {content:"great, but *expensive* (currently: davinci, or gpt-4 *if* you have access)", value:"great"}, ...broadlyAvailableModels.filter(m => m.type === "completion" || m.type === "chat-completion").map(m => ({value:m.name, content:m.shortLabel}))], defaultValue: defaultValues.modelName || "good" },
+          maxTokensPerMessage: { hidden:true, label: "📏 Max tokens per message:", infoTooltip:"This can be used to limit the length of the AI's responses. A 'token' is basically a word - 500 tokens is about 400 words in most tokenizers. Leave this blank to allow unlimited tokens to be generated per message. Note that you can also control the length of the AI's responses in the reminder message by saying something like 'Your response should be at most 3 sentences' or whatever.", type:"textLine", defaultValue:defaultValues.maxTokensPerMessage || "" },
           fitMessagesInContextMethod: { hidden:true, label: "Method for fitting messages within model's context limit.", type:"select", options:[{value:"dropOld", content:"drop oldest messages"}, {value:"summarizeOld", content:"summarize oldest messages"}], defaultValue: defaultValues.fitMessagesInContextMethod ?? "summarizeOld" },
           textEmbeddingModelName: { hidden:true, label: "Text embedding model:", infoTooltip:"Yep, there's currently only one option for this. Will add more in the future. It's what converts each memory/lore entry (text) into a bunch of numbers that can be efficiently used for search/similarity/lookup.", type:"select", options:[...broadlyAvailableModels.filter(m => m.type === "text-embedding").map(m => ({value:m.name, content:m.name}))], defaultValue: defaultValues.textEmbeddingModelName ?? "text-embedding-ada-002" },
           autoGenerateMemories: { hidden:true, show:d=>d.fitMessagesInContextMethod==="summarizeOld", label: "💽 Auto-generated character memories:", infoTooltip:"You can use /mem and /lore commands to manually add memories and lore. If you enable this feature, memories will be created by the character during each summarization step. This increases the cost a bit (maybe +20%) and makes responses a bit slower, but gives the character the ability to 'save' memories, and 'recall' them when they're relevant. Currently this only works within individual threads - i.e. characters can't recall details from *other* threads. You can manually copy memories and lore over into a new thread if needed.", type:"select", options:[{value:"none", content:"disabled"}, {value:"v1", content:"enabled"}], defaultValue: defaultValues.autoGenerateMemories ?? "v1" },
@@ -2680,6 +2720,10 @@
         result.name = result.name.replaceAll("#", ""); // just to be sure - a hash is used for `/ai @charName#123 <instruction>` so it's important that it's not in the name
 
         if(result.customCode.trim() === "") result.customCode = ""; // if the custom code box just contained whitespace, remove it
+        
+        if(result.maxTokensPerMessage.trim() === "") result.maxTokensPerMessage = null;
+        if(result.maxTokensPerMessage) result.maxTokensPerMessage = Number(result.maxTokensPerMessage);
+        
 
         // process prompt results back into well-formed character object:
 
@@ -3267,341 +3311,384 @@
         return currentText;
       }
 
-
+      let alreadyComputingSummaryForThreadPromises = {};
+      let alreadyComputingSummaryForThreadResolvers = {};
       async function computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId, onProgressMessage, signals, exitOnFirstHashMissAndReturnHashChain}) {
-        if(!signals) signals = {};
-        // here's the overall idea: "consume" old messages (remove them from the start of the messages array) until you get to `messageTokensToConsumePerSummary` tokens, and then summarize them (use an existing summary if we already have it - it's kinda treated like the first message), and then keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
-        // note: upToMessageId is inclusive. it's needed for things like recomputeBotReply, where it may be that not all messages in the thread are visible to the bot.
 
-        let thread = await db.threads.get(threadId);
-        let aiCharacter = await db.characters.get(thread.characterId);
-        let userCharacter = await getUserCharacterObj(threadId);
-
-        // WARNING: If you change this, you'll probably have to change the summarization prompts.
-        let modelName;
-        if(await threadIsUsingOpenAiModel(thread)) {
-          modelName = "gpt-3.5-turbo"; // if they're using any OpenAI model, then we use turbo for summarization
-        } else {
-          modelName = thread.modelName;
+        function finalize() {
+          // this function is called in the finally clause of the below try/finally block, so it gets called right before any `return` statement in the `try` clause
+          let resolver = alreadyComputingSummaryForThreadResolvers[threadId];
+          delete alreadyComputingSummaryForThreadPromises[threadId];
+          delete alreadyComputingSummaryForThreadResolvers[threadId];
+          resolver();
         }
-
-        const characterId = aiCharacter.id;
-
-        let originalMessages = await db.messages.where({threadId}).toArray();
-        originalMessages.sort((a,b) => a.order - b.order);
-
-        if(upToMessageId === undefined) upToMessageId = originalMessages.at(-1).id;
-        originalMessages = originalMessages.slice(0, originalMessages.findIndex(m => m.id === upToMessageId)+1);
-
-        let originalMessagesPreparedForBot = await prepareMessagesForBot({messages:originalMessages, onProgressMessage});
-        let remainingMessages = originalMessagesPreparedForBot.slice(0);
-
-        const tokenLimitForSummaryAndMessages = await getTokenLimitForSummaryAndMessages(aiCharacter, thread);
-
-        if(tokenLimitForSummaryAndMessages < 500) {
-          alert("Heads up: It looks like you may have an instruction or reminder that is really long - this means that there's only a very small amount of room for the messages and the summary. If your character's instruction/reminder isn't very long, then this could be a bug - in which case, please report this on Github or the Discord server.");
-        }
-
-        // these two can't really be any bigger, because we need to leave the final ~third for the *new* summary (although I think, practically, the summary will tend to be a lot smaller than 0.3*token limit, since the model naturally prevents summaries from getting too long)
-        // CAUTION: if you change these, users will have to recompute all their summaries (since hashes will change) but you can fix this by checking for an instruction hash match every time we add a message to the batch (TODO)
-        const maxTokenCountOfSummary = Math.round(tokenLimitForSummaryAndMessages/3); // <-- probably don't want summary to be any longer than the first third of our token budget
-        const messageTokensToConsumePerSummary = Math.round(availableModels[modelName].maxSequenceLength*0.3);
-
-        if(maxTokenCountOfSummary + messageTokensToConsumePerSummary > availableModels[modelName].maxSequenceLength-500) { // -500 due to token estimation and to make room for summarization prompt
-          throw new Error("The specified values of `maxTokenCountOfSummary` and `messageTokensToConsumePerSummary` are such that the summarization process could go over this model's token limit.");
-        }
-
-        let memoryIdsToSetToCurrent = [];
-        // let memories = await db.memories.where({threadId});
-        // memories.sort((a,b) => a.index - b.index);
-        // if(aiCharacter.autoGenerateMemories === "v1") {
-        //   // set isCurrent to false on all memories of this character so we can re-validate them along with the summaries - in case the thread has been edited
-        //   await db.memories.where({threadId, status:"current"}).modify({status:"noncurrent"});
-        //   await db.memories.where({summaryHash:"", threadId}).modify({status:"current"}); // <-- bit hacky, but this is needed for user-added memories before any summaries were done (so they don't belong to a summaryHash). could maybe make *all* user-added memories use "" (empty string) as summaryHash, but for now I just add them to the summary that they were closest to, or if there is no summary yet, then ""
-        // }
         
-        // get total tokens in all messages
-        let initialTokenCount = await countTokensInMessages(remainingMessages, modelName);
-        let currentTokenCount = initialTokenCount;
-        let numTokensToSummarize; // we don't know this until we've looped through and found the first hash with no matching summary in our database
-        let prevSummary;
-        let prevSummaryObj;
-        let prevInstructionHash;
-        let instructionHashChain = [];
-        let i = 0;
-        let numSummariesGenerated = 0; // <-- i.e. where we didn't have an existing matching summary
-        let alreadyWarnedAboutLoop = false;
-        // while the total token count is too high, grab batches of old messages, and summarize them
-        while(currentTokenCount > tokenLimitForSummaryAndMessages) {
-          if(signals.stop) return {};
-          let progess = 1 - ((currentTokenCount-tokenLimitForSummaryAndMessages) / (initialTokenCount-tokenLimitForSummaryAndMessages));
-          if(onProgressMessage) onProgressMessage({message:`summarizing (step ${i}, ${Math.round(progess*100)}% done)`});
+        try {
+          while(alreadyComputingSummaryForThreadPromises[threadId]) { // we need `while` instead of `if` because there could have been *multiple* calls for this threadId waiting, and we only want to let one of them through at a time
+            if(onProgressMessage) onProgressMessage({message:`existing summary in progress...`});
+            await alreadyComputingSummaryForThreadPromises[threadId];
+          }
+          alreadyComputingSummaryForThreadPromises[threadId] = new Promise((resolve) => {
+            alreadyComputingSummaryForThreadResolvers[threadId] = resolve;
+          });
+
+          if(!signals) signals = {};
+          // here's the overall idea: "consume" old messages (remove them from the start of the messages array) until you get to `messageTokensToConsumePerSummary` tokens, and then summarize them (use an existing summary if we already have it - it's kinda treated like the first message), and then keep repeating until the total number of tokens in the messages array falls below `tokenLimit` minus some tokens for the bot's response.
+          // note: upToMessageId is inclusive. it's needed for things like recomputeBotReply, where it may be that not all messages in the thread are visible to the bot.
+
+          let thread = await db.threads.get(threadId);
+          let aiCharacter = await db.characters.get(thread.characterId);
+          let userCharacter = await getUserCharacterObj(threadId);
+
+          // WARNING: If you change this, you'll probably have to change the summarization prompts.
+          let modelName;
+          if(await threadIsUsingOpenAiModel(thread)) {
+            modelName = "gpt-3.5-turbo"; // if they're using any OpenAI model, then we use turbo for summarization
+          } else {
+            modelName = thread.modelName;
+          }
+
+          const characterId = aiCharacter.id;
+
+          let originalMessages = await db.messages.where({threadId}).toArray();
+          originalMessages.sort((a,b) => a.order - b.order);
+
+          if(upToMessageId === undefined) upToMessageId = originalMessages.at(-1).id;
+          originalMessages = originalMessages.slice(0, originalMessages.findIndex(m => m.id === upToMessageId)+1);
+
+          let originalMessagesPreparedForBot = await prepareMessagesForBot({messages:originalMessages, onProgressMessage});
+          let remainingMessages = originalMessagesPreparedForBot.slice(0);
+
+          const tokenLimitForSummaryAndMessages = await getTokenLimitForSummaryAndMessages(aiCharacter, thread);
+
+          if(tokenLimitForSummaryAndMessages < 500) {
+            alert("Heads up: It looks like you may have an instruction or reminder that is really long - this means that there's only a very small amount of room for the messages and the summary. If your character's instruction/reminder isn't very long, then this could be a bug - in which case, please report this on Github or the Discord server.");
+          }
+
+          // these two can't really be any bigger, because we need to leave the final ~third for the *new* summary (although I think, practically, the summary will tend to be a lot smaller than 0.3*token limit, since the model naturally prevents summaries from getting too long)
+          // CAUTION: if you change these, users will have to recompute all their summaries (since hashes will change) but you can fix this by checking for an instruction hash match every time we add a message to the batch (TODO)
+          const maxTokenCountOfSummary = Math.round(tokenLimitForSummaryAndMessages/3); // <-- probably don't want summary to be any longer than the first third of our token budget
+          const messageTokensToConsumePerSummary = Math.round(availableModels[modelName].maxSequenceLength*0.3);
+
+          if(maxTokenCountOfSummary + messageTokensToConsumePerSummary > availableModels[modelName].maxSequenceLength-500) { // -500 due to token estimation and to make room for summarization prompt
+            throw new Error("The specified values of `maxTokenCountOfSummary` and `messageTokensToConsumePerSummary` are such that the summarization process could go over this model's token limit.");
+          }
+
+          let memoryIdsToSetToCurrent = [];
+          // let memories = await db.memories.where({threadId});
+          // memories.sort((a,b) => a.index - b.index);
+          // if(aiCharacter.autoGenerateMemories === "v1") {
+          //   // set isCurrent to false on all memories of this character so we can re-validate them along with the summaries - in case the thread has been edited
+          //   await db.memories.where({threadId, status:"current"}).modify({status:"noncurrent"});
+          //   await db.memories.where({summaryHash:"", threadId}).modify({status:"current"}); // <-- bit hacky, but this is needed for user-added memories before any summaries were done (so they don't belong to a summaryHash). could maybe make *all* user-added memories use "" (empty string) as summaryHash, but for now I just add them to the summary that they were closest to, or if there is no summary yet, then ""
+          // }
           
-          // grab old messages until we have at least `messageTokensToConsumePerSummary` tokens worth of text
-          let messageBatchTokenCount = 0;
-          let messageBatchArr = [];
-          while(messageBatchTokenCount < messageTokensToConsumePerSummary) {
-            if(signals.stop) return {};
-            if(remainingMessages.length === 0) break; // no more messages
+          // get total tokens in all messages
+          let initialTokenCount = await countTokensInMessages(remainingMessages, modelName);
+          let currentTokenCount = initialTokenCount;
+          let numTokensToSummarize; // we don't know this until we've looped through and found the first hash with no matching summary in our database
+          let prevSummary;
+          let prevSummaryObj;
+          let prevInstructionHash;
+          let instructionHashChain = [];
+          let i = 0;
+          let numSummariesGenerated = 0; // <-- i.e. where we didn't have an existing matching summary
+          let alreadyWarnedAboutLoop = false;
+          // while the total token count is too high, grab batches of old messages, and summarize them
+          while(currentTokenCount > tokenLimitForSummaryAndMessages) {
+            if(signals.stop) {
+              return {};
+            }
+            let progess = 1 - ((currentTokenCount-tokenLimitForSummaryAndMessages) / (initialTokenCount-tokenLimitForSummaryAndMessages));
+            if(onProgressMessage) onProgressMessage({message:`summarizing (step ${i}, ${Math.round(progess*100)}% done)`});
             
-            let m = remainingMessages[0];
-            let tokens = await countTokensInMessages([m], modelName);
-            if(messageBatchTokenCount > 0 && messageBatchTokenCount+tokens >= messageTokensToConsumePerSummary) {
-              break; // don't add this message to the batch, because it would put us over the limit
+            // grab old messages until we have at least `messageTokensToConsumePerSummary` tokens worth of text
+            let messageBatchTokenCount = 0;
+            let messageBatchArr = [];
+            while(messageBatchTokenCount < messageTokensToConsumePerSummary) {
+              if(signals.stop) {
+                return {};
+              }
+              if(remainingMessages.length === 0) break; // no more messages
+              
+              let m = remainingMessages[0];
+              let tokens = await countTokensInMessages([m], modelName);
+              if(messageBatchTokenCount > 0 && messageBatchTokenCount+tokens >= messageTokensToConsumePerSummary) {
+                break; // don't add this message to the batch, because it would put us over the limit
+              }
+
+              if(messageBatchTokenCount+tokens >= messageTokensToConsumePerSummary) {
+                // we were forced to add a message to the batch that puts us over the limit (since the batch would otherwise be empty), so we need to compress it:
+                m.content = await compressText({text:m.content, tokenLimit:messageTokensToConsumePerSummary, modelName, onProgressMessage, threadId});
+                tokens = await countTokensInMessages([m], modelName);
+              }
+
+              messageBatchArr.push(m);
+              messageBatchTokenCount += tokens;
+              remainingMessages.shift();
             }
 
-            if(messageBatchTokenCount+tokens >= messageTokensToConsumePerSummary) {
-              // we were forced to add a message to the batch that puts us over the limit (since the batch would otherwise be empty), so we need to compress it:
-              m.content = await compressText({text:m.content, tokenLimit:messageTokensToConsumePerSummary, modelName, onProgressMessage, threadId});
-              tokens = await countTokensInMessages([m], modelName);
+            if(messageBatchTokenCount > availableModels[modelName].maxSequenceLength*0.8) {
+              console.error("The messageBatchTokenCount is nearly the full size of the model's token limit.");
+              console.error("messageBatchTokenCount:", messageBatchTokenCount);  
             }
 
-            messageBatchArr.push(m);
-            messageBatchTokenCount += tokens;
-            remainingMessages.shift();
-          }
-
-          if(messageBatchTokenCount > availableModels[modelName].maxSequenceLength*0.8) {
-            console.error("The messageBatchTokenCount is nearly the full size of the model's token limit.");
-            console.error("messageBatchTokenCount:", messageBatchTokenCount);  
-          }
-
-          let messageBatchSummarizationInstruction;
-          if(aiCharacter.autoGenerateMemories === "v1") {
-            if(i > 0) { // if i>0, then we have prevSummary 
-              let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
-              // NOTE: Dedent doesn't work here because messageBatchText is multi-line, so the second line is not indented and thus prevents the dedenting
-              messageBatchSummarizationInstruction = `
-Here's an overall summary of what has happened previously:
-
-------
-${prevSummary}
-------  
-
-And here are some recent happenings/messages:
-
-------
-${messageBatchText}
-------
-
-I have two tasks for you:
-
-1. Given that we already knew about the stuff in the summary, write a list of new things that we learned by reading the recent happenings/messages. Include all important details. Every learning should start with the text "We learned that".
-2. Write a new version of the above *overall* summary that integrates what has recently happened. DO NOT MISS ANY IMPORTANT DETAILS. The summary can be LONG. Retain ALL important details from the previous summary.
-
-Your reply should start with "NEW LEARNINGS:" and follow this exact template (nothing more, nothing less):
-
-NEW LEARNINGS:
-* We learned that <something we learned about the story/characters from the messages. include relevant context & info - e.g. "X happened due to Y, right after Z happened" instead of just "X happened">
-* We learned that <add another thing here. you should always reference with names instead of pronouns>
-* We learned that <write as many points as needed - don't miss any info! we want to record ALL useful information)
-
-NEW OVERALL SUMMARY:
-<write a new summary here - it should start with "${prevSummary.split(" ").slice(0, 5).join(" ")}..." and should include ALL the important details that were in the previous summary - it's okay for the summary to be LONG if needed>`.trim();
-            } else {
-              let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
-              // NOTE: Dedent doesn't work here because messageBatchText is multi-line, so the second line is not indented and thus prevents the dedenting
-              messageBatchSummarizationInstruction = `
-Here are some messages:
-
-------
-${messageBatchText}
-------
-
-I have two tasks for you:
-
-1. Write a list of things that a reader would learn by reading the messages. Include all important details. Every learning should start with the text "We learned that".
-2. Write a summary of the messages. DO NOT MISS ANY IMPORTANT DETAILS. The summary can be LONG.
-
-Your reply should start with "LEARNINGS:" and follow this exact template (nothing more, nothing less):
-
-LEARNINGS:
-* We learned that <something we learned about the story/characters from the messages. include relevant context & info - e.g. "X happened due to Y, right after Z happened" instead of just "X happened">
-* We learned that <add another thing here. you should always reference with names instead of pronouns>
-* We learned that <write as many points as needed - don't miss any info! we want to record ALL useful information)
-
-OVERALL SUMMARY:
-<write a summary here - it should include ALL the important details - it's okay for the summary to be LONG if needed>`.trim();
-            }
-          } else {
-            if(i > 0) { // if i>0, then we have prevSummary 
-              let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
-              // NOTE: Dedent doesn't work here because messageBatchText is multi-line, so the second line is not indented and thus prevents the dedenting
-              messageBatchSummarizationInstruction = `Here's what has recently happened:\n\n------\n${messageBatchText}\n------\n\nHere's a summary of what happened previously:\n\n------\n${prevSummary}\n------\n\nPlease reply with a new version of this summary that ALSO includes what has recently happened. Include ALL the KEY details. DO NOT MISS ANY IMPORTANT DETAILS. You MUST include all the details that were in the previous summary in your response. Your response should start with "${prevSummary.split(" ").slice(0, 5).join(" ")}" and it should compress all the important details into a new summary. It's okay for the summary to be LONG if needed.`.trim();
-            } else {
-              let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
-              // NOTE: Dedent doesn't work here because messageBatchText is multi-line, so the second line is not indented and thus prevents the dedenting
-              messageBatchSummarizationInstruction = `Please summarize the content of these messages:\n\n------\n${messageBatchText}\n------\n\nRespond with the summary only - nothing else. Include all relevant details. Be concise, but DO NOT leave out any important details. It's okay for the summary to be LONG if needed.`.trim();
-            }
-          }
-
-
-          // Note: Hash corresponds to only the inputs (i.e. prevSummary and messageBatchArr).
-          // User can edit summaries and that doesn't mess with our hashing stuff (if they edited a *non-latest* summary, then summaries would need to be recomputed [which wouldn't be a big deal], but they can only edit latest one anyway).
-          
-          // I was originally using the whole messageBatchSummarizationInstruction as the hash, but that's not ideal because then everytime I update the instruction prompt, every thread will need to have all its summaries recomputed.
-          // With this approach they'll only ever need to recompute summaries and memories if the actual messages change.
-          // If I ever want to force everyone to recompute summaries and memories (e.g. because I introduced a really bad bug that makes it worth it) then I can increment the summarizationVersion.
-          
-          // CAUTION: incrementing summarizationVersion or editing textToHash will cause everyone to need to recompute all summaries - can cost multiple dollars for very long threads.
-          const summarizationVersion = 1;
-          let textToHash = summarizationVersion + " " + (prevSummary || "") + messageBatchArr.map(m => m.content).join("\n\n\n");
-          let hash = await sha256Text(textToHash);
-
-          instructionHashChain.push(hash);
-
-          if(signals.stop) return {};
-
-          // check if we have a summary for this text yet
-          let summaryObj = await db.summaries.get(hash);
-          let summary = summaryObj?.summary;
-          if(!summary) {
-            if(exitOnFirstHashMissAndReturnHashChain) {
-              return {instructionHashChain};
-            }
-            if(numTokensToSummarize === null) {
-              numTokensToSummarize = currentTokenCount;
-            }
-            let result;
-            while(1) {
-              if(signals.stop) return {};
-              result = await getChatCompletion({
-                messages: [
-                  {role: "system", content: "You are an expert text summarization assistant. You respond only with what the user requests - nothing more, nothing less."},
-                  {role: "user", content: messageBatchSummarizationInstruction},
-                ],
-                modelName,
-                temperature: 0.7,
-                threadId, // just used to track token usage
-              });
-              if(result) break;
-              if(onProgressMessage) onProgressMessage({message:`error, retrying summary...`});
-              await delay(3000);
-            }
-            numSummariesGenerated++;
-            if(!alreadyWarnedAboutLoop && numSummariesGenerated > 5*(numTokensToSummarize/messageTokensToConsumePerSummary)) { // the 5* is because it's very unlikely that each summary only consumed 1/5 of messageTokensToConsumePerSummary
-              alert("The summary system might be caught in a loop? This could be a bug. If you click OK, it will continue, but please watch it to ensure it doesn't infinitely loop and spend lots of API credits.");
-              alreadyWarnedAboutLoop = true;
-            }
+            let messageBatchSummarizationInstruction;
             if(aiCharacter.autoGenerateMemories === "v1") {
-              let [ memoriesText, summaryText ] = result.split(/OVERALL SUMMARY:|NEW OVERALL SUMMARY:/);
-              let memories = memoriesText.trim().replace(/^LEARNINGS:|NEW LEARNINGS:/, "").trim().split("\n").map(m => m.trim().replace(/^\* (We learned that )?/, "").trim()).filter(m => m);
-              memories = memories.map(m => m.replace(/\n+/g, "\n")); // not ideal, but: memories cannot have two consecutive newlines, since in the memory editing UI two newlines indicate a gap between entries
-              memories = memories.map(m => m[0].toUpperCase() + m.slice(1)); // capitalize first letter of each memory
+              if(i > 0) { // if i>0, then we have prevSummary 
+                let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
+                // NOTE: Dedent doesn't work here because messageBatchText is multi-line, so the second line is not indented and thus prevents the dedenting
+                messageBatchSummarizationInstruction = `
+  Here's an overall summary of what has happened previously:
 
-              let embeddingModelName = thread.textEmbeddingModelName;
+  ------
+  ${prevSummary}
+  ------  
 
-              // Warn user if they're using a non-OpenAI model and have character memories enabled (TODO: add option for locally-computed embeddings)
-              if(!await threadIsUsingOpenAiModel(thread)) {
-                let userPermissionToUseOpenAiByThread = (await db.misc.get("userPermissionToUseOpenAiModelByThread")) || {};
-                if(!userPermissionToUseOpenAiByThread[thread.id]) {
-                  let confirm = window.confirm(`You're using a non-OpenAI model (${thread.modelName}), but you currently have character memories enabled. Character memories currenly rely on an OpenAI API, so this message is to inform you that text from this chat will be processed via OpenAI's text embedding service. Do you want to continue?`);
-                  userPermissionToUseOpenAiByThread[thread.id] = confirm;
-                  await db.misc.put({key:"userPermissionToUseOpenAiModelByThread", value:userPermissionToUseOpenAiModelByThread});
-                  if(!confirm) return;
-                }
+  And here are some recent happenings/messages:
+
+  ------
+  ${messageBatchText}
+  ------
+
+  I have two tasks for you:
+
+  1. Given that we already knew about the stuff in the summary, write a list of new things that we learned by reading the recent happenings/messages. Include all important details. Every learning should start with the text "We learned that".
+  2. Write a new version of the above *overall* summary that integrates what has recently happened. DO NOT MISS ANY IMPORTANT DETAILS. The summary can be LONG. Retain ALL important details from the previous summary.
+
+  Your reply should start with "NEW LEARNINGS:" and follow this exact template (nothing more, nothing less):
+
+  NEW LEARNINGS:
+  * We learned that <something we learned about the story/characters from the messages. include relevant context & info - e.g. "X happened due to Y, right after Z happened" instead of just "X happened">
+  * We learned that <add another thing here. you should always reference with names instead of pronouns>
+  * We learned that <write as many points as needed - don't miss any info! we want to record ALL useful information)
+
+  NEW OVERALL SUMMARY:
+  <write a new summary here - it should start with "${prevSummary.split(" ").slice(0, 5).join(" ")}..." and should include ALL the important details that were in the previous summary - it's okay for the summary to be LONG if needed>`.trim();
+              } else {
+                let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
+                // NOTE: Dedent doesn't work here because messageBatchText is multi-line, so the second line is not indented and thus prevents the dedenting
+                messageBatchSummarizationInstruction = `
+  Here are some messages:
+
+  ------
+  ${messageBatchText}
+  ------
+
+  I have two tasks for you:
+
+  1. Write a list of things that a reader would learn by reading the messages. Include all important details. Every learning should start with the text "We learned that".
+  2. Write a summary of the messages. DO NOT MISS ANY IMPORTANT DETAILS. The summary can be LONG.
+
+  Your reply should start with "LEARNINGS:" and follow this exact template (nothing more, nothing less):
+
+  LEARNINGS:
+  * We learned that <something we learned about the story/characters from the messages. include relevant context & info - e.g. "X happened due to Y, right after Z happened" instead of just "X happened">
+  * We learned that <add another thing here. you should always reference with names instead of pronouns>
+  * We learned that <write as many points as needed - don't miss any info! we want to record ALL useful information)
+
+  OVERALL SUMMARY:
+  <write a summary here - it should include ALL the important details - it's okay for the summary to be LONG if needed>`.trim();
               }
-
-              let embeddings = await embedTexts({textArr:memories, modelName:embeddingModelName, shouldCache:true});
-
-              let existingThreadMemories = await db.memories.where({threadId, status:"current"}).toArray();
-              existingThreadMemories.sort((a,b) => a.index - b.index);
-              let previousMemory = existingThreadMemories.at(-1);
-              let previousMemoryIndex = previousMemory ? previousMemory.index : -1;
-              let i = 0;
-              let memoryObjsToAdd = [];
-              for(let memory of memories) {
-                let embedding = embeddings[i];
-                memoryObjsToAdd.push({summaryHash:hash, threadId, text:memory, characterId, embeddings:{[embeddingModelName]:embedding}, status:"current", index:previousMemoryIndex+1, triggers:[]});
-                previousMemoryIndex++;
-                addToDebugLog(`<b>added memory:</b> ${memory}`);
-                console.log("added memory:", memory);
-                i++;
-              }
-
-              if(signals.stop) return {};
-
-              await db.transaction('rw', db.memories, async tx => {
-                // counter-intuitively, in rare cases it's possible for us to already have memories for this batch of messages (i.e. for this summary hash).
-                // e.g. if the user closed the tab right as the memories were being added to the db, but the summary didn't get a chance to be added.
-                // so we delete any existing memories that we have for these messages by checking for matches on the summaryHash.
-                await tx.table("memories").where({summaryHash:hash, threadId}).delete();
-
-                let ids = await tx.table("memories").bulkAdd(memoryObjsToAdd, undefined, {allKeys: true});
-                memoryIdsToSetToCurrent.push(...ids);
-              });
-
-              summary = summaryText.trim();
             } else {
-              summary = result.trim();
+              if(i > 0) { // if i>0, then we have prevSummary 
+                let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
+                // NOTE: Dedent doesn't work here because messageBatchText is multi-line, so the second line is not indented and thus prevents the dedenting
+                messageBatchSummarizationInstruction = `Here's what has recently happened:\n\n------\n${messageBatchText}\n------\n\nHere's a summary of what happened previously:\n\n------\n${prevSummary}\n------\n\nPlease reply with a new version of this summary that ALSO includes what has recently happened. Include ALL the KEY details. DO NOT MISS ANY IMPORTANT DETAILS. You MUST include all the details that were in the previous summary in your response. Your response should start with "${prevSummary.split(" ").slice(0, 5).join(" ")}" and it should compress all the important details into a new summary. It's okay for the summary to be LONG if needed.`.trim();
+              } else {
+                let messageBatchText = messageBatchArr.map(m => `[${m.name}]: ${m.content}`).join("\n\n");
+                // NOTE: Dedent doesn't work here because messageBatchText is multi-line, so the second line is not indented and thus prevents the dedenting
+                messageBatchSummarizationInstruction = `Please summarize the content of these messages:\n\n------\n${messageBatchText}\n------\n\nRespond with the summary only - nothing else. Include all relevant details. Be concise, but DO NOT leave out any important details. It's okay for the summary to be LONG if needed.`.trim();
+              }
             }
-            console.log("computed summary:", summary);
-            addToDebugLog(`<b>computed summary:</b> ${summary}`);
-            let messageIds = messageBatchArr.map(m => m.id);
-            let prevSummaryHash = prevSummaryObj ? prevSummaryObj.hash : null;
-            await db.summaries.put({hash, summary, threadId, messageIds, prevSummaryHash});
-          } else {
-            // There's already an existing summary that matches this instruction hash.
-            // mark the existing memories that match this summary has as current/valid:
-            let memories = await db.memories.where({summaryHash:hash, threadId}).toArray();
-            memoryIdsToSetToCurrent.push(...memories.map(m => m.id));
+
+
+            // Note: Hash corresponds to only the inputs (i.e. prevSummary and messageBatchArr).
+            // User can edit summaries and that doesn't mess with our hashing stuff (if they edited a *non-latest* summary, then summaries would need to be recomputed [which wouldn't be a big deal], but they can only edit latest one anyway).
+            
+            // I was originally using the whole messageBatchSummarizationInstruction as the hash, but that's not ideal because then everytime I update the instruction prompt, every thread will need to have all its summaries recomputed.
+            // With this approach they'll only ever need to recompute summaries and memories if the actual messages change.
+            // If I ever want to force everyone to recompute summaries and memories (e.g. because I introduced a really bad bug that makes it worth it) then I can increment the summarizationVersion.
+            
+            // CAUTION: incrementing summarizationVersion or editing textToHash will cause everyone to need to recompute all summaries - can cost multiple dollars for very long threads.
+            const summarizationVersion = 1;
+            let textToHash = summarizationVersion + " " + (prevSummary || "") + messageBatchArr.map(m => m.content).join("\n\n\n");
+            let hash = await sha256Text(textToHash);
+
+            instructionHashChain.push(hash);
+
+            if(signals.stop) {
+              return {};
+            }
+
+            // check if we have a summary for this text yet
+            let summaryObj = await db.summaries.get(hash);
+            let summary = summaryObj?.summary;
+            if(!summary) {
+              if(exitOnFirstHashMissAndReturnHashChain) {
+                return {instructionHashChain};
+              }
+              if(numTokensToSummarize === null) {
+                numTokensToSummarize = currentTokenCount;
+              }
+              let result;
+              while(1) {
+                if(signals.stop) {
+                  return {};
+                }
+                result = await getChatCompletion({
+                  messages: [
+                    {role: "system", content: "You are an expert text summarization assistant. You respond only with what the user requests - nothing more, nothing less."},
+                    {role: "user", content: messageBatchSummarizationInstruction},
+                  ],
+                  modelName,
+                  temperature: 0.7,
+                  threadId, // just used to track token usage
+                });
+                if(result) break;
+                if(onProgressMessage) onProgressMessage({message:`error, retrying summary...`});
+                await delay(3000);
+              }
+              numSummariesGenerated++;
+              if(!alreadyWarnedAboutLoop && numSummariesGenerated > 5*(numTokensToSummarize/messageTokensToConsumePerSummary)) { // the 5* is because it's very unlikely that each summary only consumed 1/5 of messageTokensToConsumePerSummary
+                alert("The summary system might be caught in a loop? This could be a bug. If you click OK, it will continue, but please watch it to ensure it doesn't infinitely loop and spend lots of API credits.");
+                alreadyWarnedAboutLoop = true;
+              }
+              if(aiCharacter.autoGenerateMemories === "v1") {
+                let [ memoriesText, summaryText ] = result.split(/OVERALL SUMMARY:|NEW OVERALL SUMMARY:/);
+                let memories = memoriesText.trim().replace(/^LEARNINGS:|NEW LEARNINGS:/, "").trim().split("\n").map(m => m.trim().replace(/^\* (We learned that )?/, "").trim()).filter(m => m);
+                memories = memories.map(m => m.replace(/\n+/g, "\n")); // not ideal, but: memories cannot have two consecutive newlines, since in the memory editing UI two newlines indicate a gap between entries
+                memories = memories.map(m => m[0].toUpperCase() + m.slice(1)); // capitalize first letter of each memory
+
+                let embeddingModelName = thread.textEmbeddingModelName;
+
+                // Warn user if they're using a non-OpenAI model and have character memories enabled (TODO: add option for locally-computed embeddings)
+                if(!await threadIsUsingOpenAiModel(thread)) {
+                  let userPermissionToUseOpenAiByThread = (await db.misc.get("userPermissionToUseOpenAiModelByThread")) || {};
+                  if(!userPermissionToUseOpenAiByThread[thread.id]) {
+                    let confirm = window.confirm(`You're using a non-OpenAI model (${thread.modelName}), but you currently have character memories enabled. Character memories currenly rely on an OpenAI API, so this message is to inform you that text from this chat will be processed via OpenAI's text embedding service. Do you want to continue?`);
+                    userPermissionToUseOpenAiByThread[thread.id] = confirm;
+                    await db.misc.put({key:"userPermissionToUseOpenAiModelByThread", value:userPermissionToUseOpenAiModelByThread});
+                    if(!confirm) {
+                      return {};
+                    }
+                  }
+                }
+
+                let embeddings = await embedTexts({textArr:memories, modelName:embeddingModelName, shouldCache:true});
+
+                let existingThreadMemories = await db.memories.where({threadId, status:"current"}).toArray();
+                existingThreadMemories.sort((a,b) => a.index - b.index);
+                let previousMemory = existingThreadMemories.at(-1);
+                let previousMemoryIndex = previousMemory ? previousMemory.index : -1;
+                let i = 0;
+                let memoryObjsToAdd = [];
+                for(let memory of memories) {
+                  let embedding = embeddings[i];
+                  memoryObjsToAdd.push({summaryHash:hash, threadId, text:memory, characterId, embeddings:{[embeddingModelName]:embedding}, status:"current", index:previousMemoryIndex+1, triggers:[]});
+                  previousMemoryIndex++;
+                  addToDebugLog(`<b>added memory:</b> ${memory}`);
+                  console.log("added memory:", memory);
+                  i++;
+                }
+
+                if(signals.stop) {
+                  return {};
+                }
+
+                await db.transaction('rw', db.memories, async tx => {
+                  // counter-intuitively, in rare cases it's possible for us to already have memories for this batch of messages (i.e. for this summary hash).
+                  // e.g. if the user closed the tab right as the memories were being added to the db, but the summary didn't get a chance to be added.
+                  // so we delete any existing memories that we have for these messages by checking for matches on the summaryHash.
+                  await tx.table("memories").where({summaryHash:hash, threadId}).delete();
+
+                  let ids = await tx.table("memories").bulkAdd(memoryObjsToAdd, undefined, {allKeys: true});
+                  memoryIdsToSetToCurrent.push(...ids);
+                });
+
+                summary = summaryText.trim();
+              } else {
+                summary = result.trim();
+              }
+              console.log("computed summary:", summary);
+              addToDebugLog(`<b>computed summary:</b> ${summary}`);
+              let messageIds = messageBatchArr.map(m => m.id);
+              let prevSummaryHash = prevSummaryObj ? prevSummaryObj.hash : null;
+              await db.summaries.put({hash, summary, threadId, messageIds, prevSummaryHash});
+            } else {
+              // There's already an existing summary that matches this instruction hash.
+              // mark the existing memories that match this summary has as current/valid:
+              let memories = await db.memories.where({summaryHash:hash, threadId}).toArray();
+              memoryIdsToSetToCurrent.push(...memories.map(m => m.id));
+            }
+
+            if(signals.stop) {
+              return {};
+            }
+
+            // Compress summary if needed.
+            // Note this is *outside* of the above `if` block because user will be able to adjust maxTokenCountOfSummary, and we want to re-compute/compress summaries if they change that value.
+            // (this also helps with backwards-compat since maxTokenCountOfSummary previously didn't exist, we so we may need to compress some old summaries)
+            if(await countTokens(summary, modelName) > maxTokenCountOfSummary) {
+              addToDebugLog(`<b>summary to compress:</b> ${summary}`);
+              summary = await compressText({text:summary, tokenLimit:maxTokenCountOfSummary, modelName, onProgressMessage, threadId});
+              await db.summaries.where({hash}).modify({summary});
+              addToDebugLog(`<b>compressed summary:</b> ${summary}`);
+            }
+
+            if(signals.stop) {
+              return {};
+            }
+            
+            summaryObj = await db.summaries.get(hash);
+
+            // get size difference between summary and original messages
+            // let summaryTokenChange = countTokens(prevSummary || "") - countTokens(summary);
+            // let messageArrTokenChange = -messageBatchTokenCount; // since all these messages were "removed" (squashed into the summary)
+            // let overallTokenChange = summaryTokenChange + messageArrTokenChange;
+            // currentTokenCount += overallTokenChange; // overallTokenChange is almost certainly negative but we can't assume that for sure, since it's not technically *impossible* for the LLM to return a summary that's longer than message batch
+
+            currentTokenCount = await countTokens(summary||"", modelName) + await countTokensInMessages(remainingMessages, modelName);
+            prevSummary = summary;
+            prevSummaryObj = summaryObj;
+            prevInstructionHash = hash;
+            i++;
           }
 
-          if(signals.stop) return {};
-
-          // Compress summary if needed.
-          // Note this is *outside* of the above `if` block because user will be able to adjust maxTokenCountOfSummary, and we want to re-compute/compress summaries if they change that value.
-          // (this also helps with backwards-compat since maxTokenCountOfSummary previously didn't exist, we so we may need to compress some old summaries)
-          if(await countTokens(summary, modelName) > maxTokenCountOfSummary) {
-            addToDebugLog(`<b>summary to compress:</b> ${summary}`);
-            summary = await compressText({text:summary, tokenLimit:maxTokenCountOfSummary, modelName, onProgressMessage, threadId});
-            await db.summaries.where({hash}).modify({summary});
-            addToDebugLog(`<b>compressed summary:</b> ${summary}`);
+          // it's possible that there are no remainingMessages due to the summarization happening to consume them all in the final batch.
+          // in this case we add some messages back until we reach the token limit.
+          // it means that there will be overlap between the summary and the messages, but that's fine.
+          if(remainingMessages.length === 0) {
+            let messagesToMaybeAdd = originalMessagesPreparedForBot.slice(0);
+            while(1) {
+              let currentTokenCount = await countTokens(prevSummary||"", modelName) + await countTokensInMessages(remainingMessages, modelName);
+              if(currentTokenCount >= tokenLimitForSummaryAndMessages) break;
+              if(remainingMessages.length > 3) break;
+              if(messagesToMaybeAdd.length === 0) break;
+              remainingMessages.unshift(messagesToMaybeAdd.pop());
+            }
           }
 
-          if(signals.stop) return {};
+          if(signals.stop) {
+            return {};
+          }
+
+          await db.transaction('rw', db.memories, async tx => {
+            await tx.table("memories").where({threadId, status:"current"}).modify({status:"noncurrent"});
+            await tx.table("memories").where("id").anyOf(memoryIdsToSetToCurrent).modify({status:"current"});
+            await tx.table("memories").where({summaryHash:"", threadId}).modify({status:"current"}); // <-- bit hacky, but this is needed for user-added memories before any summaries were done (so they don't belong to a summaryHash). could maybe make *all* user-added memories use "" (empty string) as summaryHash, but for now I just add them to the summary that they were closest to, or if there is no summary yet, then ""
+          });
           
-          summaryObj = await db.summaries.get(hash);
-
-          // get size difference between summary and original messages
-          // let summaryTokenChange = countTokens(prevSummary || "") - countTokens(summary);
-          // let messageArrTokenChange = -messageBatchTokenCount; // since all these messages were "removed" (squashed into the summary)
-          // let overallTokenChange = summaryTokenChange + messageArrTokenChange;
-          // currentTokenCount += overallTokenChange; // overallTokenChange is almost certainly negative but we can't assume that for sure, since it's not technically *impossible* for the LLM to return a summary that's longer than message batch
-
-          currentTokenCount = await countTokens(summary||"", modelName) + await countTokensInMessages(remainingMessages, modelName);
-          prevSummary = summary;
-          prevSummaryObj = summaryObj;
-          prevInstructionHash = hash;
-          i++;
-        }
-
-        // it's possible that there are no remainingMessages due to the summarization happening to consume them all in the final batch.
-        // in this case we add some messages back until we reach the token limit.
-        // it means that there will be overlap between the summary and the messages, but that's fine.
-        if(remainingMessages.length === 0) {
-          let messagesToMaybeAdd = originalMessagesPreparedForBot.slice(0);
-          while(1) {
-            let currentTokenCount = await countTokens(prevSummary||"", modelName) + await countTokensInMessages(remainingMessages, modelName);
-            if(currentTokenCount >= tokenLimitForSummaryAndMessages) break;
-            if(remainingMessages.length > 3) break;
-            if(messagesToMaybeAdd.length === 0) break;
-            remainingMessages.unshift(messagesToMaybeAdd.pop());
+          if(signals.stop) {
+            return {};
           }
+
+          // NOTE: prevSummary can be undefined - i.e. no summaries were needed to get messages under the tokenLimitForSummaryAndMessages limit
+          return {summary:prevSummary, instructionHash:prevInstructionHash, instructionHashChain, remainingMessages}; // remainingMessages = unsummarized messages (the ones that follow the summary)
+
+        } finally {
+          finalize();
         }
-
-        if(signals.stop) return {};
-
-        await db.transaction('rw', db.memories, async tx => {
-          await tx.table("memories").where({threadId, status:"current"}).modify({status:"noncurrent"});
-          await tx.table("memories").where("id").anyOf(memoryIdsToSetToCurrent).modify({status:"current"});
-          await tx.table("memories").where({summaryHash:"", threadId}).modify({status:"current"}); // <-- bit hacky, but this is needed for user-added memories before any summaries were done (so they don't belong to a summaryHash). could maybe make *all* user-added memories use "" (empty string) as summaryHash, but for now I just add them to the summary that they were closest to, or if there is no summary yet, then ""
-        });
-        
-        if(signals.stop) return {};
-
-        // NOTE: prevSummary can be undefined - i.e. no summaries were needed to get messages under the tokenLimitForSummaryAndMessages limit
-        return {summary:prevSummary, instructionHash:prevInstructionHash, instructionHashChain, remainingMessages}; // remainingMessages = unsummarized messages (the ones that follow the summary)
       }
 
       
@@ -4439,20 +4526,29 @@ OVERALL SUMMARY:
 
         if(modelType === "chat-completion") {
 
+          let tokensInPrompt = await countTokensInMessages(messagesArr, modelName);
+
           let data = {
             model: modelName,
             messages: messagesArr,
             temperature: replyingCharacter.temperature ?? 0.7,
-            // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted roleInstruction and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
           };
           if(replyingCharacter.topP) data.top_p = replyingCharacter.topP;
           if(replyingCharacter.frequencyPenalty) data.frequency_penalty = replyingCharacter.frequencyPenalty;
           if(replyingCharacter.presencePenalty) data.presence_penalty = replyingCharacter.presencePenalty;
           if(replyingCharacter.stopSequences && replyingCharacter.stopSequences.length > 0) data.stop = replyingCharacter.stopSequences;
 
+          if(replyingCharacter.maxTokensPerMessage) {
+            // note that the chat completion endpoint defaults to unlimited max_tokens (i.e. uses [up to] the full context size), so we only need to mess with it if the user has set a limit
+            let max_tokens = Math.round((availableModels[modelName].maxSequenceLength - tokensInPrompt) * 0.95); // *0.95 just to add a bit of a buffer in case of a few off-by-one errors, or whatever
+            if(max_tokens > replyingCharacter.maxTokensPerMessage) {
+              max_tokens = replyingCharacter.maxTokensPerMessage;
+            }
+            data.max_tokens = max_tokens;
+          }
+
           if(getStreamingResponse) {
             data.stream = true;
-            let tokensInPrompt = await countTokensInMessages(messagesArr, modelName);
             apiTokenUsage = {prompt:tokensInPrompt, completion:0, total:tokensInPrompt};
             
             let response = await fetch(modelObj.endpointUrl, {
@@ -4499,12 +4595,15 @@ OVERALL SUMMARY:
           let prompt = promptIntro + messagesArr.map(m => (m.role=="user"?`[[${m.name ?? userName}]]: `:m.role=="system"?`[[SYSTEM]]: `:`[[${m.name}]]: `)+m.content).join("\n\n") + `\n\n[[${replyingCharacterName}]]:`;
           
           // davinci *requires* max_tokens else it defaults to 16 (unlike turbo which defaults to infinity)
-          let max_tokens = Math.round((availableModels[modelName].maxSequenceLength - await countTokens(prompt, modelName)) * 0.85); // *0.85 because countTokens is an estimate
+          let max_tokens = Math.round((availableModels[modelName].maxSequenceLength - await countTokens(prompt, modelName)) * 0.95); // *0.95 just to add a bit of a buffer in case of a few off-by-one errors, or whatever
           
+          if(replyingCharacter.maxTokensPerMessage && max_tokens > replyingCharacter.maxTokensPerMessage) {
+            max_tokens = replyingCharacter.maxTokensPerMessage;
+          }
+
           let data = {
             model: modelName,
             prompt,
-            // max_tokens: maxTokensInResponse, // This is commented out because it's incorrect - since we subtracted roleInstruction and reminderMessage from tokenLimit. Not sure why we'd need to include max_tokens anyway?
             temperature: replyingCharacter.temperature ?? 0.7,
             stop: [`\n\n[[`],
             max_tokens,  // see note above
@@ -5069,6 +5168,9 @@ OVERALL SUMMARY:
             let shouldScrollDown = messageFeedIsNearBottom();
             await addMessageToFeed(messageObj, {character, inPlaceOf:messageEl})
             if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+
+            // we don't await this because we want to do it in the background
+            computeAndSaveThreadSummaryIfNeeded({threadId});
             
             messageEl.dataset.canDelete = "true";
             await triggerMessageActionCustomCodeEvent({threadId, eventData:{}, eventName:"MessageAdded"});
@@ -5703,6 +5805,7 @@ OVERALL SUMMARY:
             // we leave `shape` and `size` as thread default
           },
           streamingResponse: true,
+          maxTokensPerMessage: null,
         };
         // override with character and then thread-specific settings:
         let thread = await db.threads.get(threadId);
@@ -5722,6 +5825,7 @@ OVERALL SUMMARY:
             shape: null, // null => default to character setting
             size: null,
           },
+          maxTokensPerMessage: null,
         };
         // override with character and then thread-specific settings:
         let thread = await db.threads.get(threadId);
@@ -6178,6 +6282,9 @@ OVERALL SUMMARY:
 
         await db.threads.update(threadId, {unsentMessageText:$.messageInput.value});
 
+        // we don't `await` this because we want it to happen in the background
+        computeAndSaveThreadSummaryIfNeeded({threadId});
+
         let messageCount = await db.messages.count();
         if(await db.threads.count() === 1 && (messageCount === 4 || messageCount === 5)) {
           await prompt2({message:{type:"none", html:dedent(`
@@ -6233,6 +6340,7 @@ OVERALL SUMMARY:
         // scene: "scene", // not exposing `scene` yet because I think it should probably be like userCharacter - i.e. instantiated as a thread property. but devs can edit scene by adding to messages anyway so no rush here.
         streamingResponse: "streamingResponse",
         customData: "customData",
+        maxTokensPerMessage: "maxTokensPerMessage",
       };
 
       
