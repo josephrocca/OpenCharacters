@@ -148,6 +148,7 @@
       #chatThreads .threadFolder {
         display: flex;
         justify-content: space-between;
+        align-items: center;
       }
 
       #chatThreads .thread .favStar, #chatThreads .thread .changeFolderPath {
@@ -378,6 +379,7 @@
       #characterFoldersList .characterFolder {
         display: flex;
         justify-content: space-between;
+        align-items: center;
       }
       #characterSelection .character {
         user-select:none;
@@ -769,7 +771,7 @@
 
 
       const dbName = "chatbot-ui-v1";
-      const dbVersion = 80;
+      const dbVersion = 81;
 
       let db = await new Dexie(dbName).open().catch(e => false); // throws if db doesn't exist
       let dbLoadingModal;
@@ -992,6 +994,9 @@
         if(thread.userMessagesSentHistory === undefined) thread.userMessagesSentHistory = [];
         if(thread.unsentMessageText === undefined) thread.unsentMessageText = "";
         if(thread.shortcutButtons === undefined) thread.shortcutButtons = [];
+        for(let shortcut of thread.shortcutButtons) {
+          if(shortcut.insertionType === undefined) shortcut.insertionType = "replace";
+        }
         // WARNING: If you add something here, you may need to edit:
         // - addThread
         // - getThreadJSONById
@@ -1317,7 +1322,11 @@
           }
           foldersHtml += currentSubfolderNames.map(name => {
             let folderPath = currentFolderPath ? currentFolderPath+"/"+name : name;
-            return `<div class="threadFolder" data-folder-path="${sanitizeHtml(folderPath)}">${threadFolderData[folderPath]?.emoji ?? "📁"} ${sanitizeHtml(name)} <span class="editFolderName emojiButton" style="font-size:0.7rem; display:flex; align-items:center;">✏️</span></div>`;
+            let icon = threadFolderData[folderPath]?.emoji;
+            if(icon && icon.startsWith("http")) {
+              icon = `<img src="${sanitizeHtml(icon)}" style="height:1.2rem; width:1.2rem; object-fit:cover; border-radius:2px;"/>`;
+            }
+            return `<div class="threadFolder" data-folder-path="${sanitizeHtml(folderPath)}">${icon ?? "📁"}<span style="flex-grow:1; margin-left:0.5rem;">${sanitizeHtml(name)}</span><span class="editFolderName emojiButton" style="font-size:0.7rem; display:flex; align-items:center;">✏️</span></div>`;
           }).join("");
         }
         // $.chatThreadFolders.innerHTML = foldersHtml;
@@ -1352,7 +1361,6 @@
           btn.addEventListener("click", async function(e) {
             e.stopPropagation();
             const folderPath = btn.closest(".threadFolder").dataset.folderPath;
-            let newFolderPath;
             
             let label;
             if(folderPath.split("/").length === 1) {
@@ -1364,7 +1372,7 @@
 
             let result = await prompt2({
               newFolderPath: {type:"textLine", label, defaultValue:folderPath},
-              emoji: {type:"textLine", label:"Folder emoji:", defaultValue:threadFolderData[folderPath]?.emoji || ""},
+              emoji: {type:"textLine", label:"Folder emoji or image URL:", defaultValue:threadFolderData[folderPath]?.emoji || ""},
             });
             if(!result) return;
 
@@ -1375,7 +1383,7 @@
 
             await db.misc.put({key:"threadFolderData", value:threadFolderData});
 
-            newFolderPath = result.newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
+            let newFolderPath = result.newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
             // each thread has a folderPath property, which is a string like "folder1/folder2/folder3" or just "" (empty string) if it's in the root folder
             await db.threads.toCollection().modify(function(thread) {
               // we need to move all threads that start with folderPath to newFolderPath
@@ -1991,7 +1999,11 @@
         }
         foldersHtml += currentSubfolderNames.map(name => {
           let folderPath = currentFolderPath ? currentFolderPath+"/"+name : name;
-          return `<div class="characterFolder" data-folder-path="${sanitizeHtml(folderPath)}">${characterFolderData[folderPath]?.emoji ?? "📁"} ${sanitizeHtml(name)} <span class="editFolderName emojiButton" style="font-size:0.7rem; display:flex; align-items:center;">✏️</span></div>`;
+          let icon = characterFolderData[folderPath]?.emoji;
+          if(icon && icon.startsWith("http")) {
+            icon = `<img src="${sanitizeHtml(icon)}" style="height:1.2rem; width:1.2rem; object-fit:cover; border-radius:2px;"/>`;
+          }
+          return `<div class="characterFolder" data-folder-path="${sanitizeHtml(folderPath)}">${icon ?? "📁"}<span style="flex-grow:1; margin-left:0.5rem;">${sanitizeHtml(name)}</span><span class="editFolderName emojiButton" style="font-size:0.7rem; display:flex; align-items:center;">✏️</span></div>`;
         }).join("");
 
         $.characterFoldersList.innerHTML = foldersHtml;
@@ -2255,7 +2267,6 @@
           btn.addEventListener("click", async function(e) {
             e.stopPropagation();
             const folderPath = btn.closest(".characterFolder").dataset.folderPath;
-            let newFolderPath;
             
             let label;
             if(folderPath.split("/").length === 1) {
@@ -2267,7 +2278,7 @@
 
             let result = await prompt2({
               newFolderPath: {type:"textLine", label, defaultValue:folderPath},
-              emoji: {type:"textLine", label:"Folder emoji:", defaultValue:characterFolderData[folderPath]?.emoji || ""},
+              emoji: {type:"textLine", label:"Folder emoji or image URL:", defaultValue:characterFolderData[folderPath]?.emoji || ""},
             });
             if(!result) return;
 
@@ -2278,7 +2289,7 @@
 
             await db.misc.put({key:"characterFolderData", value:characterFolderData});
 
-            newFolderPath = newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
+            let newFolderPath = result.newFolderPath.trim().replace(/^\//, "").replace(/\/$/, "").trim();
             // each character has a folderPath property, which is a string like "folder1/folder2/folder3" or just "" (empty string) if it's in the root folder
             await db.characters.toCollection().modify(function(character) {
               // we need to move all characters that start with folderPath to newFolderPath
@@ -2627,7 +2638,13 @@
             buttonWrapper.appendChild(shortcutBtn);
             shortcutBtn.addEventListener("click", async function() {
               if(shortcut.type === "message") {
-                $.messageInput.value = shortcut.message;
+                if(shortcut.insertionType === "replace") {
+                  $.messageInput.value = shortcut.message;
+                } else if(shortcut.insertionType === "append") {
+                  $.messageInput.value += shortcut.message;
+                } else if(shortcut.insertionType === "prepend") {
+                  $.messageInput.value = shortcut.message + $.messageInput.value;
+                }
                 if(shortcut.autoSend) {
                   await sendButtonClickHandler();
                 }
@@ -2638,14 +2655,14 @@
        if(shortcutButtonsCtn.innerHTML !== "") {
           let bulkEditButton = htmlToElement(`<button>✏️</button>`);
           bulkEditButton.addEventListener("click", async function() {
-            let shortcutsInTextFormat = thread.shortcutButtons.map(s => `@name=${s.name}\n@message=${s.message}\n@autoSend=${s.autoSend ? "yes" : "no"}`).join("\n\n");
+            let shortcutsInTextFormat = thread.shortcutButtons.map(s => `@name=${s.name}\n@message=${s.message}\n@insertionType=${s.insertionType}\n@autoSend=${s.autoSend ? "yes" : "no"}`).join("\n\n");
             let result = await prompt2({
               shortcutsInTextFormat: {label: "Bulk-edit shortcuts:", type: "text", defaultValue:shortcutsInTextFormat, height:"fit-content"},
             });
             if(!result) return;
 
             // parse shortcuts:
-            const regex = /(?:^|\n+)@name=(.*?)\n@message=(.*?)\n@autoSend=(yes|no)/gs;
+            const regex = /(?:^|\n+)@name=(.*?)\n@message=(.*?)\n@insertionType=(replace|append|prepend)\n@autoSend=(yes|no)/gs;
             let matches;
             let parsedShortcuts = [];
 
@@ -2653,7 +2670,8 @@
               let shortcut = {
                 name: matches[1],
                 message: matches[2],
-                autoSend: matches[3] === 'yes',
+                insertionType: matches[3],
+                autoSend: matches[4] === 'yes',
                 type: "message",
               };
               parsedShortcuts.push(shortcut);
@@ -4205,7 +4223,7 @@
             signals,
           });
           if(!rawResult) {
-            alert("There was an error getting the memory search queries. Please try again.");
+            if(!signals.stop) alert("There was an error getting the memory search queries. Please try again.");
             return {};
           }
 
@@ -7460,16 +7478,16 @@
       });
 
       $.addShortcutButton.addEventListener("click", async function() {
-        let result = await prompt2({
+        let shortcut = await prompt2({
           intro: {html: `<div style="font-size: 0.85rem;margin-bottom: 0.5rem;">Shortcuts are buttons that appear above the text box which can be used to easily/quickly send a commonly-used message.</div>`, type:"none"},
           name: {label: "Shortcut name:", type: "textLine", placeholder:"user reply"},
-          message: {label: "Message text:", type: "textLine", placeholder:"/user write an intersting first-person reply"},
-          autoSend: {label: "Auto-send?", type: "select", options:[{content:"Yes, immediately send", value:"yes"}, {content: "No, just put it in the text area", value:"no"}]},
+          message: {label: "Message text:", type: "text", height:"fit-content", minHeight:"2rem", placeholder:"/user write an intersting first-person reply"},
+          insertionType: {label: "Insertion type:", type: "select", options:[{content:"Replace existing text", value:"replace"}, {content: "Add to 𝗲𝗻𝗱 of existing text", value:"append"}, {content: "Add to 𝘀𝘁𝗮𝗿𝘁 of existing text", value:"prepend"}]},
+          autoSend: {label: "Auto-send?", type: "select", options:[{content:"Yes, send on click", value:"yes"}, {content: "No, just put it in the text area", value:"no"}]},
         });
-        if(!result) return;
-        let {name, message, autoSend} = result;
-        autoSend = autoSend === "yes";
-        let shortcut = {name, message, autoSend, type:"message"};
+        if(!shortcut) return;
+        shortcut.autoSend = (shortcut.autoSend === "yes");
+        shortcut.type = "message";
         let thread = await db.threads.get(activeThreadId);
         thread.shortcutButtons.push(shortcut);
         await db.threads.put(thread);
