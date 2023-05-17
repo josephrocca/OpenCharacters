@@ -4444,7 +4444,6 @@
 
             // drop worst entries/batches until we're under token limit allocated to memories:
             while(await countTokensInAllChunks() > retrievedMemoriesTokenLimitFraction * availableModels[modelName].maxSequenceLength) {
-              console.log("dropping...")
               if(relevantLore.length === 0) {
                 memoryBatches.pop();
               } else if(memoryBatches.length === 0) {
