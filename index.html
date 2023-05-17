@@ -5478,6 +5478,11 @@
           let loreEntriesUsed = await db.lore.where("id").anyOf(message.loreIdsUsed).toArray();
 
           let content = [];
+
+          if(message.instruction) {
+            content.push(`<b>Instruction Used:</b> ${message.instruction}`);
+          }
+
           if(message.summaryHashUsed === undefined) {
             content.push(`<b>Summary Used:</b><div style="opacity:0.5;font-size: 80%; margin-top:0.5rem;">(This message was created before message-summary-usage tracking was implemented)</div>`);
           } else if(message.summaryHashUsed === null) {
