@@ -2956,6 +2956,20 @@
         return characterObj;
       }
 
+      async function getOpenAiApiKey() {
+        let apiKey = (await db.misc.get("openAiApiKey"))?.value;
+        while(!apiKey) {
+          let result = await prompt2({
+            openAiApiKey: { label: "Please create a new OpenAI API secret key and paste it here. Go to <a style='color:blue' href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a> to do that. You can change or delete this later by clicking the 'settings' button.", type:"textLine", placeholder:"sk-...", focus:true },
+          });
+          if(!result || !result.openAiApiKey) continue;
+          apiKey = result.openAiApiKey;
+          break;
+        }
+        await db.misc.put({ key: "openAiApiKey", value: apiKey });
+        return apiKey;
+      }
+
 
       function createMessageObj({threadId, message, characterId, hiddenFrom, creationTime, expectsReply, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed, memoryQueriesUsed, messageIdsUsed, scene, avatar, name, customData, wrapperStyle, order, instruction}) {
         if(threadId === undefined || message === undefined || characterId === undefined) throw new Error(`createMessageObj: threadId, message, and characterId are required: ${threadId}, ${message}, ${characterId}`);
@@ -3087,6 +3101,10 @@
           unsentMessageText: "",
           shortcutButtons: [],
         };
+
+        if(aiCharacter.loreBookUrls.length > 0) {
+          await getOpenAiApiKey(); // so we have it for embedTexts
+        }
 
         await ensureLoreUrlsAreLoaded({loreBookUrls:aiCharacter.loreBookUrls, modelName:aiCharacter.textEmbeddingModelName});
 
@@ -3236,13 +3254,15 @@
         let embeddings = textsRemaining.filter(e => e.embedding);
         textsRemaining = textsRemaining.filter(e => !e.embedding);
 
+        let apiKey = await getOpenAiApiKey();
+
         let endpointUrl = "https://api.openai.com/v1/embeddings";
         let headers = {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${(await db.misc.get("openAiApiKey"))?.value}`,
+          "Authorization": `Bearer ${apiKey}`,
         };
         if(new URL(endpointUrl).hostname.includes("azure")) {
-          headers["api-key"] = (await db.misc.get("openAiApiKey"))?.value;
+          headers["api-key"] = apiKey;
         }
 
         // batch textArr into chunks of 100
@@ -3378,7 +3398,11 @@
 
       let alreadyComputingSummaryForThreadPromises = {};
       let alreadyComputingSummaryForThreadResolvers = {};
-      async function computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId, onProgressMessage, signals, exitOnFirstHashMissAndReturnHashChain}) {
+      async function computeAndSaveThreadSummaryIfNeeded({threadId, upToMessageId, onProgressMessage, signals, exitOnFirstHashMissAndReturnHashChain, continuePastCurrentSummary}) {
+
+        // Note:
+        //  - continuePastCurrentSummary is so that we can load summaries "ahead of time" (it just computes - causes this function to not return anything)
+        //  - exitOnFirstHashMissAndReturnHashChain is so that we can allow people to delete summaries for a thread (the current threadId on each summary is erroneous, since there could be a second thread using it)
 
         function finalize() {
           // this function is called in the finally clause of the below try/finally block, so it gets called right before any `return` statement in the `try` clause
@@ -3459,8 +3483,11 @@
           let i = 0;
           let numSummariesGenerated = 0; // <-- i.e. where we didn't have an existing matching summary
           let alreadyWarnedAboutLoop = false;
-          // while the total token count is too high, grab batches of old messages, and summarize them
-          while(currentTokenCount > tokenLimitForSummaryAndMessages) {
+
+          let condition = () => currentTokenCount > tokenLimitForSummaryAndMessages; // while the total token count is too high, grab batches of old messages, and summarize them
+          if(continuePastCurrentSummary) condition = () => true; // we break out of the while loop when we run out of messages to summarize (or, to be more accurate, when we don't have a 'full' batch of messages to summarize)
+          
+          while(condition()) {
             if(signals.stop) {
               return {};
             }
@@ -3474,7 +3501,10 @@
               if(signals.stop) {
                 return {};
               }
-              if(remainingMessages.length === 0) break; // no more messages
+              if(remainingMessages.length === 0) {
+                if(continuePastCurrentSummary) return; // there isn't a full batch of messages to summarize, so we're done with the "computing ahead of current summary"
+                break; // no more messages
+              }
               
               let m = remainingMessages[0];
               let tokens = await countTokensInMessages([m], modelName);
@@ -4495,15 +4525,7 @@
         let apiKey = modelObj.apiKey;
         
         if(apiKey === "<OPENAI>") {
-          apiKey = (await db.misc.get("openAiApiKey"))?.value;
-          if(!apiKey) {
-            let result = await prompt2({
-              openAiApiKey: { label: "Please create a new OpenAI API secret key and paste it here. Go to <a style='color:blue' href='https://platform.openai.com/account/api-keys' target='_blank'>this page</a> to do that. You can change or delete this later by clicking the 'settings' button.", type:"textLine", placeholder:"sk-...", focus:true },
-            });
-            if(!result) return;
-            await db.misc.put({ key: "openAiApiKey", value: result.openAiApiKey });
-            apiKey = result.openAiApiKey;
-          }
+          apiKey = await getOpenAiApiKey();
         }
 
         async function handleStreamingResponse(reader) {
@@ -5269,7 +5291,7 @@
             if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
             // we don't await this because we want to do it in the background
-            computeAndSaveThreadSummaryIfNeeded({threadId});
+            computeAndSaveThreadSummaryIfNeeded({threadId, continuePastCurrentSummary:true});
             
             messageEl.dataset.canDelete = "true";
             await triggerMessageActionCustomCodeEvent({threadId, eventData:{}, eventName:"MessageAdded"});
@@ -5828,6 +5850,7 @@
         return el;
       }
 
+
       function textContainsAsALanguageModelText(text) {
         let t = text.toLowerCase();
         return t.includes("as a language model")
@@ -5836,6 +5859,7 @@
           || t.includes("language model trained")
           || /\bas an ai\b/.test(t)
           || /\bi'm sorry.+(appropriate|acceptable)\b/.test(t)
+          || /\bi apologi[zs]e.+(appropriate|acceptable)\b/.test(t)
       }
 
       async function messageEditButtonClickHandler(e) {
@@ -8686,6 +8710,8 @@
           if(editingExistingCharacter) {
             submitButtonText = "save edits";
           }
+
+          delete character.folderPath;
 
           let result = await characterDetailsPrompt(character, {editingExistingCharacter, submitButtonText});
           if(result) {
