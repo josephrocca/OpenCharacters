@@ -45,9 +45,8 @@ The most recent message is at the bottom/end of the array. The `author` field ca
 
 Below is an example that replaces `:)` with `૮ ˶ᵔ ᵕ ᵔ˶ ა` in every message that is added to the thread. Just paste it into the custom code box to try it out.
 ```js
-oc.thread.on("MessageAdded", function() {
-  let m = oc.thread.messages.at(-1); // get most recent message
-  m.content = m.content.replaceAll(":)", "૮ ˶ᵔ ᵕ ᵔ˶ ა");
+oc.thread.on("MessageAdded", function({message}) {
+  message.content = message.content.replaceAll(":)", "૮ ˶ᵔ ᵕ ᵔ˶ ა");
 });
 ```
 You can edit existing messages like in this example, and you can also delete them by just removing them from the `oc.thread.messages` array (with `pop`, `shift`, `splice`, or however else), and you can of course add new ones - e.g. with `push`/`unshift`.
@@ -139,9 +138,9 @@ async function getPdfText(data) {
   return (await Promise.all(pageTexts)).join(' ');
 }
       
-oc.thread.on("MessageAdded", async function () {
+oc.thread.on("MessageAdded", async function ({message}) {
   let messages = oc.thread.messages;
-  let lastMessage = messages.at(-1);
+  let lastMessage = message;
   if(lastMessage.author === "user") {
     let urlsInLastMessage = [...lastMessage.content.matchAll(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g)].map(m => m[0]);
     if(urlsInLastMessage.length === 0) return;
@@ -176,8 +175,8 @@ Custom code is executed securely (i.e. in a sandboxed iframe), so if you're usin
 
 Here's some custom code that adds a `/charname` command that changes the name of the character. It intercepts the user messages, and if it begins with `/charname`, then it changes `oc.character.name` to whatever comes after `/charname`, and then deletes the message.
 ```js
-oc.thread.on("MessageAdded", async function () {
-  let m = oc.thread.messages.at(-1); // most recent message
+oc.thread.on("MessageAdded", async function ({message}) {
+  let m = message; // the message that was just added
   if(m.author === "user" && m.content.startsWith("/charname ")) {
     oc.character.name = m.content.replace(/^\/charname /, "");
     oc.thread.messages.pop(); // remove the message
@@ -246,12 +245,11 @@ The `messages` parameter is the only required one.
 Here's an example of some custom code that edits all messages to include more emojis:
 
 ```js
-oc.thread.on("MessageAdded", async function() {
-  let lastMessage = oc.thread.messages.at(-1);
+oc.thread.on("MessageAdded", async function({message}) {
   let result = await oc.getChatCompletion({
-    messages: [{author:"user", content:`Please edit the following message to have more emojis:\n\n---\n${lastMessage.content}\n---\n\nReply with only the above message (the content between ---), but with more (relevant) emojis.`}],
+    messages: [{author:"user", content:`Please edit the following message to have more emojis:\n\n---\n${message.content}\n---\n\nReply with only the above message (the content between ---), but with more (relevant) emojis.`}],
   });
-  lastMessage.content = result.trim().replace(/^---|---$/g, "").trim();
+  message.content = result.trim().replace(/^---|---$/g, "").trim();
 });
 ```
 
