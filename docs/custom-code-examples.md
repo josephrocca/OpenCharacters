@@ -206,11 +206,9 @@ async function getPdfText(data) {
   return (await Promise.all(pageTexts)).join(' ');
 }
       
-oc.thread.on("MessageAdded", async function () {
-  let messages = oc.thread.messages;
-  let lastMessage = messages.at(-1);
-  if(lastMessage.author === "user") {
-    let urlsInLastMessage = [...lastMessage.content.matchAll(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g)].map(m => m[0]);
+oc.thread.on("MessageAdded", async function ({message}) {
+  if(message.author === "user") {
+    let urlsInLastMessage = [...message.content.matchAll(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g)].map(m => m[0]);
     if(urlsInLastMessage.length === 0) return;
     if(!window.Readability) window.Readability = await import("https://esm.sh/@mozilla/readability@0.4.4?no-check").then(m => m.Readability);
     let url = urlsInLastMessage.at(-1); // we use the last URL in the message, if there are multiple
@@ -230,7 +228,7 @@ oc.thread.on("MessageAdded", async function () {
       output = `# ${article.title || "(no page title)"}\n\n${article.textContent}`;
       output = output.slice(0, 5000); // <-- grab only the first 5000 characters (you can change this)
     }
-    messages.push({
+    oc.thread.messages.push({
       author: "system",
       hiddenFrom: ["user"], // hide the message from user so it doesn't get in the way of the conversation
       content: "Here's the content of the webpage that was linked in the previous message: \n\n"+output,
