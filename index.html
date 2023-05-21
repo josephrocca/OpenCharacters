@@ -775,7 +775,7 @@
 
 
       const dbName = "chatbot-ui-v1";
-      const dbVersion = 83;
+      const dbVersion = 90;
 
       let db = await new Dexie(dbName).open().catch(e => {
         console.warn(e);
@@ -790,7 +790,7 @@
             message: {type:"none", "html":`<p style="margin:0;">A database upgrade will be done when you click continue. A full export/backup will be downloaded first in case anything goes wrong.</p>`},
           }, {cancelButtonText:null, submitButtonText:"Continue"});
           
-          dbLoadingModal = createLoadingModal("Please wait...");
+          dbLoadingModal = createLoadingModal(`Please wait...<br><span style="font-size:80%; opacity:0.6;">This could take a while if you have a lot of data.</span>`);
 
           const originalDbJsonBlob = await db.export({prettyJson: true});
           let yyyymmdd = new Date().toISOString().split("T")[0];
@@ -799,7 +799,7 @@
         await db.close(); // we need to close before db.version() call below and re-open afterwards
       } else {
         // brand new user, so create the db:
-        console.log("New user, creating database");
+        console.log("New user, creating database...");
         db = new Dexie(dbName);
       }
       
@@ -821,6 +821,7 @@
         memories: "++id,[summaryHash+threadId],[characterId+status],[threadId+status],[threadId+index],threadId", // memories are associated with a summary hash because they are computed alongside the summary. We need to track the hash so that if earlier messages are edited (and therefore the summaries need to be recomputed), we know to only consider "valid"/"current" the memories that are associated with currently-"used". The "type" property is used to track the "currentness", and also to track whether a memory was manually added by the user (in which case it is *always* considered valid)
         lore: "++id,bookId,bookUrl",
         textEmbeddingCache: "++id,textHash,&[textHash+modelName]",
+        textCompressionCache: "++id,uncompressedTextHash,&[uncompressedTextHash+modelName+tokenLimit]",
         usageStats: "[dateHour+threadId+modelName],threadId,characterId,dateHour", // note that characterId can be derived from threadId - it's just included for quick aggregation. modelName is like "gpt-3.5-turbo", dateHour is like "2023-3-29-14"
       }).upgrade(async tx => {
 
@@ -1004,6 +1005,8 @@
         for(let shortcut of thread.shortcutButtons) {
           if(shortcut.insertionType === undefined) shortcut.insertionType = "replace";
         }
+        if(thread.currentSummaryHashChain === undefined) thread.currentSummaryHashChain = null; // NOTE: currentSummaryHashChain isn't added here since we need the thread to be fully loaded before we can calculate it (including the custom code iframe), so we have a function to access this thread property which will calculate it if it's not already calculated
+
         // WARNING: If you add something here, you may need to edit:
         // - addThread
         // - getThreadJSONById
@@ -1222,7 +1225,9 @@
 
         let summaries = json.data.data.find(d => d.tableName === "summaries");
         if(summaries) {
-          summaries.rows = summaries.rows.filter(s => keepThreadCheck(s.threadId));
+          let summaryHashesToKeep = new Set(threads.rows.map(t => t.currentSummaryHashChain ?? []).flat());
+          // Note: s.threadId only exists for 'legacy' reasons (we don't rely on it because a summary can be used by multiple threads), but it's useful here because currentSummaryHashChain is a new property and may not exist for old threads, so we can use the threadId as a backup check
+          summaries.rows = summaries.rows.filter(s => summaryHashesToKeep.has(s.hash) || keepThreadCheck(s.threadId));
         }
 
         let memories = json.data.data.find(d => d.tableName === "memories");
@@ -1481,6 +1486,8 @@
             }, {submitButtonText:"export"});
             if(!result) return;
 
+            let loadingModal = createLoadingModal("Exporting thread...");
+            
             let opts = {};
             opts.excludeUserMessagesSentHistory = true;
 
@@ -1500,6 +1507,8 @@
               let filename = encodeURIComponent(`${thread.name} - ${character.name}`.replaceAll(" ", "_")) + ".json";
               downloadTextOrBlob(JSON.stringify(json), filename);
             }
+
+            loadingModal.delete();
           });
         });
 
@@ -1528,6 +1537,8 @@
             }
           });
         });
+
+
       }
 
       function usageStatsEntriesToCost(entries) {
@@ -1585,7 +1596,10 @@
 
         let summaries = json.data.data.find(d => d.tableName === "summaries");
         if(summaries) {
-          summaries.rows = summaries.rows.filter(s => s.threadId === threadId);
+          let hashes = new Set(thread.currentSummaryHashChain || []);
+          // note: summaries shouldn't really have a threadId because they have hash as a unique key, which means if someone duplicates a thread, there is a single summary, but it's used for multiple threads.
+          // that's why we use hashes instead of threadId here. I've yet to adjust the db to remove threadId from summaries.
+          summaries.rows = summaries.rows.filter(s => hashes.has(s.hash));
         }
 
         let memories = json.data.data.find(d => d.tableName === "memories");
@@ -1641,7 +1655,7 @@
         // }
 
         // get message feed scroll position:
-        let originalScrollPosition = $.messageFeed.scrollTop;
+        // let originalScrollPosition = $.messageFeed.scrollTop;
         
         let messagesWeNeedToAdd = displayedMessages.slice(0);
 
@@ -1686,13 +1700,15 @@
           attachEventHandlersToMessageEl(messageEl);
         });
 
-        if(previouslyRenderedMessageFeedThreadId === threadId) {
-          // restore message feed scroll position:
-          $.messageFeed.scrollTop = originalScrollPosition;
-        } else {
-          // scroll to bottom of feed
-          $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
-        }
+        // if(previouslyRenderedMessageFeedThreadId === threadId) {
+        //   // restore message feed scroll position:
+        //   $.messageFeed.scrollTop = originalScrollPosition;
+        // } else {
+        //   // scroll to bottom of feed
+        //   $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
+        // }
+
+        $.messageFeed.scrollTop = $.messageFeed.scrollHeight
         
         if(displayedMessages.length === 0) {
           showEl($.noMessagesNotice);
@@ -1701,29 +1717,31 @@
         }
 
         if(messages.length > displayedMessages.length) {
-          // add a "load earlier" element at the top of the feed with an intersection observer that triggers when it's scrolled into view
-          let triggerEl = document.createElement("div");
-          triggerEl.cssText = `height:50px;`;
-          let triggerIsEnabled = true;
-          $.messageFeed.insertBefore(triggerEl, $.messageFeed.firstChild);
-          // add intersection observer
-          let observer = new IntersectionObserver((entries, observer) => {
-            entries.forEach(async entry => {
-              if(entry.isIntersecting && triggerIsEnabled) {
-                triggerIsEnabled = false;
-                let { finished } = await prependEarlierMessagesToFeed();
-                if(finished) {
-                  observer.unobserve(triggerEl);
-                  triggerEl.remove();
-                } else {
-                  // move trigger to top of message feed and enable:
-                  $.messageFeed.prepend(triggerEl);
-                  triggerIsEnabled = true;
+          setTimeout(() => { // <-- do this in a set timeout so the message feed has time to render, else it might get triggered right away
+            // add a "load earlier" element at the top of the feed with an intersection observer that triggers when it's scrolled into view
+            let triggerEl = document.createElement("div");
+            triggerEl.cssText = `height:50px;`;
+            let triggerIsEnabled = true;
+            $.messageFeed.insertBefore(triggerEl, $.messageFeed.firstChild);
+            // add intersection observer
+            let observer = new IntersectionObserver((entries, observer) => {
+              entries.forEach(async entry => {
+                if(entry.isIntersecting && triggerIsEnabled) {
+                  triggerIsEnabled = false;
+                  let { finished } = await prependEarlierMessagesToFeed();
+                  if(finished) {
+                    observer.unobserve(triggerEl);
+                    triggerEl.remove();
+                  } else {
+                    // move trigger to top of message feed and enable:
+                    $.messageFeed.prepend(triggerEl);
+                    triggerIsEnabled = true;
+                  }
                 }
-              }
+              });
             });
-          });
-          observer.observe(triggerEl);
+            observer.observe(triggerEl);
+          }, 100);
         }
 
         await updateInlineReminderMessage({aiCharacter:character, thread, showInlineReminder});
@@ -2603,8 +2621,15 @@
       let activeThreadId = null; // <-- used globally
       let activeCharacterId = null; // <-- used globally
       async function showThread(threadId) {
-        activeThreadId = threadId;
         let thread = await db.threads.get(threadId);
+
+        if(thread.currentSummaryHashChain === undefined) {
+          let { instructionHashChain } = await computeAndSaveThreadSummaryIfNeeded({threadId, exitOnFirstHashMissAndReturnHashChain:true});
+          thread.currentSummaryHashChain = instructionHashChain;
+          await db.threads.put(thread);
+        }
+
+        activeThreadId = threadId;
         activeCharacterId = thread.characterId;
 
         $.threadModelSelector.value = thread.modelName;
@@ -3100,6 +3125,7 @@
           userMessagesSentHistory: [],
           unsentMessageText: "",
           shortcutButtons: [],
+          currentSummaryHashChain: [],
         };
 
         if(aiCharacter.loreBookUrls.length > 0) {
@@ -3366,9 +3392,9 @@
               resultText = resultText.trim().replace(/^NEW TEXT: ?/, "").trim();
             } else {
               if(compressionStep < 2) { 
-                messages.push({role: "user", content: `I'm rewriting/summarizing a document to make it slightly shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding a more concise version of the "NEXT PART" section to the end of it. Add every single sentence/paragraph/etc. from "NEXT PART" to the "SO FAR" text, almost verbatim, except with slighly shorter (e.g. drop superfluous words and shorten/drop uninformative sentences where possible). Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR: ${newText.slice(0, 70)}..." and integrate a more concise version of the "NEXT PART" text to produce a new, LONGER summary.`});
+                messages.push({role: "user", content: `I'm rewriting/summarizing a document to make it slightly shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: [...] ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding a more concise version of the "NEXT PART" section to the end of it. Add every single sentence/paragraph/etc. from "NEXT PART" to the "SO FAR" text, almost verbatim, except with slighly shorter (e.g. drop superfluous words and shorten/drop uninformative sentences where possible). Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR: ${newText.slice(0, 70)}..." and integrate a more concise version of the "NEXT PART" text to produce a new, LONGER summary.`});
               } else {
-                messages.push({role: "user", content: `I'm rewriting/summarizing a document to make it a bit shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding a summarized version of the "NEXT PART" section to the end of it. Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR:" and add a summarized version of the "NEXT PART" text to the end of it. Make sure to include ALL important details in the new "SO FAR:" section - it should be LONGER than the existing one.`});
+                messages.push({role: "user", content: `I'm rewriting/summarizing a document to make it a bit shorter. Below is my work so far.\n\nSO FAR: ${newText}\n\n-----\n\nHere's what I need to add to the "SO FAR" next:\n\nNEXT PART: [...] ${chunk}${textChunks.length > chunkI+1 ? "..." : ""}\n\n-----\n\nPlease continue the "SO FAR" text by adding a summarized version of the "NEXT PART" section to the end of it. Just respond with the newly-extended "SO FAR" section - nothing else. Your response should start with "SO FAR:" and add a summarized version of the "NEXT PART" text to the end of it. Make sure to include ALL important details in the new "SO FAR:" section - it should be LONGER than the existing one.`});
               }
               resultText = await getChatCompletion({messages, modelName, temperature:0.7, threadId});
               resultText = resultText.trim().replace(/^SO FAR: ?/, "").trim();
@@ -3394,6 +3420,18 @@
           }
         }
         return currentText;
+      }
+
+      async function getThreadSummaryHashChain(threadOrThreadId) {
+        let thread = typeof threadOrThreadId === "number" ? await db.threads.get(threadOrThreadId) : threadOrThreadId;
+
+        if(thread.currentSummaryHashChain === undefined) {
+          let { instructionHashChain } = await computeAndSaveThreadSummaryIfNeeded({threadId:thread.id, exitOnFirstHashMissAndReturnHashChain:true});
+          thread.currentSummaryHashChain = instructionHashChain;
+          await db.threads.put(thread);
+        }
+
+        return thread.currentSummaryHashChain;
       }
 
       let alreadyComputingSummaryForThreadPromises = {};
@@ -3502,7 +3540,11 @@
                 return {};
               }
               if(remainingMessages.length === 0) {
-                if(continuePastCurrentSummary) return; // there isn't a full batch of messages to summarize, so we're done with the "computing ahead of current summary"
+                if(continuePastCurrentSummary) {
+                  // there isn't a full batch of messages to summarize, so we're done with the "computing ahead of current summary"
+                  // it's important that we return here because there are other operations done below that we don't want to do if this is a 'continuePastCurrentSummary' type call, rather than actually getting the summary (e.g. setting the thread's currentSummaryHashChain)
+                  return;
+                }
                 break; // no more messages
               }
               
@@ -3514,8 +3556,18 @@
 
               if(messageBatchTokenCount+tokens >= messageTokensToConsumePerSummary) {
                 // we were forced to add a message to the batch that puts us over the limit (since the batch would otherwise be empty), so we need to compress it:
-                m.content = await compressText({text:m.content, tokenLimit:messageTokensToConsumePerSummary, modelName, onProgressMessage, threadId});
+                let newText;
+                let uncompressedTextHash = await sha256Text(m.content);
+                let cacheEntry = await db.textCompressionCache.where({uncompressedTextHash, modelName, tokenLimit:messageTokensToConsumePerSummary}).first();
+                if(cacheEntry) {
+                  newText = cacheEntry.compressedText;
+                } else {
+                  newText = await compressText({text:m.content, modelName, tokenLimit:messageTokensToConsumePerSummary, onProgressMessage, threadId});
+                  await db.textCompressionCache.put({uncompressedTextHash, modelName, tokenLimit:messageTokensToConsumePerSummary, compressedText:newText, threadId});
+                }
+                m.content = newText;
                 tokens = await countTokensInMessages([m], modelName);
+                if(onProgressMessage) onProgressMessage({message:`summarizing (step ${i}, ${Math.round(progess*100)}% done)`});
               }
 
               messageBatchArr.push(m);
@@ -3778,6 +3830,8 @@
             return {};
           }
 
+          await db.threads.where({id:threadId}).modify({currentSummaryHashChain:instructionHashChain});
+
           // NOTE: prevSummary can be undefined - i.e. no summaries were needed to get messages under the tokenLimitForSummaryAndMessages limit
           return {summary:prevSummary, instructionHash:prevInstructionHash, instructionHashChain, remainingMessages}; // remainingMessages = unsummarized messages (the ones that follow the summary)
 
@@ -3849,7 +3903,12 @@
         let aiCharacter = await db.characters.get(thread.characterId);
         let userCharacter = await getUserCharacterObj(threadId);
 
-        if(!aiCharacter.customCode) return messages;
+        if(!aiCharacter.customCode.trim()) return messages;
+
+        // sometimes we need to render messages for a thread that isn't active (e.g. if user clicks thread export, and then we need to compute thread.currentSummaryHashChain because it hasn't been 'lazily' upgraded yet)
+        if(!customCodeIframes[threadId] && aiCharacter.customCode.trim()) {
+          await createNewCustomCodeIframeForThread(threadId); // this adds iframe as here: customCodeIframes[threadId]
+        }
 
         if(onProgressMessage) onProgressMessage({message:"waiting for custom code iframe..."});
         while(!customCodeIframes[threadId]) {
@@ -4366,9 +4425,10 @@
           
           // we create "batches" of memories - i.e. chronologically ordered groups of memories that are relevant and adjacent
           // use top memories as "seeds" for each batch:
-          // CAUTION: We need to `slice(0, 20)` not to stay under token limit (we drop them later if there are too many), but because we extend batches based on adjacent memories that occur in `memoryBatches`, and that can result in a looonng loop if we include very memory as a batch.
+          // CAUTION: We need to `slice(0, 20)` not to stay under token limit (we drop them later if there are too many), but because we extend batches based on adjacent memories that occur in `memoryBatches`, and that can result in a looonng loop if we include every memory as a batch.
           let memoryBatches = relevantMemories.slice(0, 20).sort((a,b) => a.index-b.index).map(m => ({memories:[m], seedMemory:m}));
-          
+          memoryBatches.sort((a,b) => b.seedMemory._relevanceScore - a.seedMemory._relevanceScore);
+
           let maxMemoryIndex = memories.at(-1)?.index ?? 0;
           let minMemoryIndex = memories[0]?.index ?? 0; // note: the term `index` is actually a misnomer here - should be `order` or something, since the `status:"noncurrent"` memories can create gaps in the `status:"current"` memories.
 
@@ -4381,7 +4441,7 @@
             let addedNext;
             let addedPrevious;
             while(true) {
-              if(batch.memories.length >= 3) break;
+              if(batch.memories.length >= 1+numPreviousToAdd+numNextToAdd) break;
               addedNext = false;
               addedPrevious = false;
 
@@ -4408,7 +4468,7 @@
               }
 
               // if we added a nextMemory or previousMemory that's the same as one of the seeds in the batches that
-              // we haven't processed yet, we should remove that batch and widen the limits on this batch
+              // we haven't processed yet, then we should remove that batch and widen the limits on this batch
               if(addedNext) {
                 let lastMemory = batch.memories.at(-1);
                 let batchToRemove = memoryBatches.slice(i+1).find(b => b.seedMemory.id === lastMemory.id);
@@ -4440,46 +4500,84 @@
           console.log("memoryBatches:", memoryBatches.slice(0));
           console.log("relevantLore:", relevantLore.slice(0));
           if(memoryBatches.length > 0 || relevantLore.length > 0) {
-            const createMemoriesAndLoreMessageContentChunks = () => {
-              let chunks = [`Some potentially helpful things/facts/happenings that may or may not be relevant:`];
+            
+            let retrievalPrefixText = `Some potentially helpful things/facts/happenings that may or may not be relevant:`;
+            let memoryPrefixText = `# Some stuff that happened previously:\n`;
+            let lorePrefixText = `# A fact or piece of world 'lore':\n`;
+            let memoryJoinerText = ` → `;
+
+            const createMemoriesAndLoreMessageContent = () => {
+              if(memoryBatches.length === 0 && relevantLore.length === 0) return "";
+
+              let chunks = [retrievalPrefixText];
               if(memoryBatches.length > 0) {
                 for(let batch of memoryBatches) {
-                  chunks.push(`A memory of a previous happening:\n${batch.memories.map(m => m.text).join(" → ")}`);
+                  chunks.push(`${memoryPrefixText}${batch.memories.map(m => m.text).join(memoryJoinerText)}`);
                 }
               }
               if(relevantLore.length > 0) {
                 for(let entry of relevantLore) {
-                  chunks.push(`A fact or piece of world 'lore':\n${entry.text}`);
+                  chunks.push(`${lorePrefixText}${entry.text}`);
                 }
               }
-              return chunks;
+              return chunks.join("\n\n");
             };
-            let textChunkToTokenCountCache = {};
-            async function countTokensInAllChunks() {
-              let chunks = createMemoriesAndLoreMessageContentChunks();
-              let joinerTokens = await countTokens("\n\n", modelName);
-              let totalTokens = 0;
-              for(let chunk of chunks) {
-                if(textChunkToTokenCountCache[chunk] === undefined) {
-                  textChunkToTokenCountCache[chunk] = await countTokens(chunk, modelName);
-                }
-                totalTokens += textChunkToTokenCountCache[chunk];
-                totalTokens += joinerTokens;
-              }
-              return totalTokens;
-            }
 
             onProgressMessage({message:"dropping mem/lore"});
-            await delay(10); // to ensure progress message is rendered in case of infinite loop below
+            await delay(10); // to ensure progress message is rendered in case of infinite loop below - helpful for bug reports
 
+            for(let batch of memoryBatches) {
+              for(let memory of batch.memories) {
+                memory._tokenCount = await countTokens(memory.text, modelName);
+              }
+            }
+            for(let entry of relevantLore) {
+              entry._tokenCount = await countTokens(entry.text, modelName);
+            }
+            let retrievalPrefixTextTokenCount = await countTokens(retrievalPrefixText, modelName);
+            let memoryPrefixTextTokenCount = await countTokens(memoryPrefixText, modelName);
+            let lorePrefixTextTokenCount = await countTokens(lorePrefixText, modelName);
+            let memoryJoinerTokenCount = await countTokens(memoryJoinerText, modelName);
+
+            function countTokensInRetrievalText() {
+              let tokensInPrefixes = retrievalPrefixTextTokenCount + memoryPrefixTextTokenCount*memoryBatches.length + lorePrefixTextTokenCount*relevantLore.length;
+              let tokensInMemories = memoryBatches.reduce((count, b) => count + b.memories.reduce((count, m) => count+m._tokenCount, 0), 0);
+              let tokensInLore = relevantLore.reduce((count, e) => count + e._tokenCount, 0);
+              let tokensInJoiners = memoryJoinerTokenCount*(memoryBatches.length-1);
+              return tokensInPrefixes + tokensInMemories + tokensInLore + tokensInJoiners;
+            }
+
+            let retrievalTextTokenCount;
+
+            function dropBatchOrMemoryFromBatch() {
+              let b = memoryBatches.pop();
+              let tokensInDroppedBatch = b.memories.reduce((count, m) => count+m._tokenCount, 0);
+              if(tokensInDroppedBatch > 0.3*retrievalTextTokenCount) {
+                // if the dropped batch is a significant fraction of the total, then we should just drop one memory from it instead - the one from either end that has lowest score
+                if(b.memories.at(0)._relevanceScore < b.memories.at(-1)._relevanceScore) {
+                  b.memories.shift();
+                } else {
+                  b.memories.pop();
+                }
+                if(b.memories.length > 0) {
+                  memoryBatches.push(b);
+                }
+              }
+            }
+            
             // drop worst entries/batches until we're under token limit allocated to memories:
-            while(await countTokensInAllChunks() > retrievedMemoriesTokenLimitFraction * availableModels[modelName].maxSequenceLength) {
+            while(1) {
+              retrievalTextTokenCount = await countTokensInRetrievalText();
+              if(retrievalTextTokenCount < retrievedMemoriesTokenLimitFraction * availableModels[modelName].maxSequenceLength) {
+                break;
+              }
+
               if(relevantLore.length === 0) {
-                memoryBatches.pop();
+                dropBatchOrMemoryFromBatch();
               } else if(memoryBatches.length === 0) {
                 relevantLore.pop();
               } else {
-                if(memoryBatches.at(-1)._relevanceScore < relevantLore.at(-1)._relevanceScore) memoryBatches.pop();
+                if(memoryBatches.at(-1)._relevanceScore < relevantLore.at(-1)._relevanceScore) dropBatchOrMemoryFromBatch();
                 else if(memoryBatches.at(-1)._relevanceScore >= relevantLore.at(-1)._relevanceScore) relevantLore.pop();
                 else throw new Error("This shouldn't happen - weird relevance score bug while dropping memories/lore.");
               }
@@ -4487,6 +4585,34 @@
             // put memoryBatches in chronological order:
             memoryBatches.sort((a,b) => a.seedMemory.id - b.seedMemory.id);
             if(memoryBatches.length > 0 || relevantLore.length > 0) {
+
+              // batch merging:
+              for(let i = 0; i < memoryBatches.length; i++) {
+                let batch = memoryBatches[i];
+                // if any of the memories in this batch are in the next batch, then we should remove the overlapping memories from the next batch and then add the remaining memories to this batch:
+                let nextBatch = memoryBatches[i+1];
+                if(nextBatch) {
+                  let memoryIdsInThisBatch = batch.memories.map(m => m.id);
+                  let memoryIdsInNextBatch = nextBatch.memories.map(m => m.id);
+                  let thereAreOverlappingMemories = memoryIdsInThisBatch.some(id => memoryIdsInNextBatch.includes(id));
+                  if(thereAreOverlappingMemories) {
+                    // add the non-overlapping memories to this batch:
+                    batch.memories.push(...nextBatch.memories.filter(m => !memoryIdsInThisBatch.includes(m.id)));
+                    // as a quick sanity check, ensure that all memory.index values are larger than the previous one:
+                    for(let j = 1; j < batch.memories.length; j++) {
+                      if(batch.memories[j].index <= batch.memories[j-1].index) {
+                        console.error("memory.index values are not in chronological order - during memory batch merging");
+                        debugger; // this shouldn't happen
+                      }
+                    }
+                    // remove next batch:
+                    memoryBatches.splice(i+1, 1);
+                    // we need to re-check this batch against the next batch, so decrement i:
+                    i--;
+                  }
+                }
+              }
+
               memoryIdBatchesUsed = memoryBatches.map(b => b.memories.map(m => m.id));
               loreIdsUsed = relevantLore.map(l => l.id);
 
@@ -4495,13 +4621,16 @@
               }
 
               let summaryMessageIndex = messagesArr.findIndex(m => m._isSummary);
-              let memoriesMessage = {role:"system", content:createMemoriesAndLoreMessageContentChunks().join("\n\n")};
-              if(summaryMessageIndex === -1) {
-                // this can happen if the user has manually added memories before the summarization stuff has started
-                messagesArr.unshift(memoriesMessage);
-              } else {
-                // insert memories message after summary message:
-                messagesArr.splice(summaryMessageIndex+1, 0, memoriesMessage);
+              let content = createMemoriesAndLoreMessageContent();
+              if(content) {
+                let memoriesMessage = {role:"system", content};
+                if(summaryMessageIndex === -1) {
+                  // this can happen if the user has manually added memories before the summarization stuff has started
+                  messagesArr.unshift(memoriesMessage);
+                } else {
+                  // insert memories message after summary message:
+                  messagesArr.splice(summaryMessageIndex+1, 0, memoriesMessage);
+                }
               }
             }
           }
@@ -5228,7 +5357,7 @@
             $.sendButton.disabled = false;
           });
 
-          $.statusNotifier.innerHTML = "<button style='font-size: 0.9rem;'>🛑 stop response</button>";
+          $.statusNotifier.innerHTML = "<button style='font-size: 0.9rem; margin-top:1.5rem;'>🛑 stop response</button>";
           $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
             e.preventDefault(); e.stopPropagation();
             signals.stop = true;
@@ -5351,7 +5480,7 @@
 
           let signals = {stop:false, wasDeleted:false};
 
-          $.statusNotifier.innerHTML = "<button data-stop-reponse-button='1' style='font-size: 0.9rem;'>🛑 stop response</button>";
+          $.statusNotifier.innerHTML = "<button data-stop-reponse-button='1' style='font-size: 0.9rem; margin-top:1.5rem;'>🛑 stop response</button>";
           $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
             e.preventDefault(); e.stopPropagation();
             signals.stop = true;
@@ -7127,7 +7256,7 @@
         iframe.style.opacity = "";
         iframe.style.display = "none";
 
-        if(isMobile && thread.customCodeWindow.visible && $.rightColumn.dataset.visible === "no") {
+        if(isMobile && activeThreadId === threadId && thread.customCodeWindow.visible && $.rightColumn.dataset.visible === "no") {
           // this is necessary (and must come before the triggerInitCustomCodeEvent call, below) because some iframes will require user interaction to initialize the thread - if dev shows the iframe, then they probably want the mobile user to see it first (new users probably wouldn't know to click the button that shows the iframe)
           $.toggleRightColumnButton.click();
         }
@@ -7589,7 +7718,7 @@
         let messages = await db.messages.where("threadId").equals(threadId).toArray();
         messages.sort((a,b) => a.order - b.order);
 
-        $.statusNotifier.innerHTML = "<button style='font-size: 0.9rem;'>🛑 stop response</button>";
+        $.statusNotifier.innerHTML = "<button style='font-size: 0.9rem; margin-top:1.5rem;'>🛑 stop response</button>";
         $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
           e.preventDefault(); e.stopPropagation();
           signals.stop = true;
@@ -8147,6 +8276,9 @@
 
         $.importDataFileInput.value = "";
 
+        let loadingModal = createLoadingModal(`Importing data...<br><span style="font-size:80%; opacity:0.6;">This could take a while if the file is large.</span>`);
+        await delay(50); // give the loading modal a chance to render
+
         let success = false;
         try {
           if(await tryImportingDexieFile(file, options).catch(e => "fail") === "finished") {
@@ -8157,6 +8289,8 @@
             success = true;
           }
         } catch(e) {}
+
+        loadingModal.delete();
 
         if(!success) {
           alert("The file that you're importing doesn't seem to be a valid format. If you think it is valid, please report this as a bug on Github or Discord.");
@@ -8171,9 +8305,9 @@
         const originalDbJsonText = await db.export({prettyJson: true}).then(blob => blob.text());
 
         let singleThreadImportId = null;
-        let loadingModal;
 
         try {
+
           try {
             let json = JSON.parse(await new Blob([file]).text());
             if(!json.formatName && json.type === "application/json" && json.uri?.startsWith("file:///")) {
@@ -8193,8 +8327,6 @@
           let json = JSON.parse(await new Blob([file]).text());
 
           if(!json.data || !json.data.data) return "fail";
-
-          loadingModal = createLoadingModal(`Importing data...<br><span style="font-size:80%; opacity:0.6;">This could take a while if the file is large.</span>`);
 
           // TODO: I should probably convert IDs to UUIDs so I don't need to do this sort of thing, but this is fine for now. Note: If you do this, you need to update the export modal because it currently uses comma-separated IDs
           
@@ -8216,6 +8348,7 @@
           let importedUsageStats = json.data.data.find(d => d.tableName === "usageStats")?.rows;
           let importedMemories = json.data.data.find(d => d.tableName === "memories")?.rows;
           let importedLore = json.data.data.find(d => d.tableName === "lore")?.rows;
+          let importedTextCompressionCacheEntries = json.data.data.find(d => d.tableName === "textCompressionCache")?.rows;
           
           const existingCharacters = await db.characters.toArray();
 
@@ -8370,6 +8503,12 @@
             }
           }
 
+          if(importedTextCompressionCacheEntries) {
+            for(let entry of importedTextCompressionCacheEntries) {
+              entry.threadId = threadIdMap[entry.threadId];
+            }
+          }
+
           // if there's just one thread, then we assume it was from a single-thread export
           // and in that case we probably don't want isFav to persist, and we also probably
           // want that thread to be at the top - i.e. lastMessageTime = now
@@ -8509,6 +8648,7 @@
             });
           }
 
+
           // TODO: should probably update the lastMessageTime of each charactersThatWeAlreadyHave to be the time of their last message, since this could be wrong now 
 
         } catch(e) {
@@ -8517,10 +8657,8 @@
           downloadTextOrBlob(originalDbJsonText, `opencharacters-export-${yyyymmdd}.json`);
           await delay(1000);
           alert(`There was an error importing your data. Your data has been downloaded as a backup. Please share this error message on Github:\n\n${e.message}\n\n${e.stack}`);
-          if(loadingModal) loadingModal.delete();
           return "fail";
         }
-        if(loadingModal) loadingModal.delete();
         
         await renderCharacterList(); // <-- in case they're currently on the character screen
         await renderThreadList();
@@ -8676,13 +8814,6 @@
         return "finished";
       }
 
-      await renderThreadList();
-
-      let customPostPageLoadMainThreadCode = (await db.misc.get("customPostPageLoadMainThreadCode"))?.value || "";
-      if(customPostPageLoadMainThreadCode.trim()) {
-        eval(customPostPageLoadMainThreadCode);
-      }
-
       // parse url hash as json
       let ignoreHashChange = false;
       async function checkForHashCommand() {
@@ -8738,6 +8869,13 @@
         }
       });
 
+      await renderThreadList();
+
+      let customPostPageLoadMainThreadCode = (await db.misc.get("customPostPageLoadMainThreadCode"))?.value || "";
+      if(customPostPageLoadMainThreadCode.trim()) {
+        eval(customPostPageLoadMainThreadCode);
+      }
+
       if(await checkForHashCommand() === null) {
         // if there are no threads, show the character selection screen
         if(!$("#chatThreads .thread")) {
@@ -8746,8 +8884,10 @@
           // otherwise click the most recently-interacted-with thread
           let allThreads = await db.threads.orderBy("lastViewTime").reverse().toArray();
           let thread = allThreads[0];
-          $.chatThreads.dataset.currentFolderPath = thread.folderPath;
-          await renderThreadList();
+          if($.chatThreads.dataset.currentFolderPath !== thread.folderPath) {
+            $.chatThreads.dataset.currentFolderPath = thread.folderPath;
+            await renderThreadList();
+          }
           let el = $.chatThreads.querySelector(`.thread[data-thread-id="${thread.id}"]`);
           if(!el) el = $.chatThreads.querySelector(`.thread`); // in case the 'last viewed' thread is in a different folder to the 'last messaged' thread (renderThreadList shows last messaged thread)
           el.click();
