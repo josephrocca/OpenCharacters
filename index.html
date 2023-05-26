@@ -1156,6 +1156,8 @@
         });
         if(!result) return;
 
+        let loadingModal = createLoadingModal(`Please wait...<br><span style="font-size:80%; opacity:0.6;">This could take a while if you have a lot of data.</span>`);
+
         const blob = await db.export({prettyJson: true});
         const json = JSON.parse(await blob.text());
 
@@ -1255,6 +1257,8 @@
 
         let yyyymmdd = new Date().toISOString().split("T")[0];
         downloadTextOrBlob(JSON.stringify(json), `opencharacters-export-${yyyymmdd}.json`);
+
+        loadingModal.delete();
       });
 
       // This renders the list of threads in the left column.
