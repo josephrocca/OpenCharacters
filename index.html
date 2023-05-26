@@ -5419,8 +5419,10 @@
             await addMessageToFeed(messageObj, {character, inPlaceOf:messageEl})
             if(shouldScrollDown) $.messageFeed.scrollTop = $.messageFeed.scrollHeight;
 
-            // we don't await this because we want to do it in the background
-            computeAndSaveThreadSummaryIfNeeded({threadId, continuePastCurrentSummary:true});
+            if(character.fitMessagesInContextMethod === "summarizeOld") {
+              // we don't await this because we want to do it in the background
+              computeAndSaveThreadSummaryIfNeeded({threadId, continuePastCurrentSummary:true});
+            }
             
             messageEl.dataset.canDelete = "true";
             await triggerMessageActionCustomCodeEvent({threadId, eventData:{}, eventName:"MessageAdded"});
@@ -6614,8 +6616,10 @@
 
         await db.threads.update(threadId, {unsentMessageText:$.messageInput.value});
 
-        // we don't `await` this because we want it to happen in the background
-        computeAndSaveThreadSummaryIfNeeded({threadId});
+        if(threadCharacter.fitMessagesInContextMethod === "summarizeOld") {
+          // we don't `await` this because we want it to happen in the background
+          computeAndSaveThreadSummaryIfNeeded({threadId});
+        }
 
         let messageCount = await db.messages.count();
         if(await db.threads.count() === 1 && (messageCount === 4 || messageCount === 5)) {
