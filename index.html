@@ -911,6 +911,7 @@
 
       function upgradeCharacterFromOldVersion(character) {
         upgradeCharacterInitialMessagesArrayIfNeeded(character);
+        if(character.customCode === undefined) character.customCode = "";
         if(character.modelVersion) {
           character.modelName = character.modelVersion;
           delete character.modelVersion;
@@ -1160,6 +1161,7 @@
 
         const blob = await db.export({prettyJson: true});
         const json = JSON.parse(await blob.text());
+        // const json = await (new Response(blob)).json(); // <-- a hack to go straight from blob to json
 
         let keepThreadCheck;
         let keepCharacterCheck;
@@ -8016,6 +8018,13 @@
         resizeMessageInputTextAreaToFitContent();
       });
 
+      $.messageInput.addEventListener("input", async e => {
+        if($.messageInput.value.length % 10 === 0) {
+          await delay(10);
+          resizeMessageInputTextAreaToFitContent();
+        }
+      });
+
       $.clearDataButton.addEventListener("click", async function() {
         if(!confirm("🚨 Are you sure you want to DELETE ALL DATA? This cannot be undone. 🚨")) {
           return;
@@ -8512,9 +8521,17 @@
           }
 
           if(importedTextCompressionCacheEntries) {
+            let alreadyGot = new Set();
             for(let entry of importedTextCompressionCacheEntries) {
               entry.threadId = threadIdMap[entry.threadId];
+              let uniqueKey = entry.uncompressedTextHash + "-<<-|->>-" + entry.modelName + "-<<-|->>-" + entry.tokenLimit;
+              if(alreadyGot.has(uniqueKey)) {
+                entry.shouldRemove = true;
+              } else {
+                alreadyGot.add(uniqueKey);
+              }
             }
+            importedTextCompressionCacheEntries = importedTextCompressionCacheEntries.filter(entry => !entry.shouldRemove);
           }
 
           // if there's just one thread, then we assume it was from a single-thread export
