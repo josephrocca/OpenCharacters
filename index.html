@@ -8310,7 +8310,7 @@
         loadingModal.delete();
 
         if(!success) {
-          alert("The file that you're importing doesn't seem to be a valid format. If you think it is valid, please report this as a bug on Github or Discord.");
+          alert("The file that you're importing doesn't seem to be a valid format, or something went wrong during import. If you think your file is valid, please report this as a bug on Github or Discord.");
         }
 
         await updateModelList();
@@ -8521,14 +8521,17 @@
           }
 
           if(importedTextCompressionCacheEntries) {
-            let alreadyGot = new Set();
+            
+            let existingEntries = await db.textCompressionCache.toArray();
+            let alreadyGotEntryKeys = new Set(existingEntries.map(entry => entry.uncompressedTextHash + "-<<-|->>-" + entry.modelName + "-<<-|->>-" + entry.tokenLimit));
+
             for(let entry of importedTextCompressionCacheEntries) {
               entry.threadId = threadIdMap[entry.threadId];
               let uniqueKey = entry.uncompressedTextHash + "-<<-|->>-" + entry.modelName + "-<<-|->>-" + entry.tokenLimit;
-              if(alreadyGot.has(uniqueKey)) {
+              if(alreadyGotEntryKeys.has(uniqueKey)) {
                 entry.shouldRemove = true;
               } else {
-                alreadyGot.add(uniqueKey);
+                alreadyGotEntryKeys.add(uniqueKey);
               }
             }
             importedTextCompressionCacheEntries = importedTextCompressionCacheEntries.filter(entry => !entry.shouldRemove);
