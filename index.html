@@ -8529,12 +8529,12 @@
               entry.threadId = threadIdMap[entry.threadId];
               let uniqueKey = entry.uncompressedTextHash + "-<<-|->>-" + entry.modelName + "-<<-|->>-" + entry.tokenLimit;
               if(alreadyGotEntryKeys.has(uniqueKey)) {
-                entry.shouldRemove = true;
+                entry.__shouldRemove = true;
               } else {
                 alreadyGotEntryKeys.add(uniqueKey);
               }
             }
-            importedTextCompressionCacheEntries = importedTextCompressionCacheEntries.filter(entry => !entry.shouldRemove);
+            importedTextCompressionCacheEntries = importedTextCompressionCacheEntries.filter(entry => !entry.__shouldRemove);
           }
 
           // if there's just one thread, then we assume it was from a single-thread export
@@ -8629,6 +8629,9 @@
           }
           if(importedLore) {
             json.data.data.find(d => d.tableName === "lore").rows = importedLore;
+          }
+          if(importedTextCompressionCacheEntries) {
+            json.data.data.find(d => d.tableName === "textCompressionCache").rows = importedTextCompressionCacheEntries;
           }
 
           // delete old apiUsage table/data
