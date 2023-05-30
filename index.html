@@ -5391,6 +5391,7 @@
             if(e.name !== "AbortError") {
               alert("There was an error during doBotReplyIfNeeded:\n\n"+e.stack);
             }
+            messageEl.remove();
             return {};
           });
           messageEl.querySelector(".statusMessage").innerHTML = "";
@@ -5560,7 +5561,7 @@
           }
         } catch(e) {
           console.error(e);
-          alert("Recompute bot reply failed:\n"+e.stack);
+          alert("regenerateMessage failed:\n"+e.stack);
         }
 
         alreadyRecomputingBotReply = false;
@@ -7752,6 +7753,7 @@
           if(e.name !== "AbortError") {
             alert("There was an error during doBotReplyInPlaceOfUser:\n\n"+e.stack);
           }
+          messageEl.remove();
           return {};
         });
         messageEl.querySelector(".statusMessage").innerHTML = "";
@@ -7771,7 +7773,7 @@
 
         messageObj.expectsReply = expectsReply;
 
-        // if `message` is falsy, it means the bot failed to reply, so delete the message and end the loop
+        // if `message` is falsy, it means the bot failed to reply, so delete the message
         if(typeof message !== "string") {
           messageEl.remove();
           return false;
