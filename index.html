@@ -1431,7 +1431,9 @@
         $.chatThreads.querySelectorAll(".thread").forEach(thread => {
           thread.addEventListener("click", async function() {
             const threadId = parseInt(thread.dataset.threadId);
+            let loadingModal = createLoadingModal("Loading...");
             await showThread(threadId);
+            loadingModal.delete();
           });
         });
         $.chatThreads.querySelectorAll(".thread .favStar").forEach(favStarEl => {
