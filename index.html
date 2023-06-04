@@ -4764,7 +4764,7 @@
         }, 100);
         setTimeout(() => {
           clearInterval(abortCheckInterval); // hacky, but just in case this code below throws an error before it reaches the clearInterval
-        }, 1000*60);
+        }, 1000*60*10) // <-- must be longer than the longest possible response time
 
         if(modelType === "chat-completion") {
 
