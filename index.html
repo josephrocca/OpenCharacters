@@ -5357,6 +5357,7 @@
           messageEl.dataset.canDelete = "false"; // to tell delete handler that this message "doesn't exist" yet - we handle the deletion in this function instead
 
           if(!signals) signals = {stop:false, wasDeleted:false};
+
           messageEl.querySelector(".info .deleteButton").addEventListener("click", async e => {
             e.preventDefault(); e.stopPropagation();
             signals.stop = true;
@@ -5493,6 +5494,13 @@
 
           let signals = {stop:false, wasDeleted:false};
 
+          messageEl.querySelector(".info .deleteButton").addEventListener("click", async e => {
+            e.preventDefault(); e.stopPropagation();
+            signals.stop = true;
+            signals.wasDeleted = true;
+            messageEl.remove();
+          });
+
           $.statusNotifier.innerHTML = "<button data-stop-reponse-button='1' style='font-size: 0.9rem; margin-top:1.5rem;'>🛑 stop response</button>";
           $.statusNotifier.querySelector("button").addEventListener("click", async (e) => {
             e.preventDefault(); e.stopPropagation();
@@ -5522,6 +5530,10 @@
 
           hideEl($.statusNotifier);
           $.statusNotifier.innerHTML = "";
+
+          if(signals.wasDeleted || message === undefined) {
+            return;
+          }
 
           if(message === undefined) {
             await addMessageToFeed(messageObj, {inPlaceOf:messageEl});
