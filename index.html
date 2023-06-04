@@ -2434,8 +2434,10 @@
           
           // create a new thread if they click a character
           characterEl.addEventListener("click", async function() {
+            let loadingModal = createLoadingModal("Loading...");
             let characterId = parseInt(characterEl.dataset.characterId);
             await createNewThreadWithCharacterId(characterId);
+            loadingModal.delete();
           });
         });
       }
