@@ -7991,6 +7991,7 @@
       });
 
       function resizeMessageInputTextAreaToFitContent() {
+        $.messageInput.style.height = "";
         let height = Math.min(window.innerHeight*0.75, $.messageInput.scrollHeight);
         $.messageInput.style.height = height + "px";
       }
