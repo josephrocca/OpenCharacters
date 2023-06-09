@@ -1159,9 +1159,8 @@
 
         let loadingModal = createLoadingModal(`Please wait...<br><span style="font-size:80%; opacity:0.6;">This could take a while if you have a lot of data.</span>`);
 
-        const blob = await db.export({prettyJson: true});
-        const json = JSON.parse(await blob.text());
-        // const json = await (new Response(blob)).json(); // <-- a hack to go straight from blob to json
+        const blob = await db.export({prettyJson:true, numRowsPerChunk:100});
+        const json = await new Response(blob).json(); // use Response hack instead of JSON.parse(await blob.text()) to avoid maximum string length errors
 
         let keepThreadCheck;
         let keepCharacterCheck;
@@ -1574,8 +1573,8 @@
         let threadCharacters = await db.characters.where("id").anyOf(threadCharacterIds).toArray();
         let threadCharacterLoreBookUrls = [...new Set(threadCharacters.map(c => c.loreBookUrls).flat())];
 
-        const blob = await db.export({prettyJson: true});
-        const json = JSON.parse(await blob.text());
+        const blob = await db.export({prettyJson: true, numRowsPerChunk:100});
+        const json = await new Response(blob).json(); // use Response hack instead of JSON.parse(await blob.text()) to avoid maximum string length errors
 
         // in case I add a new table and forget to update this function, tables must be explicitely allowed here:
         let tableNamesAllowList = ["characters", "threads", "messages", "summaries", "memories", "usageStats", "lore"];
@@ -8338,7 +8337,7 @@
 
       async function tryImportingDexieFile(file, options) {
         // backup existing data just in cast this wrecks the db for some reason (used in catch block below):
-        const originalDbJsonText = await db.export({prettyJson: true}).then(blob => blob.text());
+        const originalDbJsonBlob = await db.export({prettyJson:true, numRowsPerChunk:100});
 
         let singleThreadImportId = null;
 
@@ -8360,7 +8359,8 @@
             // db = await Dexie.import(file); // this wasn't doing a version upgrade, and I'm not sure how to trigger it, so I'm just using the code below which was written for partial imports (but also works for full imports), and does the version upgrade manually
           }
 
-          let json = JSON.parse(await new Blob([file]).text());
+          let json = await new Response(new Blob([file])).json(); // a hack to go straight from blob to json to avoid maximum string length errors
+          // let json = JSON.parse(await new Blob([file]).text());
 
           if(!json.data || !json.data.data) return "fail";
 
@@ -8664,6 +8664,7 @@
 
           // convert json back to blob and import
           let blob = new Blob([JSON.stringify(json)], {type: "application/json"});
+          
           await db.import(blob, {acceptVersionDiff:true, acceptMissingTables:true});
 
           if(loreEntriesToAddAfterImport.length > 0) {
@@ -8704,7 +8705,7 @@
         } catch(e) {
           console.error(e);
           let yyyymmdd = new Date().toISOString().split("T")[0];
-          downloadTextOrBlob(originalDbJsonText, `opencharacters-export-${yyyymmdd}.json`);
+          downloadTextOrBlob(originalDbJsonBlob, `opencharacters-export-${yyyymmdd}.json`);
           await delay(1000);
           alert(`There was an error importing your data. Your data has been downloaded as a backup. Please share this error message on Github:\n\n${e.message}\n\n${e.stack}`);
           return "fail";
