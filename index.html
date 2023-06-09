@@ -557,7 +557,7 @@
     <audio id="musicPlayer" style="display:none;"></audio>
 
     <script type="module">
-      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadTextOrBlob, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet, htmlToElement } from "./utils.js?v=33";
+      import { $, $$, delay, showEl, hideEl, prompt2, createFloatingWindow, sanitizeHtml, textToSpeech, sha256Text, dedent, downloadTextOrBlob, createGpt3Tokenizer, cosineDistance, createLoadingModal, applyObjectOverrides, objectKeysAndTypesAreValid, addBackgroundToElement, importStylesheet, htmlToElement, jsonToBlob } from "./utils.js?v=34";
 
       let JSON5;
       (async function() {
@@ -8663,7 +8663,8 @@
           miscData.rows = miscData.rows.filter(m => !existingMiscKeys.includes(m.key));
 
           // convert json back to blob and import
-          let blob = new Blob([JSON.stringify(json)], {type: "application/json"});
+          // let blob = new Blob([JSON.stringify(json)], {type: "application/json"});
+          let blob = jsonToBlob(json);
           
           await db.import(blob, {acceptVersionDiff:true, acceptMissingTables:true});
 
