@@ -510,7 +510,7 @@
               <button id="messageFeedOpenLeftColumnButton" class="openLeftColumnButton" style="display:none; background: var(--button-bg);border-radius: var(--border-radius);border: 1px solid var(--button-border-color);padding: 0.25rem; min-width: 2rem; height: 100%; margin-right:0.5rem;">☰</button>
               <div style="background: var(--button-bg); display:flex; height: 100%; border-radius: var(--border-radius);border: 1px solid var(--button-border-color);padding: 0.25rem;">
                 <div style="display: flex;align-items: center;font-size:var(--button-font-size);margin-right: 0.25rem;">model:</div>
-                <select id="threadModelSelector" style="max-width:100px;"></select>
+                <select id="threadModelSelector" style="max-width:130px;"></select>
               </div>
               <!-- <div id="threadSettingsButton" style="margin-left:0.5rem; cursor:pointer;   background: var(--button-bg); display:flex; height: 100%; border-radius: var(--border-radius);border: 1px solid var(--button-border-color);padding: 0.25rem;">
                 <div style="display: flex;align-items: center;justify-content:center;font-size:var(--button-font-size);min-width:1.5rem;">⚙️</div>
@@ -1122,7 +1122,8 @@
 
       // for openai and webgpu/webnn models (i.e. you don't need to setup your own inference server, and most people already have an openai account):
       let broadlyAvailableModels = [
-        {name:"gpt-3.5-turbo", shortLabel:"gpt-3.5-turbo - good/fast/cheap", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"chat-completion", tokenPricing:{prompt: 0.002, completion: 0.002}},
+        {name:"gpt-3.5-turbo", shortLabel:"gpt-3.5-turbo - good/fast/cheap", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"chat-completion", tokenPricing:{prompt: 0.0015, completion: 0.002}},
+        {name:"gpt-3.5-turbo-16k", shortLabel:"gpt-3.5-turbo-16k - 4x longer memory/context", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:16384, type:"chat-completion", tokenPricing:{prompt: 0.003, completion: 0.004}},
         {name:"text-davinci-003", shortLabel:"text-davinci-003 - good/expensive", endpointUrl:"https://api.openai.com/v1/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"completion", tokenPricing:{prompt: 0.02, completion: 0.02}},
         {name:"gpt-4", shortLabel:"gpt-4 - excellent, but expensive (need access via openai waitlist)", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:8192, type:"chat-completion", tokenPricing:{prompt: 0.03, completion: 0.06}},
         {name:"text-embedding-ada-002", shortLabel:"text-embedding-ada-002", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:8192, type:"text-embedding", tokenPricing:{prompt:0.0004, completion: 0.0004}},
@@ -3221,7 +3222,7 @@
         let modelObj = availableModels[modelName];
 
         // TODO: get actual GPT-4 tokenizer
-        if(modelName === "gpt-3.5-turbo" || modelName === "text-davinci-003" || modelName === "gpt-4") {
+        if(modelName.startsWith("gpt-3.5-turbo") || modelName.startsWith("text-davinci-003") || modelName.startsWith("gpt-4")) {
           if(!gpt3Tokenizer) gpt3Tokenizer = createGpt3Tokenizer();
           modelNameToTokenizerCache[modelName] = gpt3Tokenizer;
           return gpt3Tokenizer;
