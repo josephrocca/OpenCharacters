@@ -1684,15 +1684,17 @@
         // shift messages off `messagesWeNeedToAdd` until we find one that doesn't *exactly* match the same-index element that is already in the feed
         let lastMatchingMessageEl;
         let preexistingMessageEls = [];
-        for(let messageEl of $.messageFeed.querySelectorAll(".message")) {
-          let messageObj = messagesWeNeedToAdd[0];
-          let messageObjHash = await sha256Text(JSON.stringify(messageObj));
-          if(messageEl.dataset.hash === messageObjHash) {
-            lastMatchingMessageEl = messageEl;
-            messagesWeNeedToAdd.shift();
-            preexistingMessageEls.push(messageEl);
-          } else {
-            break;
+        if(!opts.forceFullRender) {
+          for(let messageEl of $.messageFeed.querySelectorAll(".message")) {
+            let messageObj = messagesWeNeedToAdd[0];
+            let messageObjHash = await sha256Text(JSON.stringify(messageObj));
+            if(messageEl.dataset.hash === messageObjHash) {
+              lastMatchingMessageEl = messageEl;
+              messagesWeNeedToAdd.shift();
+              preexistingMessageEls.push(messageEl);
+            } else {
+              break;
+            }
           }
         }
 
@@ -6598,12 +6600,11 @@
                   warningMessage += `\n\nIt's best to do any name changes at the start of the thread, before summaries${threadCharacter.associativeMemoryMethod !== "none" ? " and memories" : ""} start to be computed/stored.`;
                   alert(warningMessage);
                 }
-
               } else if(message.startsWith("/avatar ")) {
                 thread.userCharacter.avatar.url = arg;
               }
               await db.threads.put(thread);
-              await renderMessageFeed(threadId);
+              await renderMessageFeed(threadId, {forceFullRender:true});
               $.messageInput.value = "";
             } else {
 
