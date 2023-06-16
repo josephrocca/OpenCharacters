@@ -1,5 +1,5 @@
 # Running Python Code
-You can use [Pyodide](https://github.com/pyodide/pyodide) to run Python in the browser. Note that not all Python will run in the Pyodide runtime yet, but support for more Python functionality gets added with each new version. You can request support for packages/features [here](https://github.com/pyodide/pyodide/issues), but be sure to search for existing issues first. 
+You can use [Pyodide](https://github.com/pyodide/pyodide) to run Python in the browser. Note that not all Python packages will run in the Pyodide runtime yet, but support for more Python functionality gets added with each new version. You can request support for packages/features [here](https://github.com/pyodide/pyodide/issues), but be sure to search for existing issues first. 
 
 To get started with Pyodide, try pasting this code in the custom code input box in the advanced area of the character editor:
 ```js
