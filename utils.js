@@ -667,14 +667,10 @@ export function jsonToBlob(json) {
       const entries = Array.isArray(value) ? value : Object.entries(value);
       for(let i = 0; i < entries.length; i++) {
         if(Array.isArray(value)) {
-          if(typeof entries[i] !== "function") {
-            blobParts.push(processValue(typeof entries[i] !== "undefined" ? entries[i] : null));
-          }
+          blobParts.push(processValue(entries[i]));
         } else {
           const [key, val] = entries[i];
-          if(typeof val !== "undefined" && typeof val !== "function") {
-            blobParts.push(textEncoder.encode(JSON.stringify(key) + ':'), processValue(val));
-          }
+          blobParts.push(textEncoder.encode(JSON.stringify(key) + ':'), processValue(val));
         }
         if(i !== entries.length - 1) blobParts.push(textEncoder.encode(','));
       }
@@ -682,9 +678,11 @@ export function jsonToBlob(json) {
       const startBracket = Array.isArray(value) ? '[' : '{';
       const endBracket = Array.isArray(value) ? ']' : '}';
       return new Blob([textEncoder.encode(startBracket), ...blobParts, textEncoder.encode(endBracket)]);
+    } else if(typeof value === 'function' || typeof value === 'undefined') {
+      return textEncoder.encode("null");
     } else {
       // For primitives we just convert it to string and encode
-      return textEncoder.encode(JSON.stringify(typeof value !== "function" ? value : null));
+      return textEncoder.encode(JSON.stringify(value));
     }
   }
 
