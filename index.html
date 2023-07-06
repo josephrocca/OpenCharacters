@@ -6040,6 +6040,8 @@
           || /\bi'm sorry.+(appropriate|acceptable)\b/.test(t)
           || /\bi apologi[zs]e.+(appropriate|acceptable)\b/.test(t)
           || /\b(i (can't|cannot) (assist|help)( you|) with that)\b/.test(t)
+          || /\b(i'm |)sorry, i (can't|cannot)\b/.test(t.slice(0, 50))
+          || /\bunfortunately,? i (can't|cannot)\b/.test(t.slice(0, 50))
       }
 
       async function messageEditButtonClickHandler(e) {
