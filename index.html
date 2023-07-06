@@ -6039,6 +6039,7 @@
           || /\bas an ai\b/.test(t)
           || /\bi'm sorry.+(appropriate|acceptable)\b/.test(t)
           || /\bi apologi[zs]e.+(appropriate|acceptable)\b/.test(t)
+          || /\b(i (can't|cannot) (assist|help)( you|) with that)\b/.test(t)
       }
 
       async function messageEditButtonClickHandler(e) {
