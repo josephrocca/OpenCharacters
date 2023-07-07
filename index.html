@@ -2687,8 +2687,8 @@
         }, 200);
         
         document.querySelectorAll("#chatThreads .thread").forEach(el => el.classList.remove("selected"));
-        const threadEl = $.chatThreads.querySelector(`.thread[data-thread-id="${threadId}"]`);
-        threadEl.classList.add("selected");
+        let threadEl = $.chatThreads.querySelector(`.thread[data-thread-id="${threadId}"]`);
+        if(threadEl) threadEl.classList.add("selected"); // `if(threadEl)` because it may not be visible if it's hidden by "show more" button due to the above `renderThreadList` call
         
         document.querySelectorAll("#middleColumn > .middleColumnScreen").forEach(el => hideEl(el));
         showEl($.chatInterface);
