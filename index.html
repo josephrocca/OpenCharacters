@@ -3171,7 +3171,10 @@
           await getOpenAiApiKey(); // so we have it for embedTexts
         }
 
-        await ensureLoreUrlsAreLoaded({loreBookUrls:aiCharacter.loreBookUrls, modelName:aiCharacter.textEmbeddingModelName});
+        await ensureLoreUrlsAreLoaded({loreBookUrls:aiCharacter.loreBookUrls, modelName:aiCharacter.textEmbeddingModelName}).catch(e => {
+          console.error("Error loading lore urls:", e);
+          alert("Error loading lore urls: "+e);
+        });
 
         // when a thread is first created, we copy across the character's userCharacter as a starting point for the `thread.userCharacter` - after that, the `aiCharacter.userCharacter` is not relevant to the thread (i.e. thread's userCharacter can diverge from the character's 'template' userCharacter)
         applyObjectOverrides({object:threadObj.userCharacter, overrides:aiCharacter.userCharacter});
@@ -6528,7 +6531,10 @@
                 let controls = {}; // this will get populated with `data` object that is proxied such that we can update the values of the inputs in reloadButtonClickHandler.
 
                 async function reloadButtonClickHandler() {
-                  await ensureLoreUrlsAreLoaded({loreBookUrls:character.loreBookUrls, modelName:thread.textEmbeddingModelName});
+                  await ensureLoreUrlsAreLoaded({loreBookUrls:character.loreBookUrls, modelName:thread.textEmbeddingModelName}).catch(e => {
+                    console.error("Error loading lore urls:", e);
+                    alert("Error loading lore urls: "+e);
+                  });
                   loreBookUrlEntries = await db.lore.where("bookUrl").anyOf(character.loreBookUrls).toArray();
                   controls.data.loreBookUrlEntriesText = loreBookUrlEntries.map(m => `${m.text}`).join("\n\n");
                 }
