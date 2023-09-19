@@ -12,9 +12,9 @@ If you open your user settings and click the button to show advanced options, yo
 ### Step 2:
 Run this command in your terminal:
 ```bash
-docker run --rm -p 80:80 -e MODEL=databricks/dolly-v2-3b hyperonym/basaran:0.17.2
+docker run --rm -p 80:80 -e MODEL=databricks/dolly-v2-3b hyperonym/basaran:0.19.0
 ```
-You can change `databricks/dolly-v2-3b` to any* Hugging Face language model (see [this list](https://huggingface.co/models?pipeline_tag=text-generation)), and you can change `0.17.2` to the latest version from [here](https://hub.docker.com/r/hyperonym/basaran/tags).
+You can change `databricks/dolly-v2-3b` to any* Hugging Face language model (see [this list](https://huggingface.co/models?pipeline_tag=text-generation)), and you can change `0.19.0` to the latest version from [here](https://hub.docker.com/r/hyperonym/basaran/tags) (note: 0.21.1 has a [bug](https://github.com/hyperonym/basaran/issues/253)).
 
 *[Currently](https://github.com/xenova/transformers.js/issues/93), the model must use the newer "fast tokenizer" format - it should have a `tokenizer.json` file in its Hugging Face repo.
 
@@ -56,7 +56,7 @@ Note that, if you do end up finding an API wrapper, you'll still want to use the
 
 ### Swapping out OpenAI API for an exact duplicate/proxy
 
-There are some services which duplicate OpenAI's APIs *exactly* because they're actually just proxying it or have licensed access to OpenAI's models (e.g. Azure). The custom model config doesn't fully support this use case yet, so if you run into any troubles with the custom model configs, you can instead run the following code after page load using the "after page load" custom code box in your user settings:
+There are some services which duplicate OpenAI's APIs *exactly* (including the actual model names) because they're actually just proxying it or have licensed access to OpenAI's models (e.g. Azure). The custom model config doesn't fully support this use case yet, so if you run into any troubles with the custom model configs, you can instead run the following code after page load using the "after page load" custom code box in your user settings:
 ```js
 let proxyHandler = {
   apply: async function (target, thisArg, argumentsList) {
