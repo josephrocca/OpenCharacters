@@ -1124,13 +1124,18 @@
       let broadlyAvailableModels = [
         {name:"gpt-3.5-turbo", shortLabel:"gpt-3.5-turbo - good/fast/cheap", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"chat-completion", tokenPricing:{prompt: 0.0015, completion: 0.002}},
         {name:"gpt-3.5-turbo-16k", shortLabel:"gpt-3.5-turbo-16k - 4x longer memory", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:16384, type:"chat-completion", tokenPricing:{prompt: 0.003, completion: 0.004}},
-        {name:"text-davinci-003", shortLabel:"text-davinci-003 - creative/expensive, DEPRECATED by openai soon", endpointUrl:"https://api.openai.com/v1/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"completion", tokenPricing:{prompt: 0.02, completion: 0.02}},
+        {name:"gpt-3.5-turbo-instruct", shortLabel:"gpt-3.5-turbo-instruct - good/fast/cheap", endpointUrl:"https://api.openai.com/v1/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"completion", tokenPricing:{prompt: 0.0015, completion: 0.002}},
         // {name:"gpt-3.5-turbo-instruct", shortLabel:"gpt-3.5-turbo-instruct - more controllable", endpointUrl:"https://api.openai.com/v1/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"completion", tokenPricing:{prompt: 0.0015, completion: 0.002}},
         {name:"gpt-4", shortLabel:"gpt-4 - excellent, 2x longer memory, expensive", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:8192, type:"chat-completion", tokenPricing:{prompt: 0.03, completion: 0.06}},
-        {name:"gpt-3.5-turbo-0301", shortLabel:"gpt-3.5-turbo - old version, DEPRECATED by openai soon", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"chat-completion", tokenPricing:{prompt: 0.0015, completion: 0.002}},
-        {name:"gpt-4-0314", shortLabel:"gpt-4 - old version, DEPRECATED by openai soon", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:8192, type:"chat-completion", tokenPricing:{prompt: 0.03, completion: 0.06}},
+        {name:"text-davinci-003", shortLabel:"text-davinci-003 - creative/expensive, DEPRECATED Jan 2024", endpointUrl:"https://api.openai.com/v1/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"completion", tokenPricing:{prompt: 0.02, completion: 0.02}},
+        {name:"gpt-3.5-turbo-0301", shortLabel:"gpt-3.5-turbo-0301, old/DEPRECATED June 2024", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"chat-completion", tokenPricing:{prompt: 0.0015, completion: 0.002}},
+        {name:"gpt-4-0314", shortLabel:"gpt-4-0314, old/DEPRECATED June 2024", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:8192, type:"chat-completion", tokenPricing:{prompt: 0.03, completion: 0.06}},
         {name:"text-embedding-ada-002", shortLabel:"text-embedding-ada-002", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:8192, type:"text-embedding", tokenPricing:{prompt:0.0004, completion: 0.0004}},
       ];
+
+      if(Date.now() > new Date("2024-01-04").getTime()) {
+        broadlyAvailableModels = broadlyAvailableModels.filter(m => m.name !== "text-davinci-003");
+      }
       
       async function updateModelList() {
         // console.log("updateModelList");
@@ -3132,7 +3137,7 @@
         if(modelName === "good") modelName = "gpt-3.5-turbo";
         if(modelName === "great") {
           if(userModelCapabilities["gpt-4"]?.canRun) modelName = "gpt-4";
-          else modelName = "text-davinci-003";
+          else modelName = Date.now() < new Date("2024-01-04").getTime() ? "text-davinci-003" : "gpt-3.5-turbo-instruct";
         }
 
         // get highest bookId value:
@@ -5716,7 +5721,8 @@
         });
 
         messageEl.querySelector(".recomputeWithAltModelButton").addEventListener("click", async function() {
-          await regenerateMessage(messageEl, {modelNameOverride:"text-davinci-003"});
+          let modelNameOverride = Date.now() < new Date("2024-01-04").getTime() ? "text-davinci-003" : "gpt-3.5-turbo-instruct";
+          await regenerateMessage(messageEl, {modelNameOverride});
         });
 
 
