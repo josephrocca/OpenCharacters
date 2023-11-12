@@ -2595,6 +2595,8 @@
         let folderPath = $.chatThreads.dataset.currentFolderPath;
         const thread = await addThread({name:defaultThreadName, characterId, folderPath});
 
+        await renderThreadList();
+        
         const character = await db.characters.get(characterId);
         let userCharacter = await getUserCharacterObj(thread.id);
 
