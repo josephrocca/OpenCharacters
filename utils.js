@@ -225,6 +225,9 @@ export async function prompt2(specs, opts={}) {
         return el.value;
       }
     });
+    opts.controls.submit = function() {
+      ctn.querySelector("button.submit").click();
+    };
     opts.controls.cancel = function() {
       promptResolver(null);
     };
