@@ -5872,7 +5872,7 @@
           let messages = await db.messages.where("threadId").equals(threadId).toArray();
           messages.sort((a,b) => a.order - b.order);
           let lastMessage = messages[messages.length-1];
-          let lastMessageEl = $.messageFeed.querySelector(".message:last-child");
+          let lastMessageEl = [...$.messageFeed.querySelectorAll(".message")].pop();
           if(e.key === "ArrowRight") {
             // the `lastMessage.variants` array has `null` in the position of the 'current' message, so if null is at the end of the array, and they pressed right arrow, then we recompute:
             if(lastMessage.variants[lastMessage.variants.length-1] === null) {
