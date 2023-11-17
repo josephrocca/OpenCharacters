@@ -9021,5 +9021,21 @@
    
     </script>
 
+    <script>
+      try {
+        let isSafari = navigator.vendor && navigator.vendor.indexOf('Apple') > -1 && navigator.userAgent && navigator.userAgent.indexOf('CriOS') == -1 && navigator.userAgent.indexOf('FxiOS') == -1;
+        let isTouchScreen = window.matchMedia("(pointer: coarse)").matches;
+        if(isSafari && window.innerWidth < 800) {
+          let viewportMetaEl = document.querySelector("[name=viewport]");
+          if(!viewportMetaEl.getAttribute("content").includes("maximum-scale")) {
+            viewportMetaEl.setAttribute("content", viewportMetaEl.getAttribute("content") + ", maximum-scale=1");
+          }
+          console.log("Safari iOS detected. Added maximum-scale attribute to prevent zooming:", viewportMetaEl.getAttribute("content"));
+        }
+      } catch(e) {
+        console.error(e);
+      }
+    </script>
+
   </body>
 </html>
