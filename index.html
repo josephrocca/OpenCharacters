@@ -3556,6 +3556,7 @@
           }
 
           let memoryIdsToSetToCurrent = [];
+          let highestMemoryIndexInCurrentMemories = -1;
           // let memories = await db.memories.where({threadId});
           // memories.sort((a,b) => a.index - b.index);
           // if(aiCharacter.autoGenerateMemories === "v1") {
@@ -3778,16 +3779,18 @@
 
                 let embeddings = await embedTexts({textArr:memories, modelName:embeddingModelName, shouldCache:true});
 
-                let existingThreadMemories = await db.memories.where({threadId, status:"current"}).toArray();
-                existingThreadMemories.sort((a,b) => a.index - b.index);
-                let previousMemory = existingThreadMemories.at(-1);
-                let previousMemoryIndex = previousMemory ? previousMemory.index : -1;
-                let i = 0;
-                let memoryObjsToAdd = [];
+                // let existingThreadMemories = await db.memories.where({threadId, status:"current"}).toArray();
+                // existingThreadMemories.sort((a,b) => a.index - b.index);
+                // let previousMemory = existingThreadMemories.at(-1);
+                // let previousMemoryIndex = previousMemory ? previousMemory.index : -1;
+                // let i = 0;
+                // let memoryObjsToAdd = [];
+                let previousMemoryIndex = highestMemoryIndexInCurrentMemories;
                 for(let memory of memories) {
                   let embedding = embeddings[i];
                   memoryObjsToAdd.push({summaryHash:hash, threadId, text:memory, characterId, embeddings:{[embeddingModelName]:embedding}, status:"current", index:previousMemoryIndex+1, triggers:[]});
                   previousMemoryIndex++;
+                  highestMemoryIndexInCurrentMemories = previousMemoryIndex;
                   addToDebugLog(`<b>added memory:</b> ${memory}`);
                   console.log("added memory:", memory);
                   i++;
@@ -3820,6 +3823,11 @@
               // There's already an existing summary that matches this instruction hash.
               // mark the existing memories that match this summary has as current/valid:
               let memories = await db.memories.where({summaryHash:hash, threadId}).toArray();
+              for(let m of memories) {
+                if(m.index > highestMemoryIndexInCurrentMemories) {
+                   highestMemoryIndexInCurrentMemories = m.index;
+                }
+              }
               memoryIdsToSetToCurrent.push(...memories.map(m => m.id));
             }
 
