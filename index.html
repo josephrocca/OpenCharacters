@@ -3197,6 +3197,7 @@
         let urlI = 0;
         for(let url of loreBookUrls) {
           let downloadUrl;
+          let origin = new URL(url).origin;
           if(origin.endsWith("jsdelivr.net")
             || (origin.endsWith("huggingface.co") && url.includes("/resolve/"))
             || origin === "https://raw.githubusercontent.com"
