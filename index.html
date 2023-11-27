@@ -3783,8 +3783,8 @@
                 // existingThreadMemories.sort((a,b) => a.index - b.index);
                 // let previousMemory = existingThreadMemories.at(-1);
                 // let previousMemoryIndex = previousMemory ? previousMemory.index : -1;
-                // let i = 0;
-                // let memoryObjsToAdd = [];
+                let i = 0;
+                let memoryObjsToAdd = [];
                 let previousMemoryIndex = highestMemoryIndexInCurrentMemories;
                 for(let memory of memories) {
                   let embedding = embeddings[i];
