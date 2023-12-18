@@ -1,0 +1,528 @@
+div#leftColumn {
+    background-color: #000000;
+}
+
+.thread {
+    border: solid 1px #202123 !important;
+    color: white;
+}
+
+.avatar {
+    display: none;
+}
+
+.thread.selected {
+    background-color: #202123 !important;
+}
+
+button#settingsButton {
+    background-color: #202123;
+    border: none;
+    color: white;
+}
+
+button#clearDataButton {
+    background-color: #202123;
+    border: none;
+    color: white;
+}
+
+button#exportDataButton {
+    background-color: #202123;
+    border: none;
+    color:  white;
+}
+
+button.appOptionButton {
+    background-color: #202123;
+    border: none;
+    color: white;
+}
+
+button#newThreadButton {
+    background-color: #000000;
+    border: none;
+    color: white;
+}
+
+button#closeLeftColumnButton {
+    background-color: #000000;
+    border: 1px solid #202123;
+    color: white;
+}
+
+div#builtInChatInterfaceWrapper {
+    background-color: #343541;
+}
+
+#messageFeedHeaderBar > div {
+    background-color: #343541 !important;
+    border: 0.5px solid #4F5053;
+    padding-right: 5px;
+    padding-left: 10px;
+}
+
+#messageFeedHeaderBar > div > div {
+    color: white;
+}
+
+select#threadModelSelector {
+    margin-top: -2px;
+    background-color: transparent;
+    overflow: overlay;border: none;
+    color: #C5C5D3;
+}
+
+.messageWrap {
+    margin-top: 25px;
+/*    max-width: 680px;*/
+    /* background-color: green; */
+/*    padding-right: 25%;*/
+}
+
+.characterName {
+    color: #ECECF1;
+}
+
+.messageText {
+    margin-top: 15px !important;
+}
+
+.messageText {
+    color: #D1D5DB;
+}
+
+textarea#messageInput {
+    padding: 10px;
+    color: white;
+    background-color: #202123;
+    border: solid 0.5px #4F5053;
+    border-radius: 5px;
+}
+
+div#builtInChatInterfaceWrapper {
+/*    display: flex;
+    align-items: center;*/
+}
+
+#inputWrapper > div:nth-child(3) {
+/*    min-width: 680px; */
+}
+
+button#sendButton {
+    color: white;
+    background-color: #343541;
+    border-color: #555561;
+    border-radius: 5px;
+}
+
+button#threadOptionsButton {
+    color: white;
+    background-color: #343541;
+    border-color: #555561;
+    border-radius: 5px;
+}
+
+body > div:nth-child(10) > div > div {
+    padding: 25px !important;
+    background-color: #202123 !important;
+    border: none !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+    color: white;}
+
+.sectionLabel {
+    margin-bottom: 15px !important;
+    color: #999999;
+    font-weight: 300;
+    font-size: 80% !important;
+}
+
+a {
+    color: #AB6AFF !important;
+    text-decoration: none;
+}
+
+body > div:nth-child(10) > div > div > div.sectionsContainer > section:nth-child(6) > div.sectionLabel {
+    font-size: 70%;
+    line-height: 1.5;
+}
+
+body > div:nth-child(10) > div > div > div.sectionsContainer > section:nth-child(6) > div:nth-child(2) > div > textarea {
+    background-color: #2B2C2E;
+    border: none !important;
+    padding: 10px !important;
+    font-size: 80%;
+}
+
+button.submit {
+    background-color: #0FA37F;
+    border: none;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+    padding-left: 25px !important;
+    padding-right: 25px !important;
+    border-radius: 8px;
+    color: white;
+}
+
+button.submit:hover {
+    opacity: 0.8;
+}
+
+button.cancel {
+    background-color: #202123;
+    color: #D9D9E3;
+    border: 0.5px solid #56596A;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+    padding-left: 25px !important;
+    padding-right: 25px !important;
+    border-radius: 8px;
+}
+
+div#characterSelection {
+    background-color: #343541;
+}
+
+div#starterCharacterList {
+    display: none;
+}
+
+#characterSelection > div:nth-child(5) {
+    display: none;
+}
+
+.character {
+    border-color: #56596A !important;
+    border-radius: 5px !important;
+    padding: 10px !important;
+}
+
+#characterList > div > div.info > div.name {
+    color: #C5C5D3  !important;
+    font-size: 14px;
+}
+
+div#noMessagesNotice {
+    color: #FFFFFF;
+}
+
+#characterSelection > div:nth-child(2) > h2 {
+    display: none;
+}
+
+.character:hover {
+    background-color: #404150;
+}
+
+.buttons > button {
+    background-color: #202123 !important;
+    color: white !important;
+    padding: 5px;
+    border: none;
+}
+
+button#newCharacterButton {
+    border-color: #56596A !important;
+    border-radius: 5px !important;
+    padding: 10px !important;
+    background-color: #343541;
+    color: white;
+}
+
+button#newCharacterButton:hover {
+    background-color: #202123;
+}
+
+input#threadSearchInput {
+    background-color: #000000;
+    border-color: #202123;
+    color: white;
+}
+
+button#threadSearchButton {
+    background-color: #000000;
+    border-color: #202123;
+}
+
+.thread:hover {
+    background-color: #151617;
+}
+
+span.name {
+    color: #EAEAEF !important;
+    font-weight: 100;
+}
+
+button#newThreadButton:hover {
+    background-color: #202123;
+}
+
+button#closeLeftColumnButton:hover {
+    background-color: #202123;
+}
+
+button.appOptionButton:hover {
+    background-color: #000000 !important;
+    border: solid 1px #202123!important;
+}
+
+button.appOptionButton {
+    color: #C5C5D3 !important;
+}
+
+button#threadSearchButton:hover {
+    background-color: #202123;
+}
+
+button#sendButton:hover {
+    background-color: #202123;
+}
+
+button#threadOptionsButton:hover {
+    background-color: #202123;
+}
+
+#messageFeedHeaderBar > div:hover {
+    background-color: #202123 !important;
+}
+
+.promptModalInnerContainer > div {
+    border-radius: 12px !important;
+    background: #202123 !important;
+    box-shadow: none !important;
+    border: solid 0.2px #3A3A47 !important;
+}
+
+
+button.cancel:hover {
+    background-color: #404151;
+}
+
+.sectionsContainer input {
+    background-color: #2B2C2E;
+    border: none !important;
+    padding: 10px !important;
+}
+
+.structuredInputSection input {
+    background-color: #2B2C2E !important;
+    border: none !important;
+    padding: 10px !important;
+    color: white;
+}
+
+.structuredInputSection textarea {
+    background-color: #2B2C2E;
+    border: none !important;
+    padding: 10px !important;
+    font-size: 80%;
+    color: white;
+}
+
+.structuredInputSection select {
+    background-color: #2B2C2E;
+    border: none !important;
+    padding: 10px !important;
+    color: white;
+}
+
+button.showHidden {
+    border: none;
+    background-color: #202123;
+    color: #999999;
+    padding: 10px !important;
+}
+
+button.showHidden:hover {
+    border-radius: 10px;
+    background-color: black!important;
+}
+
+.messageText {
+/*    max-width: 620px !important;*/
+}
+
+pre.hljs {
+    background-color: black !important;
+}
+
+.messageText {
+    font-size: 80%;
+}
+
+select#threadModelSelector {
+    cursor: pointer;
+}
+
+div#statusNotifier > button {
+    background-color: #202123;
+    padding: 5px;
+    color: #D2D2D7;font-size: 80%;
+    border: 0.5px solid #555561;
+    font-size: 70% !important;
+    border-radius: 5px;
+    
+}
+
+div#statusNotifier > button:hover {
+    background-color: #18191A;
+}
+
+code {
+    background-color: black !important;
+}
+
+div#threadOptionsPopup {
+    background: transparent !important;
+    border: none !important;
+}
+
+button#addShortcutButton {
+    background-color: #202123 !important;
+    border: 0.5px solid #4F5053 !important;
+    padding: 10px;
+    color: #89898a;
+}
+
+button#addShortcutButton:hover {
+    color: white;
+}
+
+div#userMessagesSentHistoryCtn > div {
+    background-color: #2a2c2f !important;
+    border: 0.5px solid #545460 !important;
+    color: #d1d5db;
+    font-size: 80%;
+}
+
+.historyItem:hover {
+    background: none !important;
+    opacity: 0.8;
+}
+
+button#messageFeedOpenLeftColumnButton {
+    background-color: #202123 !important;
+    border: 1px solid #202123;
+    color: white;
+}
+
+button#messageFeedOpenLeftColumnButton:hover {
+    background-color: green;
+}
+
+div#builtInChatInterfaceWrapper {
+    /* padding-left: 25%; */
+    /* padding-right: 25%; */
+}
+
+div#chatBackgroundCtn {
+    padding-left: 25% !important;
+}
+
+div#messageFeed {
+/*    padding-left: 20%;
+    padding-right: 10;*/
+}
+
+div#inputWrapper {
+/*    padding-left: 20% !important;
+    padding-right: 20% !important;*/
+}
+
+button#characterSelectionOpenLeftColumnButton {
+    background-color: #343541 !important;
+    color: white;
+    border: 1px solid #565A6B !important;
+}
+
+button#characterSelectionOpenLeftColumnButton:hover {
+    background-color: #404151 !important;
+}
+
+button#messageFeedOpenLeftColumnButton {
+    background-color: #343541 !important;
+    color: white;
+    border: 1px solid #565A6B !important;
+}
+
+button#messageFeedOpenLeftColumnButton:hover {
+    background-color: #404151 !important;
+}
+
+.statusMessage {
+    color: #d1d5db;
+}
+
+.window {
+    background-color: #202123 !important;
+    color: #999999 !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 15px;
+    border-radius: 10px !important;
+}
+
+.closeButton {
+    background-color: black !important;
+    width: auto;
+}
+
+.header {
+    color: white;
+    border-bottom: 0.8px solid #333436 !important;
+    padding-bottom: 15px !important;
+}
+
+body > div.window > div.body div {
+    font-size: 80% !important;
+}
+
+div.messageWrap button {
+    border: 0.5px solid #5c6371 !important;
+    background-color: black !important;
+    padding: 5px !important;
+}
+
+div.messageWrap button:hover {
+    background-color: #404151 !important;
+}
+
+body > div:nth-child(9) > div > div {
+    color: white;
+    font-size: 85%;
+}
+
+button.insertAbove {
+    background-color: #202123;
+    border: 0.5px solid #565a6b;
+    font-size: 80%;
+    padding: 5px;
+}
+
+button.insertAbove:hover {
+    background-color: black;
+}
+
+button.insertBelow {
+    background-color: #202123;
+    border: 0.5px solid #565a6b;
+    font-size: 80%;
+    padding: 5px;
+}
+
+button.insertBelow:hover {
+    background-color: black;
+}
+
+.undoMessageDeleteButton button {
+    border: 1px solid #4f5053;
+    padding: 5px;
+    background-color: #343541;
+    color: white;
+}
+
+.undoMessageDeleteButton button:hover {
+    background-color: #202123;
+}
