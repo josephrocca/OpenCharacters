@@ -407,11 +407,6 @@ button#messageFeedOpenLeftColumnButton:hover {
     background-color: green;
 }
 
-div#builtInChatInterfaceWrapper {
-    /* padding-left: 25%; */
-    /* padding-right: 25%; */
-}
-
 div#chatBackgroundCtn {
     padding-left: 25% !important;
 }
@@ -425,6 +420,8 @@ div#messageFeed {
 div#inputWrapper {
     display: flex;
     align-items: center;
+    padding: 0px;
+    padding-bottom: 0.5em;
 }
 
 button#characterSelectionOpenLeftColumnButton {
@@ -536,5 +533,10 @@ button.insertBelow:hover {
 
 #inputWrapper > div:nth-child(3) {
     width: 100% !important;
-    max-width: 600px !important;
+    max-width: 680px !important;
+}
+
+.messageText {
+    font-size: 16px;
+    line-height: 1.5;
 }
