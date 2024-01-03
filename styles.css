@@ -530,11 +530,11 @@ button.insertBelow:hover {
 }
 
 .message {
-    min-width: 600px !important;
-    max-width: 100% !important;
+    width: 100% !important;
+    max-width: 600px !important;
 }
 
 #inputWrapper > div:nth-child(3) {
-    min-width: 600px !important;
-    max-width: 100% !important;
+    width: 100% !important;
+    max-width: 600px !important;
 }
