@@ -100,15 +100,6 @@ textarea#messageInput {
     border-radius: 5px;
 }
 
-div#builtInChatInterfaceWrapper {
-/*    display: flex;
-    align-items: center;*/
-}
-
-#inputWrapper > div:nth-child(3) {
-/*    min-width: 680px; */
-}
-
 button#sendButton {
     color: white;
     background-color: #343541;
@@ -426,13 +417,14 @@ div#chatBackgroundCtn {
 }
 
 div#messageFeed {
-/*    padding-left: 20%;
-    padding-right: 10;*/
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
 }
 
 div#inputWrapper {
-/*    padding-left: 20% !important;
-    padding-right: 20% !important;*/
+    display: flex;
+    align-items: center;
 }
 
 button#characterSelectionOpenLeftColumnButton {
@@ -535,4 +527,14 @@ button.insertBelow:hover {
     border-color: #202123 !important;
     color: white;
     font-size: 80%;
+}
+
+.message {
+    min-width: 600px !important;
+    max-width: 100% !important;
+}
+
+#inputWrapper > div:nth-child(3) {
+    min-width: 600px !important;
+    max-width: 100% !important;
 }
