@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
     <meta name="referrer" content="no-referrer">
-    <link rel="icon" type="image/x-icon" href="/assets/privategpt48.png">
+    <link rel="icon" type="image/x-icon" href="./assets/privategpt48.png">
     <link rel="stylesheet" type="text/css" href="styles.css">
     <title>PrivateGPT</title>
 
@@ -2679,7 +2679,7 @@
         let characterObj = await db.characters.get(thread.characterId);
 
         updateFavicon(characterObj.avatar.url);
-        document.title = `${characterObj.name} - ${thread.name} - OpenCharacters`;
+        document.title = `${characterObj.name} - ${thread.name} - PrivateGPT`;
 
         $.chatThreads.dataset.currentFolderPath = thread.folderPath;
         await renderThreadList();
@@ -4213,7 +4213,7 @@
           link.rel = 'icon';
           document.head.appendChild(link);
         }
-        link.href = url || "https://user-images.githubusercontent.com/1167575/236043589-96770b23-4378-4114-9807-7dfad8e72f71.png";
+        link.href = url || "./assets/privategpt48.png";
       }
       updateFavicon();
 
