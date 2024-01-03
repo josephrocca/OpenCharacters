@@ -57,7 +57,7 @@ div#builtInChatInterfaceWrapper {
 
 #messageFeedHeaderBar > div {
     background-color: #343541 !important;
-    border: 0.5px solid #4F5053;
+    border: 0.5px solid #555561;
     padding-right: 5px;
     padding-left: 10px;
 }
@@ -197,6 +197,7 @@ div#starterCharacterList {
     border-color: #56596A !important;
     border-radius: 5px !important;
     padding: 10px !important;
+    background-color: #404150;
 }
 
 #characterList > div > div.info > div.name {
@@ -213,7 +214,7 @@ div#noMessagesNotice {
 }
 
 .character:hover {
-    background-color: #404150;
+    background-color: #343541;
 }
 
 .buttons > button {
@@ -229,6 +230,7 @@ button#newCharacterButton {
     padding: 10px !important;
     background-color: #343541;
     color: white;
+    margin-top: 5px;
 }
 
 button#newCharacterButton:hover {
@@ -485,13 +487,13 @@ div.messageWrap button {
     padding: 5px !important;
 }
 
-div.messageWrap button:hover {
-    background-color: #404151 !important;
-}
-
 body > div:nth-child(9) > div > div {
     color: white;
     font-size: 85%;
+}
+
+.promptModalInnerContainer {
+    padding-top: 5% !important;
 }
 
 button.insertAbove {
@@ -525,4 +527,10 @@ button.insertBelow:hover {
 
 .undoMessageDeleteButton button:hover {
     background-color: #202123;
+}
+
+.threadFolder {
+    border-color: #202123 !important;
+    color: white;
+    font-size: 80%;
 }
