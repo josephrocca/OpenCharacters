@@ -167,7 +167,9 @@ button.submit {
 }
 
 button.submit:hover {
+    background-color: #0FA37F !important;
     opacity: 0.8;
+
 }
 
 button.cancel {
