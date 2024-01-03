@@ -235,6 +235,7 @@ input#threadSearchInput {
     background-color: #000000;
     border-color: #202123;
     color: white;
+    display: block !important;
 }
 
 button#threadSearchButton {
