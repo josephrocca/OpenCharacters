@@ -57,7 +57,7 @@ div#builtInChatInterfaceWrapper {
 
 #messageFeedHeaderBar > div {
     background-color: #343541 !important;
-    border: 0.5px solid #555561;
+    border: 0.5px solid #555561 !important;
     padding-right: 5px;
     padding-left: 10px;
 }
