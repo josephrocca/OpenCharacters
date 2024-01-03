@@ -556,3 +556,7 @@ button {
 #messageFeedHeaderBar > div {
     text-transform: capitalize;
 }
+
+#appOptions > button {
+    display: none;
+}
