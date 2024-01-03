@@ -248,7 +248,7 @@ button#threadSearchButton {
 
 span.name {
     color: #EAEAEF !important;
-    font-weight: 100;
+    font-weight: 80;
 }
 
 button#newThreadButton:hover {
