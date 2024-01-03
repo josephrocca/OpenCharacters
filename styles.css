@@ -547,3 +547,11 @@ button.insertBelow:hover {
 #chatThreads > div > div.info > div:nth-child(3) > span:nth-child(3) {
     display: none !important;
 }
+
+button {
+    text-transform: capitalize;
+}
+
+#messageFeedHeaderBar > div {
+    text-transform: capitalize;
+}
