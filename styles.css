@@ -5,6 +5,7 @@ div#leftColumn {
 .thread {
     border: solid 1px #202123 !important;
     color: white;
+    padding: 15px !important;
 }
 
 .avatar {
@@ -420,8 +421,10 @@ div#messageFeed {
 div#inputWrapper {
     display: flex;
     align-items: center;
-    padding: 0px;
-    padding-bottom: 0.5em;
+    padding-top: 0px !important;
+    padding-left: 0px !important;
+    padding-right: 0px !important;
+    padding-bottom: 0.5em !important;
 }
 
 button#characterSelectionOpenLeftColumnButton {
