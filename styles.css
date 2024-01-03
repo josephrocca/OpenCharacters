@@ -405,7 +405,7 @@ button#messageFeedOpenLeftColumnButton {
 }
 
 button#messageFeedOpenLeftColumnButton:hover {
-    background-color: green;
+    background-color: #202123 !important;
 }
 
 div#chatBackgroundCtn {
@@ -542,4 +542,8 @@ button.insertBelow:hover {
 .messageText {
     font-size: 16px;
     line-height: 1.5;
+}
+
+#chatThreads > div > div.info > div:nth-child(3) > span:nth-child(3) {
+    display: none !important;
 }
