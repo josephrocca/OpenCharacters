@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
     <meta name="referrer" content="no-referrer">
-    <link rel="icon" type="image/x-icon" href="./assets/privategpt48.png">
+    <link rel="icon" type="image/x-icon" href="./assets/privategpt128.png">
     <link rel="stylesheet" type="text/css" href="styles.css">
     <title>PrivateGPT</title>
 
@@ -466,7 +466,7 @@
           <button id="closeLeftColumnButton" style="cursor:pointer;min-height:2rem;margin-left: 0.5rem;min-width: 2rem;">☰</button>
         </div>
         <div id="threadSearchCtn" style="display:flex; width:100%; margin-top:0.5rem;">
-          <input id="threadSearchInput" style="height: 100%; flex-grow: 1; min-width: 0; padding-left: 0.5rem;" type="text" placeholder="search threads...">
+          <input id="threadSearchInput" style="height: 100%; flex-grow: 1; min-width: 0; padding-left: 0.5rem;" type="text" placeholder="Search threads...">
           <button id="threadSearchButton" style="cursor:pointer;min-height: 2rem;min-width: 2rem;margin-left: 0.5rem;">🔎</button>
         </div>
         <!-- <div id="threadFolderNavigationBar" style="display:flex; width:100%; margin-top:0.5rem;">
@@ -476,15 +476,15 @@
         <div id="chatThreads" data-current-folder-path=""></div>
         <div id="appOptions">
           <div style="display:flex;">
-            <button id="settingsButton" class="appOptionButton">⚙️ settings</button>
+            <button id="settingsButton" class="appOptionButton">settings</button>
             <!-- <button id="statsButton" class="appOptionButton" style="margin-left: 0.5rem; width: 2rem;">📊</button> -->
           </div>
           <div style="display: flex;">
             <button id="clearDataButton" class="appOptionButton" style="width: 4rem;">🗑️</button>
-            <button id="exportDataButton" class="appOptionButton" style="margin-left: 0.5rem; margin-right: 0.5rem;">💾 export</button>
-            <button class="appOptionButton" style="position:relative;">📁 import<input id="importDataFileInput" style="position:absolute; top:0; left:0; right:0; bottom:0; opacity:0; cursor:pointer;" type="file"></button>
+            <button id="exportDataButton" class="appOptionButton" style="margin-left: 0.5rem; margin-right: 0.5rem;">export</button>
+            <button class="appOptionButton" style="position:relative;">import<input id="importDataFileInput" style="position:absolute; top:0; left:0; right:0; bottom:0; opacity:0; cursor:pointer;" type="file"></button>
           </div>
-          <button onclick="window.open('https://github.com/josephrocca/OpenCharacters/blob/main/README.md')" class="appOptionButton">❓ about this project <span style="font-size:0.6rem; opacity:0.5;">001</span></button>
+          <button onclick="window.open('https://github.com/josephrocca/OpenCharacters/blob/main/README.md')" class="appOptionButton">about this project <span style="font-size:0.6rem; opacity:0.5;">001</span></button>
         </div>
       </div>
 
@@ -4213,7 +4213,7 @@
           link.rel = 'icon';
           document.head.appendChild(link);
         }
-        link.href = url || "./assets/privategpt48.png";
+        link.href = url || "./assets/privategpt128.png";
       }
       updateFavicon();
 

@@ -401,7 +401,7 @@ div#userMessagesSentHistoryCtn > div {
 
 button#messageFeedOpenLeftColumnButton {
     background-color: #202123 !important;
-    border: 1px solid #202123;
+    border: 0.5px solid #555561;
     color: white;
 }
 
