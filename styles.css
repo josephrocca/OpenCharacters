@@ -401,7 +401,7 @@ div#userMessagesSentHistoryCtn > div {
 
 button#messageFeedOpenLeftColumnButton {
     background-color: #202123 !important;
-    border: 0.5px solid #555561;
+    border: 0.5px solid #555561 !important;
     color: white;
 }
 
@@ -441,7 +441,6 @@ button#characterSelectionOpenLeftColumnButton:hover {
 button#messageFeedOpenLeftColumnButton {
     background-color: #343541 !important;
     color: white;
-    border: 1px solid #565A6B !important;
 }
 
 button#messageFeedOpenLeftColumnButton:hover {
