@@ -3206,7 +3206,8 @@
             downloadUrl = url;
           } else {
             // code for this CORS proxy server is here: https://replit.com/@joe64/opencharacters-cors-proxy
-            downloadUrl = "https://opencharacters-cors-proxy.joe64.repl.co?url=" + encodeURIComponent(url);
+            // EDIT: Moved to Glitch since Replit raised prices to an absurd $6/month for a 0.25 vCPU machine in Jan 2024 (no more "Always On" machines - only "Deployments" now).
+            downloadUrl = "https://opencharacters-cors-proxy.glitch.me/?url=" + encodeURIComponent(url);
           }
           let text = await fetch(downloadUrl).then(r => r.text());
           let entryTextArr = text.replace(/\r/g, "").split(/\n{2,}/).map(entry => entry.trim()).filter(entry => entry);
