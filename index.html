@@ -1128,10 +1128,10 @@
         {name:"gpt-3.5-turbo-16k", shortLabel:"gpt-3.5-turbo-16k - 4x longer memory", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:16384, type:"chat-completion", tokenPricing:{prompt: 0.001, completion: 0.002}},
         {name:"gpt-3.5-turbo-instruct", shortLabel:"gpt-3.5-turbo-instruct - good/fast/cheap", endpointUrl:"https://api.openai.com/v1/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"completion", tokenPricing:{prompt: 0.0015, completion: 0.002}},
         // {name:"gpt-3.5-turbo-instruct", shortLabel:"gpt-3.5-turbo-instruct - more controllable", endpointUrl:"https://api.openai.com/v1/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"completion", tokenPricing:{prompt: 0.0015, completion: 0.002}},
+        {name:"gpt-4-turbo-32k", shortLabel:"gpt-4-turbo - excellent, 4x longer memory", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:32768, type:"chat-completion", tokenPricing:{prompt: 0.01, completion: 0.03}},
         {name:"gpt-4", shortLabel:"gpt-4 - excellent, 2x longer memory, expensive", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:8192, type:"chat-completion", tokenPricing:{prompt: 0.03, completion: 0.06}},
         {name:"text-davinci-003", shortLabel:"text-davinci-003 - creative/expensive, DEPRECATED Jan 2024", endpointUrl:"https://api.openai.com/v1/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"completion", tokenPricing:{prompt: 0.02, completion: 0.02}},
         {name:"gpt-3.5-turbo-0301", shortLabel:"gpt-3.5-turbo-0301, old/DEPRECATED June 2024", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:4096, type:"chat-completion", tokenPricing:{prompt: 0.0015, completion: 0.002}},
-        {name:"gpt-4-0314", shortLabel:"gpt-4-0314, old/DEPRECATED June 2024", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:8192, type:"chat-completion", tokenPricing:{prompt: 0.03, completion: 0.06}},
         {name:"text-embedding-ada-002", shortLabel:"text-embedding-ada-002", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:8192, type:"text-embedding", tokenPricing:{prompt:0.0004, completion: 0.0004}},
         {name:"gpt-4o-mini", shortLabel:"gpt-4o-mini - good/fast/cheap", endpointUrl:"https://api.openai.com/v1/chat/completions", modelUrl:null, apiKey:"<OPENAI>", maxSequenceLength:128000, type:"chat-completion", tokenPricing:{prompt: 0.000015, completion: 0.002}},
 
@@ -3210,7 +3210,8 @@
             downloadUrl = url;
           } else {
             // code for this CORS proxy server is here: https://replit.com/@joe64/opencharacters-cors-proxy
-            downloadUrl = "https://opencharacters-cors-proxy.joe64.repl.co?url=" + encodeURIComponent(url);
+            // EDIT: Moved to Glitch since Replit raised prices to an absurd $6/month for a 0.25 vCPU machine in Jan 2024 (no more "Always On" machines - only "Deployments" now).
+            downloadUrl = "https://opencharacters-cors-proxy.glitch.me/?url=" + encodeURIComponent(url);
           }
           let text = await fetch(downloadUrl).then(r => r.text());
           let entryTextArr = text.replace(/\r/g, "").split(/\n{2,}/).map(entry => entry.trim()).filter(entry => entry);
@@ -6844,7 +6845,8 @@
               // Just use 'fetch' as normal and this proxy will be used automatically.
               // Note: I was originally trying a normal fetch and then only falling back to this CORS proxy if it failed, but the problem with that is that this would hit the endpoint twice, which may have side effects, and the user might not want that.
               // I may eventually have to add manual "exemptions" to skip proxying certain URLs that don't need it - like huggingface models, for example, since we could start to become bandwidth limited.
-              const proxiedUrl = "https://opencharacters-cors-proxy.joe64.repl.co?url=" + encodeURIComponent(url);
+              // EDIT: Moved to Glitch since Replit raised prices to an absurd $6/month for a 0.25 vCPU machine in Jan 2024 (no more "Always On" machines - only "Deployments" now).
+              const proxiedUrl = "https://opencharacters-cors-proxy.glitch.me?url=" + encodeURIComponent(url);
               try {
                 if(typeof argumentsList[0] === "object") {
                   argumentsList[0] = new Request(proxiedUrl, argumentsList[0]);
