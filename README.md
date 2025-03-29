@@ -1,6 +1,6 @@
 # Known Forks:
 
-* https://github.com/markphaedrus/OpenCharacters
+* https://github.com/markphaedrus/OpenCharacters (See: https://github.com/josephrocca/OpenCharacters/issues/74)
 
 ---
 
