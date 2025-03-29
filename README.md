@@ -1,3 +1,9 @@
+# Known Forks:
+
+* https://github.com/markphaedrus/OpenCharacters
+
+---
+
 (**Note**: This repo is in maintenance mode at the moment - bug fixes and small updates only. If you're working on adding substantial new features via a fork, please open an issue with a link and I'll put it here. Note that the system is very extensible via your character's [custom code](https://github.com/josephrocca/OpenCharacters/blob/main/docs/custom-code.md), so you should see if it's possible to achieve the feature that you want via that.)
 
 ![banner](https://user-images.githubusercontent.com/1167575/225629372-eb4de08a-ed62-4660-a83d-6e42a5c092d7.jpg)
